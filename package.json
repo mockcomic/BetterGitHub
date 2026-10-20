@@ -6,8 +6,8 @@
   "author": "KH",
   "license": "MIT",
   "scripts": {
-    "dev": "electron-vite dev",
-    "start": "electron-vite preview",
+    "dev": "node scripts/launch.mjs dev",
+    "start": "node scripts/launch.mjs preview",
     "build": "electron-vite build",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",

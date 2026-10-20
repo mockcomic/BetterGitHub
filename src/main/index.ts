@@ -3,6 +3,7 @@ import { buildAppMenu } from './menu'
 import { registerIpc } from './ipc'
 import { applyTheme, createMainWindow, getMainWindow } from './windows'
 import { getThemeSetting } from './settings'
+import { initCrashLogging } from './diagnostics'
 
 const gotLock = app.requestSingleInstanceLock()
 
@@ -18,6 +19,7 @@ if (!gotLock) {
   })
 
   void app.whenReady().then(async () => {
+    initCrashLogging()
     app.setAppUserModelId('com.kh.gitdesk')
 
     applyTheme(await getThemeSetting())

@@ -1,5 +1,6 @@
 import { join } from 'path'
 import { BrowserWindow, nativeTheme } from 'electron'
+import { logDiagnostics } from './diagnostics'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -23,6 +24,46 @@ export function createMainWindow(devServerUrl: string | undefined): BrowserWindo
   })
 
   trustedWebContents.add(window.webContents.id)
+
+  window.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, errorDescription, validatedUrl) => {
+      logDiagnostics(
+        `did-fail-load: code=${errorCode} desc=${errorDescription} url=${validatedUrl}`
+      )
+    }
+  )
+  window.webContents.on(
+    'render-process-gone',
+    (_event, details) => {
+      logDiagnostics(
+        `window render-process-gone: reason=${details.reason}`
+      )
+    }
+  )
+  window.webContents.on('unresponsive', () => {
+    logDiagnostics('window unresponsive')
+  })
+  window.webContents.on('did-finish-load', () => {
+    logDiagnostics(`window did-finish-load: ${window.webContents.getURL()}`)
+  })
+  window.webContents.on(
+    'console-message',
+    (
+      _event,
+      level: unknown,
+      message: string,
+      lineNumber: number,
+      sourceId: string
+    ) => {
+      const levelName = String(level).toLowerCase()
+      if (levelName.includes('error') || levelName.includes('warn')) {
+        logDiagnostics(
+          `renderer console (${levelName}) ${sourceId}:${lineNumber}: ${message}`
+        )
+      }
+    }
+  )
 
   window.on('closed', () => {
     trustedWebContents.delete(window.webContents.id)
