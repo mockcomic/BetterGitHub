@@ -9,6 +9,11 @@
     "dev": "node scripts/launch.mjs dev",
     "start": "node scripts/launch.mjs preview",
     "build": "electron-vite build",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --win --mac --linux",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -20,6 +25,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "electron": "^44.9.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
@@ -29,5 +35,36 @@
     "prismjs": "^1.30.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
+  },
+  "build": {
+    "appId": "com.kh.gitdesk",
+    "productName": "GitDesk",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
   }
 }

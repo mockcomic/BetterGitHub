@@ -8,6 +8,7 @@ import {
   menuStateFromEvent,
   type ContextMenuState
 } from './ContextMenu'
+import { ConfettiBurst, useCelebration } from './Celebration'
 
 function matches(path: string, filter: string): boolean {
   const needle = filter.trim().toLowerCase()
@@ -558,6 +559,7 @@ export function StashDetail(): JSX.Element {
 export function CommitTray(): JSX.Element {
   const state = useStoreState()
   const store = useStore()
+  const { nonce: celebrateNonce, celebrating } = useCelebration('commit')
   const draft = state.drafts.get(state.selectedRepo?.path ?? '')
   const summary = draft?.summary ?? ''
   const description = draft?.description ?? ''
@@ -567,7 +569,6 @@ export function CommitTray(): JSX.Element {
   const busy = state.busy !== null
   const total = state.status?.files.length ?? 0
   const checked = draft?.checked ?? new Set<string>()
-  const stagedCount = (state.status?.files ?? []).filter(f => f.staged).length
   const scopeTitle =
     checked.size === 0
       ? 'No files selected — Commit ships nothing until you check a file.'
@@ -585,9 +586,6 @@ export function CommitTray(): JSX.Element {
           </button>
         </div>
       )}
-      <div className="scope-line" title={scopeTitle}>
-        <b>{checked.size} of {total}</b> files · {stagedCount} staged
-      </div>
       <div className="commit-field">
         <input
           className={`summary${overlong ? ' overlong' : ''}`}
@@ -616,6 +614,12 @@ export function CommitTray(): JSX.Element {
         value={description}
         onChange={e => store.setDescription(e.target.value)}
       />
+      <div className="scope-line" title={scopeTitle}>
+        <b>{checked.size} of {total}</b> files ·{' '}
+        {state.scopeLoading
+          ? '+… −…'
+          : `+${state.scopeAdds} −${state.scopeDels}`}
+      </div>
       <div className="commit-actions">
         {state.aiBusy ? (
           <button
@@ -636,10 +640,14 @@ export function CommitTray(): JSX.Element {
           </button>
         )}
         <button
-          className="btn primary commit"
-          disabled={busy || state.aiBusy}
+          className={`btn primary commit${celebrating ? ' celebrating' : ''}`}
+          disabled={busy || state.aiBusy || (checked.size === 0 && !amending)}
           onClick={() => void store.commit()}
-          title="Commit selected files (Ctrl+Enter)"
+          title={
+            checked.size === 0 && !amending
+              ? 'Select at least one file to commit'
+              : 'Commit selected files (Ctrl+Enter)'
+          }
         >
           {state.busy === 'commit' ? (
             <>
@@ -650,6 +658,7 @@ export function CommitTray(): JSX.Element {
           ) : (
             <>Commit to {branch}</>
           )}
+          {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
         </button>
       </div>
     </>

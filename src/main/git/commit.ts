@@ -1,4 +1,5 @@
 import { execGit, GitExecError } from './exec'
+import { addPaths } from './staging'
 
 /**
  * Commits exactly the given paths with a summary/description message.
@@ -25,11 +26,9 @@ export async function commitPaths(
 
   // Make sure everything selected is present in the index (add covers
   // deletions and new files; `commit --only` below still restricts the
-  // commit to the selected paths).
-  await execGit(['add', '-A', '--end-of-options', ...paths], {
-    cwd: repoPath,
-    timeoutMs: 30_000
-  })
+  // commit to the selected paths). Paths already fully staged (including
+  // deletions) are skipped by addPaths rather than failing the add.
+  await addPaths(repoPath, paths)
 
   const args = ['commit', '--only', '-m', trimmed]
   const body = description.trim()
@@ -60,10 +59,7 @@ export async function amendCommit(
   await requireExistingCommit(repoPath)
 
   if (paths.length > 0) {
-    await execGit(['add', '-A', '--end-of-options', ...paths], {
-      cwd: repoPath,
-      timeoutMs: 30_000
-    })
+    await addPaths(repoPath, paths)
   }
 
   const args = ['commit', '--amend', '--only', '-m', trimmed]

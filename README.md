@@ -75,7 +75,15 @@ npm run dev        # develop with hot reload
 npm test           # unit tests (Vitest)
 npm run typecheck  # tsc for main+preload and renderer
 npm run build      # production bundles into out/
+npm run dist       # build an installer for the current platform
+npm run dist:win   # Windows installer + portable executable
+npm run dist:mac   # macOS DMG + ZIP
+npm run dist:linux # Linux AppImage + DEB
 ```
+
+Run the platform-specific distribution command on the target operating system.
+`npm run dist:all` requests all three targets when the build environment supports
+cross-platform packaging.
 
 Then, on first run, open **Preferences** (File menu or the link on the empty
 screen) and set the AI **Base URL**, **Model**, and **API key**, and press

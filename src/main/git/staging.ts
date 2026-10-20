@@ -1,18 +1,99 @@
+import { existsSync } from 'fs'
 import { rm } from 'fs/promises'
 import { join } from 'path'
 import { execGit, GitExecError } from './exec'
 import { getStatus } from './status'
+
+/** `fatal: pathspec 'foo' did not match any files` — git aborted the whole add. */
+const STALE_PATHSPEC = /pathspec '(.+)' did not match any files/g
+const IGNORED_HEADER = 'The following paths are ignored by one of your .gitignore files:'
+
+/**
+ * Extract from a failed `git add` the requested paths git refused, so the
+ * caller can drop them and retry. Recognises the two refusals that must not
+ * fail the stage: a stale pathspec (quoted verbatim) and gitignored paths
+ * (listed per line after the header; for a directory pathspec git lists the
+ * *files* inside it, so a listed file also drops its containing request).
+ * Anything unrecognised returns empty and the original error propagates.
+ * Relies on LC_ALL=C forcing English messages.
+ */
+function refusedPaths(stderr: string, remaining: ReadonlyArray<string>): string[] {
+  const refused = new Set<string>()
+  for (const m of stderr.matchAll(STALE_PATHSPEC)) {
+    if (remaining.includes(m[1])) refused.add(m[1])
+  }
+  const lines = stderr.split(/\r?\n/)
+  const header = lines.indexOf(IGNORED_HEADER)
+  if (header >= 0) {
+    const listed: string[] = []
+    for (let i = header + 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (line.length === 0 || line.startsWith('hint:')) break
+      listed.push(line)
+    }
+    for (const p of remaining) {
+      if (listed.includes(p) || listed.some(l => l.startsWith(`${p}/`))) refused.add(p)
+    }
+  }
+  return [...refused]
+}
+
+/**
+ * `git add` the given paths, self-healing on stale ones.
+ *
+ * Layer 1 — a cheap pre-filter drops paths matching neither the working tree
+ * nor the index (a deletion already fully staged), which would otherwise make
+ * `git add` abort the *entire* command with "fatal: pathspec … did not match
+ * any files".
+ *
+ * Layer 2 — the add itself runs in a retry loop: anything that vanishes
+ * between the check and the add, or that git still refuses by name (e.g. a
+ * file newly covered by .gitignore), is dropped from the list and the add is
+ * re-run. Each retry sheds at least one path, so the loop terminates; only a
+ * refusal git says nothing about (lock file, permissions) reaches the caller.
+ */
+export async function addPaths(
+  repoPath: string,
+  paths: ReadonlyArray<string>
+): Promise<void> {
+  if (paths.length === 0) return
+  const inIndex = new Set(
+    (
+      await execGit(['ls-files', '--end-of-options', ...paths], {
+        cwd: repoPath,
+        timeoutMs: 10_000
+      })
+    )
+      .stdout.split('\n')
+      .map(line => line.replace(/\r$/, ''))
+      .filter(line => line.length > 0)
+  )
+  let remaining = paths.filter(
+    p => inIndex.has(p) || existsSync(join(repoPath, ...p.split('/')))
+  )
+  while (remaining.length > 0) {
+    try {
+      await execGit(['add', '-A', '--end-of-options', ...remaining], {
+        cwd: repoPath,
+        timeoutMs: 20_000,
+        env: { LC_ALL: 'C' }
+      })
+      return
+    } catch (err) {
+      if (!(err instanceof GitExecError)) throw err
+      const refused = refusedPaths(err.result.stderr, remaining)
+      if (refused.length === 0) throw err
+      remaining = remaining.filter(p => !refused.includes(p))
+    }
+  }
+}
 
 /** `git add` the given paths (including deletions). */
 export async function stagePaths(
   repoPath: string,
   paths: ReadonlyArray<string>
 ): Promise<void> {
-  if (paths.length === 0) return
-  await execGit(['add', '-A', '--end-of-options', ...paths], {
-    cwd: repoPath,
-    timeoutMs: 20_000
-  })
+  await addPaths(repoPath, paths)
 }
 /** Unstage the given paths (worktree content is preserved). */
 export async function unstagePaths(

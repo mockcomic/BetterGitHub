@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -26,6 +26,7 @@ import {
   stashAll
 } from '../src/main/git/stash'
 import { resolveConflict, stagePaths } from '../src/main/git/staging'
+import { getPathsDiffText } from '../src/main/git/diff'
 import { abortOperation, continueOperation } from '../src/main/git/workflow'
 import { appendGitignoreRule, gitignoreRuleFor } from '../src/main/git/ignore'
 
@@ -419,6 +420,86 @@ describe('git integration', () => {
 
     // A directory rule keeps its trailing slash.
     expect(gitignoreRuleFor('build', true)).toBe('build/')
+    await resetClean()
+  })
+
+  it('stage-all survives already-staged deletions', async () => {
+    // Regression: `git add -A -- <path>` aborts the whole command when a path
+    // matches neither the working tree nor the index. A deletion that is
+    // already fully staged is exactly that, so a stage-all over the sidebar
+    // file list used to fail with "fatal: pathspec … did not match any files"
+    // (exit 128) and nothing else got staged.
+    await resetClean()
+    write('todelete.txt', 'doomed\n')
+    write('modified.txt', 'base\n')
+    await commitAll('add files for delete regression')
+
+    unlinkSync(join(repo, 'todelete.txt'))
+    await execGit(['add', '-A', '--end-of-options', 'todelete.txt'], { cwd: repo })
+    write('modified.txt', 'changed\n')
+
+    // Same call shape the renderer's stageAll makes: every status row,
+    // including the fully-staged deletion.
+    await stagePaths(repo, ['todelete.txt', 'modified.txt'])
+
+    const status = await getStatus(repo)
+    const modified = status.files.find(f => f.path === 'modified.txt')
+    expect(modified?.staged).toBe(true)
+    expect(modified?.worktreeCode).toBe('.')
+    expect(status.files.find(f => f.path === 'todelete.txt')?.staged).toBe(true)
+    await resetClean()
+  })
+
+  it('stage-all self-heals paths git refuses by name', async () => {
+    // A file the worktree check lets through but git rejects because it
+    // became ignored after the status snapshot (e.g. "Add to .gitignore" ran
+    // in between) must not fail the stage: addPaths drops the refused paths
+    // and retries so everything else still gets staged.
+    await resetClean()
+    write('.gitignore', '*.log\n')
+    write('keep.txt', 'kept\n')
+    await commitAll('seed ignore self-heal')
+
+    write('run.log', 'noise\n') // ignored, but present — passes existsSync
+    write('sibling.txt', 'sibling\n')
+
+    await expect(stagePaths(repo, ['run.log', 'sibling.txt'])).resolves.toBeUndefined()
+
+    const status = await getStatus(repo)
+    expect(status.files.find(f => f.path === 'sibling.txt')?.staged).toBe(true)
+    expect(status.files.map(f => f.path)).not.toContain('run.log')
+    await resetClean()
+  })
+
+  it('AI diff payload survives paths missing from the working tree', async () => {
+    // Regression: Generate batched every checked path into one
+    // `git diff HEAD -- <paths>`; a single path the index does not know — a
+    // file deleted after the status snapshot (leftover .tmp-dbg-vog probes) —
+    // aborted the whole command with "fatal: <path>: no such path in the
+    // working tree." (exit 128) and the AI call never ran.
+    await resetClean()
+    write('README.md', '# hello payload\n')
+    write('payload-new.txt', 'fresh content\n')
+    mkdirSync(join(repo, '.tmp-probe'))
+    write('.tmp-probe/explorer-probe.txt', 'doomed probe\n')
+
+    // Snapshot like generateCommitMessage does, then the probe file vanishes.
+    const status = await getStatus(repo)
+    const statusByPath = new Map(
+      status.files.map(f => [f.path, { untracked: f.untracked, oldPath: f.oldPath }])
+    )
+    unlinkSync(join(repo, '.tmp-probe', 'explorer-probe.txt'))
+
+    // A ghost path that was never in the snapshot exercises the same guard
+    // from the renderer side (stale checkbox for a file long gone).
+    const text = await getPathsDiffText(
+      repo,
+      [...statusByPath.keys(), '.tmp-probe/ghost.txt'],
+      statusByPath
+    )
+    expect(text).toContain('+# hello payload') // tracked modification, batched
+    expect(text).toContain('+fresh content') // untracked, synthesized
+    expect(text).not.toContain('doomed probe') // vanished path contributes nothing
     await resetClean()
   })
 })

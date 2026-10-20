@@ -102,7 +102,7 @@ components:
 
 **Creative North Star: "The Quiet Workbench"**
 
-GitDesk presents itself as a well-lit workbench: everything the interface is made of — panels, headers, rails, status bars — is matte, neutral, and deliberately unremarkable, so that the only things permitted to speak are the facts of the repository. A file's status letter, a green add-row in a diff, the ahead/behind count, the commit button. The system's restraint is not absence of personality; it is personality expressed as discipline. Depth comes from hairline borders and tonal surface shifts, never decoration. Motion is reduced to the honest machine signals that exist (a spinner while git or the AI is working), and elevation is a single soft ambient shadow reserved strictly for things floating above the app.
+GitDesk presents itself as a well-lit workbench: everything the interface is made of — panels, headers, rails, status bars — is matte, neutral, and deliberately unremarkable, so that the only things permitted to speak are the facts of the repository. A file's status letter, a green add-row in a diff, the ahead/behind count, the commit button. The system's restraint is not absence of personality; it is personality expressed as discipline. Depth comes from hairline borders and tonal surface shifts, never decoration. Motion is the honest machine signal: fast (90–180 ms) transform/opacity transitions that acknowledge an event — a spinner while git or the AI works, floated layers that arrive rather than blink in, buttons that answer the cursor, newly-appeared rows and changed counts that flag themselves — plus exactly one authored spectacle, the commit/push success celebration. Elevation is a single soft ambient shadow reserved strictly for things floating above the app.
 
 The type system is a two-voice arrangement: the platform-native UI stack (Segoe UI on Windows) for human text, and a programmer's monospace (Cascadia Code) for machine truth — file paths, diffs, commit bodies, shortcut keys. Wherever monospace appears, it signals "this text is verbatim from your repository, do not paraphrase it." The system ships fully paired light and dark themes through one CSS custom-property contract; every token has a counterpart in the other theme, and the dark theme is not an afterthought but the same philosophy rendered in cast iron.
 
@@ -111,7 +111,7 @@ The type system is a two-voice arrangement: the platform-native UI stack (Segoe 
 - Git state is the only protagonist: status glyphs, diff washes, badges, and the Commit button carry all meaning.
 - One shadow token, one use: floating layers only (popovers, dialogs, toasts, context menus).
 - Machine truth in monospace, human text in the system stack — the split is meaningful, never stylistic.
-- Compact, instrument-panel density: 13px base, 4–16px spacing scale, fixed 400px working rail.
+- Compact, instrument-panel density: 13px base, 4–16px spacing scale, a command strip over a 340px queue, dominant main pane, and a docked 300px commit tray.
 - Light and dark themes are first-class equals driven by `html[data-theme]` custom properties.
 
 ## Colors
@@ -168,11 +168,11 @@ The palette is GitHub-lineage: near-neutral surfaces with four semantic voices, 
 
 ## Layout
 
-The window is a fixed vertical sandwich: 33-ish px header rail on top, a flexible `.body` row in the middle, an 18-ish px status bar at the bottom. The body splits into a fixed 400px **working rail** (changes list + commit box, `flex: 0 0 400px`, right-hand hairline) and a flexible **main pane** (diff or history) that owns `min-width: 0` so long paths ellipsize instead of breaking the rail. History mirrors this with a 280px commit-files column.
+The window is a fixed vertical sandwich: a ~44 px command strip on top, a ~38 px desk-switch rail beneath it, a flexible `.body` work area in the middle, and an 18-ish px status bar at the bottom. The command strip carries, left to right: repository picker, branch picker, the mono route readout (`branch ⇄ origin · ↑n ↓m` — silent when there is nothing to say), the contextual filter centered with its `Ctrl K` chip riding inside its right edge, and the sync controls (refresh, Fetch, Pull, Push, GitHub). The body splits into three zones — a 340px **queue column** (the queue for the active view), a flexible **main pane** (diff, history, or stash detail) that owns `min-width: 0` so long paths ellipsize instead of breaking the rail, and a docked 300px **commit tray** (compose fields, scope line, full-width commit verb) that replaces itself with conflict guidance in the Conflicts view. History mirrors the pattern with a 280px commit-files column.
 
 The spatial model is rails and rows, not cards: panes separate with 1px hairline borders and tonal steps (canvas → panel → header-surface); internal padding runs on the 4/6/8/10/12/16px scale, rows are 5px vertical, toolbars 6px, commit box 10px. Sticky-in-scroll elements (changes toolbar, diff title, commit-files head, truncation notice) pin within their pane and keep the header/panel background so content scrolls beneath them.
 
-There is no responsive reflow: this is one desktop window, sized by the OS. Adaptation is truncation (ellipsis, `min-width: 0`, `word-break`) and `max-width: min(92vw, 640px)` / `max-height: 88vh` caps on dialogs, plus `max-height: 480px` scroll caps on popovers.
+There is one deliberate responsive concession: below 1160px the queue and tray narrow to 290/260px, and below 980px (or the 1040-class windows it targets) the three zones stack vertically — queue on top (max-height 38%), work area, tray (max-height 46%) — because the desk must survive a daily-driver window that is not always wide. Everything else adapts by truncation (ellipsis, `min-width: 0`, `word-break`) and `max-width: min(92vw, 640px)` / `max-height: 88vh` caps on dialogs, plus `max-height: 480px` scroll caps on popovers.
 
 ## Elevation & Depth
 
@@ -185,7 +185,7 @@ Flat by default. Every structural boundary is a 1px hairline border or a tonal s
 ### Named Rules
 **The One Shadow Rule.** One shadow token, four consumers (popover, dialog, toast, context menu). If it's in the document flow, it gets a hairline border, not a shadow.
 
-**The Flat-By-Default Rule.** Surfaces are flat at rest; depth is reserved for state (floating layers) and never for decoration. *(Directional note: hover-lift on buttons/rows — a subtle shadow response on interaction — is an accepted evolution of this doctrine, not yet implemented.)*
+**The Flat-By-Default Rule.** Surfaces are flat at rest; depth is reserved for state (floating layers) and never for decoration. *(Hover-lift is now the implemented expression of this doctrine: a 1 px raise with a faint shadow on `.btn` hover only — an interaction response, not rest-state elevation.)*
 
 ## Shapes
 
@@ -197,7 +197,7 @@ Gently softened rectangles throughout: 4px for `code` chips and inner menu items
 - **Shape:** Gently curved rectangles (6px), quiet 1px bordered defaults; label + optional glyph with 6px gap.
 - **Primary (`.btn.primary`):** Commit Green fill, white text, border darkened via `color-mix(primary 70%, black)`; hover deepens to the hover token. Padding 5px × 12px; the commit button stretches full-width, centered.
 - **Default (`.btn`):** Panel background, Hairline border, Ink text; hover shifts background to Hover Surface; disabled at 0.55 opacity.
-- **Hover / Focus:** Color shift only, no transition, no lift at instant response (hover-lift is the accepted direction). No visible focus ring on buttons; focus expression is concentrated on inputs.
+- **Hover / Focus:** Hover raises the button 1 px (`translateY(-1px)`) with a faint ambient shadow alongside the color shift, all on a 90 ms ease-out; press returns it to rest. Keyboard focus gets the Beacon Blue 3px/25% ring on buttons too (`.btn:focus-visible`), matching inputs; pointer clicks never draw the ring.
 - **Quiet variants:** `.mini` (accent-blue text, underline on hover, 12px), `.link` (button-styled accent link), `.icon-btn` (16px muted glyph button).
 
 ### Badges & Status Glyphs
@@ -210,8 +210,14 @@ Gently softened rectangles throughout: 4px for `code` chips and inner menu items
 ### Popovers & Menus
 - **Style:** Canvas face, Hairline border, 8px radius, Float shadow, 4px padding; items are 7px × 10px with 6px radius, hover to Hover Surface, active item turns Commit Green 600-weight, danger items Alarm Red. Headers are uppercase 10.5px eyebrows; separators and inline filters allowed. Max height 480px with scroll; positioned 4px below their trigger.
 
-### Segmented Tabs
-- **Style:** Two joined rectangles (Changes / History) — shared Hairline borders, outer corners 6px, active segment takes Header Surface background, Ink text, 600 weight, and a Beacon Blue border. The blue border is the only "active" signal.
+### Desk Switch
+- **Style:** Four detached tab buttons (Review / History / Conflicts / Stash) on the switch rail, 4px radius, 1px Hairline border; the active tab takes Header Surface background, Ink text, and a Beacon Blue border — the blue border is the only "active" signal. Count badges are the standard 10.5px mono pills; the Conflicts badge turns Alarm Red (on the tab too) only while conflicts exist. Arrow keys cycle the switch; full ARIA tablist semantics with the work area as its tabpanel.
+
+### Commit Tray (signature)
+- **Style:** Docked 300px panel with a left hairline, panel background, 10px padding, 8px gaps: summary input, description textarea, then the **scope line** — mono, muted, `N of M files · +A −D` with the counts in Ink — under a tooltip listing exactly which paths will ship; then Generate and the full-width Commit Green commit verb. With nothing selected the tray says `0 of N · +0 −0` and the commit button is disabled: the verb that owns Green never promises what it will not do.
+
+### Route Readout & Ctrl K Chip
+- **Style:** The strip's signature mono readout `branch ⇄ origin`, the arrow tinted Beacon Blue, trailing `↑n ↓m` counts as git reports them; it renders nothing when it has nothing to say. The filter input carries a `Ctrl K` chip — mono 10.5px muted text in a Panel-background hairline pill — visible only while the field is empty and unfocused.
 
 ### Inputs & Fields
 - **Style:** Canvas background, 1px Hairline border, 6px radius, 5px × 8px padding, full-width. Focus removes the outline and replaces it with a Beacon Blue border plus a 3px ring at 25% accent via `color-mix`. Labels are 600-weight 13px with 11.5px muted hints beneath; fields stack at 12px gaps.
@@ -237,7 +243,7 @@ Gently softened rectangles throughout: 4px for `code` chips and inner menu items
 - **Do** set repository-verbatim text (paths, diffs, commit messages, shortcut keys) in the mono stack, and UI prose in the system stack.
 - **Do** use the Float shadow only for dismissible floating layers, and give new overlays 8–10px radius + 4px inner item radius like its siblings.
 - **Do** express selection with the green Selected Surface and never with a checkbox-only or border-only treatment in the file/commit lists.
-- **Do** truncate with ellipsis at `min-width: 0` rather than wrapping paths or breaking the 400px rail.
+- **Do** truncate with ellipsis at `min-width: 0` rather than wrapping paths or breaking the 340px queue column.
 
 ### Don't:
 - **Don't** introduce chromatic color that encodes no git or task state; the palette is exhausted at Green/Blue/Red/Amber plus the three diff washes.
@@ -245,4 +251,4 @@ Gently softened rectangles throughout: 4px for `code` chips and inner menu items
 - **Don't** display type larger than 30px or text smaller than 10.5px; density comes from the 4–16px spacing scale.
 - **Don't** use Caution Amber for blockers/errors and Alarm Red for soft warnings — the severity ladder is fixed.
 - **Don't** put package-UI webfonts or icon libraries on the product; the incumbent system uses the platform's own faces and glyph characters.
-- **Don't** animate anything except the busy spinner until the hover-lift direction is actually implemented; instant state changes are the current grammar.
+- **Don't** animate for decoration: every motion must acknowledge an event (hover, arrival of a layer/row/number, tab swap, success) and stay under 180 ms except the one authored commit/push celebration; looping motion is reserved for the spinners. Every animation needs a `prefers-reduced-motion` path that keeps fades and color state while dropping travel and scale.

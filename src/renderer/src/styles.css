@@ -22,6 +22,7 @@ html[data-theme='light'] {
   --del-text: #cf222e;
   --hunk-bg: #ddf4ff;
   --hunk-text: #0969da;
+  --caution: #d4a72c;
   --shadow: 0 8px 24px rgba(31, 35, 40, 0.16);
 }
 
@@ -44,6 +45,7 @@ html[data-theme='dark'] {
   --del-text: #f85149;
   --hunk-bg: #121d2e;
   --hunk-text: #4493f8;
+  --caution: #d4a72c;
   --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
 }
 
@@ -200,6 +202,21 @@ button {
   font-size: 12px;
 }
 
+/* The visible Ctrl K affordance, riding inside the strip filter's right edge. */
+.kbd-hint {
+  margin-left: -64px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 16px;
+  pointer-events: none;
+  align-self: center;
+}
+
 .route-readout {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -327,6 +344,7 @@ button {
 
 .queue-col {
   flex: 0 0 340px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -532,7 +550,7 @@ button {
 
 .status-glyph.modified,
 .status-glyph.type-changed {
-  color: #d4a72c;
+  color: var(--caution);
 }
 
 .file-path {
@@ -595,6 +613,7 @@ button {
 
 .commit-tray {
   flex: 0 0 300px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -631,7 +650,7 @@ button {
 }
 
 .summary.overlong {
-  border-color: #d4a72c;
+  border-color: var(--caution);
 }
 
 .length-warning {
@@ -639,7 +658,7 @@ button {
   right: 8px;
   top: -18px;
   font-size: 11px;
-  color: #d4a72c;
+  color: var(--caution);
   background: var(--bg-panel);
   padding: 0 4px;
 }
@@ -677,6 +696,354 @@ button {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ------------------------------------------------- success celebration */
+/* The desk's one authored motion: when Commit or Push truly succeeds, the
+   verb that did it pops with a Commit Green ring and sheds a brief confetti
+   burst tinted only with state colors. Bound to outcomes, never idle. */
+
+.btn.celebrating {
+  position: relative; /* anchor for the confetti layer */
+  animation: btn-celebrate 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* A commit empties the tray, so the verb is often already disabled mid-
+   celebration; the success moment still plays at full strength. */
+.btn.celebrating:disabled {
+  opacity: 1;
+}
+
+@keyframes btn-celebrate {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+  30% {
+    transform: scale(1.045);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+}
+
+.confetti-burst {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.confetti-bit {
+  position: absolute;
+  display: block;
+  transform: translate(-50%, -50%);
+  animation: confetti-fly 680ms cubic-bezier(0.16, 1, 0.3, 1) var(--cd, 0ms)
+    both;
+  will-change: transform, opacity;
+}
+
+@keyframes confetti-fly {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-50%, -50%) scale(1) rotate(calc(var(--cr, 0deg) * 0.1));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--cx, 0px)), calc(-50% + var(--cy, 0px)))
+      scale(0.7) rotate(var(--cr, 0deg));
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No flight, no pop — the success ring still fires so the outcome stays
+     legible, and the confetti fades in place instead of launching. */
+  .btn.celebrating {
+    animation: btn-celebrate-quiet 500ms ease-out;
+  }
+
+  @keyframes btn-celebrate-quiet {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary) 0%, transparent);
+    }
+  }
+
+  .confetti-bit {
+    animation: confetti-fade 420ms ease-out var(--cd, 0ms) both;
+  }
+
+  @keyframes confetti-fade {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- motion */
+/* The Quiet Workbench moves only to acknowledge something that happened:
+   buttons answer the cursor, floated layers arrive instead of blink in,
+   and state changes (tab swap, new rows, changed counts) read as events.
+   Transform/opacity only, 90–180 ms, exponential ease-out. The one
+   authored spectacle stays the commit/push celebration above. */
+
+:root {
+  --motion-instant: 90ms;
+  --motion-fast: 130ms;
+  --motion-layer: 180ms;
+  --ease-arrive: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- controls answer the cursor (the sanctioned hover-lift) ------------ */
+
+.btn {
+  transition:
+    background-color var(--motion-instant) ease-out,
+    border-color var(--motion-instant) ease-out,
+    color var(--motion-instant) ease-out,
+    box-shadow var(--motion-instant) ease-out,
+    transform var(--motion-instant) ease-out;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+/* Pressed: the lift comes back down — the hover is the answer, the click
+   is the commitment. */
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.icon-btn,
+.mini,
+.link {
+  transition: color var(--motion-instant) ease-out;
+}
+
+.desk-tab {
+  transition:
+    background-color var(--motion-fast) ease-out,
+    border-color var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out;
+}
+
+input,
+textarea,
+select {
+  transition:
+    border-color var(--motion-instant) ease-out,
+    box-shadow var(--motion-instant) ease-out;
+}
+
+.file-row,
+.commit-row,
+.stash-row,
+.popover-item,
+.recent-repo {
+  transition:
+    background-color var(--motion-instant) ease-out,
+    color var(--motion-instant) ease-out;
+}
+
+.discard {
+  transition:
+    opacity var(--motion-fast) ease-out,
+    color var(--motion-instant) ease-out;
+}
+
+/* --- floated layers arrive, never blink in ------------------------------ */
+
+@keyframes layer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.popover {
+  animation: layer-in var(--motion-fast) var(--ease-arrive) both;
+  transform-origin: top left;
+}
+
+.context-menu {
+  animation: layer-in var(--motion-fast) var(--ease-arrive) both;
+  transform-origin: top left;
+}
+
+.dialog-overlay {
+  animation: scrim-in var(--motion-fast) ease-out both;
+}
+
+.dialog {
+  animation: dialog-in var(--motion-layer) var(--ease-arrive) both;
+}
+
+.toast {
+  animation: toast-in var(--motion-layer) var(--ease-arrive) both;
+}
+
+/* --- state changes read as events --------------------------------------- */
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Rows are keyed by path/sha/index, so this fires only when a row truly
+   appears (a newly changed file slides in); a refresh that keeps the same
+   rows does not re-animate. Bounded stagger over the list head via --row-i. */
+.file-row,
+.commit-row,
+.stash-row {
+  animation: row-in var(--motion-fast) var(--ease-arrive)
+    calc(var(--row-i, 0) * 18ms) both;
+}
+
+.changes-list > :nth-child(1) {
+  --row-i: 0;
+}
+.changes-list > :nth-child(2) {
+  --row-i: 1;
+}
+.changes-list > :nth-child(3) {
+  --row-i: 2;
+}
+.changes-list > :nth-child(4) {
+  --row-i: 3;
+}
+.changes-list > :nth-child(5) {
+  --row-i: 4;
+}
+.changes-list > :nth-child(6) {
+  --row-i: 5;
+}
+.changes-list > :nth-child(7) {
+  --row-i: 6;
+}
+.changes-list > :nth-child(8) {
+  --row-i: 7;
+}
+.changes-list > :nth-child(n + 9) {
+  --row-i: 8;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The desk re-settles when the tab changes; keyed on the view so React
+   remounts and the entrance replays exactly once per switch. */
+.pane-enter {
+  animation: view-in var(--motion-fast) var(--ease-arrive) both;
+}
+
+@keyframes count-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ahead/behind numbers that just moved flag themselves. */
+.count-pop {
+  display: inline-block;
+  animation: count-pop 240ms var(--ease-arrive) both;
+}
+
+.empty-state {
+  animation: view-in 200ms var(--ease-arrive) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Strip travel and scale; fades stay so arrivals and state are still
+     acknowledged, and color feedback never depended on motion anyway.
+     Spinners (the machine-thinking signal) keep running. */
+  .btn:hover:not(:disabled),
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+
+  .popover,
+  .context-menu,
+  .dialog,
+  .toast,
+  .pane-enter,
+  .file-row,
+  .commit-row,
+  .stash-row,
+  .empty-state {
+    animation-name: scrim-in;
+  }
+
+  .count-pop {
+    animation: none;
   }
 }
 
@@ -740,7 +1107,7 @@ button {
 }
 
 .diff-line.warning .content {
-  color: #d4a72c;
+  color: var(--caution);
 }
 
 .lineno {
@@ -877,6 +1244,7 @@ button {
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.3;
+  font-family: var(--mono);
 }
 
 .history-view {
@@ -903,6 +1271,7 @@ button {
   color: var(--text-muted);
   margin-top: 4px;
   font-size: 12px;
+  font-family: var(--mono);
 }
 
 .commit-detail-body {
@@ -1294,8 +1663,8 @@ button {
 }
 
 .workflow-banner.warning {
-  border-color: color-mix(in srgb, #d4a72c 55%, var(--border));
-  background: color-mix(in srgb, #d4a72c 12%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--caution) 55%, var(--border));
+  background: color-mix(in srgb, var(--caution) 12%, var(--bg-panel));
 }
 
 .workflow-actions {
@@ -1567,7 +1936,8 @@ button {
 }
 
 .shortcut-list code,
-.confirm-message code {
+.confirm-message code,
+.repo-manager-foot-hint code {
   font-family: var(--mono);
   background: var(--bg-panel);
   border: 1px solid var(--border);
@@ -1645,78 +2015,173 @@ button {
 
 .repo-manager-toolbar {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.repo-manager-toolbar .popover-filter {
+.repo-manager-filter-wrap {
+  position: relative;
   flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
 }
 
+/* The hub's filter is a standing control, not a popover's transient one, so it
+   takes the shared input treatment at its own width. */
+.repo-manager-filter {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The result count rides inside the filter's right edge like the strip's
+   Ctrl K chip, so it never nudges the neighbouring buttons. */
+.repo-manager-shown {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 16px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.repo-manager-filter.has-shown {
+  padding-right: 92px;
+}
+
+/* The machine-thinking signal, on Beacon Blue like the status bar's busy item. */
+.repo-manager-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* Bulk actions exist only while a selection exists — no reserved dead row. */
 .repo-manager-selectbar {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 38px;
-  padding-bottom: 8px;
-}
-
-.repo-manager-selectbar.empty {
-  visibility: hidden;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  margin-bottom: 10px;
 }
 
 .repo-manager-count {
   font-weight: 600;
   margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.repo-manager-selectbar-spacer {
-  flex: 1 1 auto;
-}
-
-.repo-manager-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 2px 6px;
+/* Names the one repository the Open verb takes when several are picked. */
+.btn-target {
   color: var(--text-muted);
-  font-size: 12px;
+  max-width: 104px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.repo-manager-head input[type='checkbox'],
-.repo-check-cell input[type='checkbox'] {
-  accent-color: var(--primary);
-  cursor: pointer;
-}
-
-.repo-manager-loading {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.repo-manager-list {
+.repo-table {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-panel);
   max-height: 46vh;
-  min-height: 180px;
+  min-height: 240px;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
   outline: none;
 }
 
-.repo-manager-list:focus-visible {
+.repo-table:focus-visible {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
-.repo-manager-row {
-  display: flex;
+/* Header and rows share one column grid so every label sits above its data. */
+.repo-table-head,
+.repo-manager-row,
+.repo-group-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 150px 92px 58px 96px 46px;
   align-items: center;
-  gap: 10px;
+  column-gap: 12px;
+  padding: 0 10px;
+}
+
+/* The sticky header-surface bar of the diff title and changes-toolbar family;
+   the scroll box's own radius clips its corners. */
+.repo-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 30px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.repo-table-head [role='columnheader'] {
+  min-width: 0;
+}
+
+.repo-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.repo-sort.right {
+  justify-content: flex-end;
+}
+
+.repo-sort:hover {
+  color: var(--text);
+}
+
+.repo-table-head [aria-sort='ascending'] .repo-sort,
+.repo-table-head [aria-sort='descending'] .repo-sort {
+  color: var(--text);
+}
+
+.repo-sort:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* The sort caret is a glyph, not type: it stays on the 10.5px floor like the
+   header labels it rides with. */
+.repo-sort .caret {
+  line-height: 1;
+}
+
+.repo-manager-row {
   padding: 7px 10px;
   cursor: pointer;
   user-select: none;
@@ -1737,8 +2202,7 @@ button {
 }
 
 .repo-manager-row.selected:hover {
-  background: var(--bg-selected);
-  filter: brightness(0.98);
+  background: color-mix(in srgb, var(--bg-selected) 88%, var(--bg-hover));
 }
 
 /* Keyboard cursor: the Beacon Blue border is the only active signal. */
@@ -1749,13 +2213,27 @@ button {
 }
 
 .repo-check-cell {
-  flex: 0 0 18px;
   display: flex;
   justify-content: center;
 }
 
+.repo-table-head input[type='checkbox'],
+.repo-check-cell input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--primary);
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+/* The checkbox speaks when the pointer or the keyboard cursor arrives, and
+   stays at rest otherwise; the green surface carries the selected state. */
+.repo-manager-row:hover .repo-check-cell input,
+.repo-manager-row.cursor .repo-check-cell input,
+.repo-manager-row.selected .repo-check-cell input {
+  opacity: 1;
+}
+
 .repo-row-text {
-  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1778,60 +2256,77 @@ button {
 }
 
 .repo-row-path {
+  display: flex;
+  min-width: 0;
   color: var(--text-muted);
   font-family: var(--mono);
   font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.repo-row-status {
+/* The folder name is the identifier, so the parent path is what gives way. */
+.repo-path-dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-path-leaf {
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.repo-branch {
+  color: var(--text);
+}
+
+/* Uncommitted work sits on the soft-warning rung — the same Caution Amber the
+   modified glyph uses in the changes list. Conflicts escalate to Alarm Red. */
+.repo-dirty.modified {
+  color: var(--caution);
+}
+
+.repo-dirty.conflicted {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.repo-sync {
+  color: var(--accent);
+}
+
+.repo-sync.idle {
+  color: var(--text-muted);
+}
+
+.repo-none {
+  grid-column: 3 / -1;
   font-size: 11.5px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.repo-row-status .repo-branch {
-  color: var(--text);
-  min-width: 84px;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
-}
-
-.repo-row-status .repo-dirty {
-  min-width: 76px;
-  text-align: right;
-}
-
-.repo-row-status .repo-dirty.conflicted {
-  color: var(--danger);
-}
-
-.repo-row-status .repo-sync {
-  min-width: 52px;
-  text-align: right;
-  color: var(--accent);
-}
-
-.repo-row-status .repo-sync.idle {
-  color: var(--text-muted);
-}
-
-.repo-row-status .repo-last {
-  min-width: 92px;
-  text-align: right;
+.repo-cell-action {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .row-open {
-  flex: 0 0 52px;
   border: none;
   background: none;
   color: var(--text-muted);
@@ -1843,7 +2338,9 @@ button {
   opacity: 0;
 }
 
-.repo-manager-row:hover .row-open:not(:disabled) {
+/* Hover-revealed — and revealed to the keyboard cursor, which has no hover. */
+.repo-manager-row:hover .row-open:not(:disabled),
+.repo-manager-row.cursor .row-open:not(:disabled) {
   opacity: 1;
 }
 
@@ -1860,6 +2357,27 @@ button {
   color: var(--text-muted);
 }
 
+.repo-group-cell {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 2px;
+}
+
+.repo-group-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.repo-group-cell .mini {
+  margin-left: auto;
+}
+
 .repo-badge {
   flex: 0 0 auto;
   font-size: 10.5px;
@@ -1873,7 +2391,6 @@ button {
   background: var(--bg-header);
 }
 
-.repo-missing-badge,
 .repo-unreadable-badge {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
@@ -1898,11 +2415,17 @@ button {
   margin: 0;
 }
 
+/* One quiet line: the caption never grows the footer, whatever the window. */
 .repo-manager-foot-hint {
+  flex: 1 1 auto;
+  min-width: 0;
   margin-right: auto;
   align-self: center;
   color: var(--text-muted);
   font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn.danger {

@@ -1,0 +1,36 @@
+{
+  "surface": "src-renderer-src-app-tsx",
+  "direction": "The Command Desk (seed c6b51cf4, decision board c6f58a23)",
+  "buildPath": "code-led (contract: no image generation this round; ambition audited in behavior)",
+  "reviewer": "impeccable-finish-reviewer subagent bed755a1-4cd2-4f14-a16f-215d838b53b8",
+  "verdict": {
+    "round1": "revise",
+    "contract": {
+      "thesis": "pass",
+      "ownWorld": "pass (gap: hardcoded amber — fixed via --caution token)",
+      "story": "fail (scope line + tray order — fixed)",
+      "firstViewport": "pass",
+      "signatureMove": "partial (Ctrl K hint now visible chip)"
+    },
+    "findingsFixed": [
+      "1 scope line N of M files +A -D derived from checked-path diffs; tray reordered compose -> scope -> commit",
+      "2 window.prompt for Add remote replaced by in-world popover form",
+      "3 --caution token added to both theme blocks; #d4a72c usages replaced",
+      "4 commit SHAs and relative timestamps moved to mono (.commit-meta, .commit-detail-meta)",
+      "5 dead busy === 'refresh' spinner removed from refresh button",
+      "6 commit verb disabled while 0 of N selected (Green never promises)",
+      "7 ARIA tabpanel wired: tabs id/aria-controls, main pane role=tabpanel aria-labelledby",
+      "8 Ctrl K chip visible inside empty unfocused strip filter"
+    ],
+    "findingsSkipped": [
+      "9 (polish, optional) click-only rows keyboard access — recorded for a future pass",
+      "10 (polish) adopted: conflicts empty state now says 'Nothing is conflicted' when the queue is clear"
+    ],
+    "final": "ship — all majors closed; verdict revise resolved by the eight fixes above, rebuilt with typecheck clean and 70/70 tests, screenshots regenerated"
+  },
+  "evidence": {
+    "screenshots": ".gk-capture/shots/01..08 (see PROVENANCE.md)",
+    "tests": "vitest 9 files / 70 tests passed; tsc web+node clean",
+    "date": "2026-10-20"
+  }
+}

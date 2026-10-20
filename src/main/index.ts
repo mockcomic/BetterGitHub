@@ -1,17 +1,17 @@
 import { app, BrowserWindow } from 'electron'
+import { join } from 'path'
 import { buildAppMenu } from './menu'
 import { registerIpc } from './ipc'
 import { applyTheme, createMainWindow, getMainWindow } from './windows'
 import { getThemeSetting } from './settings'
 import { initCrashLogging } from './diagnostics'
 import { stopWatching } from './watcher'
-import { captureShots } from './shots'
 
-// Debug-only capture path: GITDESK_SHOTS_DIR opens the window, captures
-// the desk views as PNGs, and quits. Inert in normal use.
-const gotLock = app.requestSingleInstanceLock()
+if (process.env['ELECTRON_RENDERER_URL'] !== undefined) {
+  app.setPath('userData', join(process.cwd(), '.userdata-dev'))
+}
 
-if (!gotLock) {
+if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {
@@ -30,18 +30,6 @@ if (!gotLock) {
     registerIpc()
     buildAppMenu()
     createMainWindow(process.env['ELECTRON_RENDERER_URL'])
-
-    const shotsDir = process.env['GITDESK_SHOTS_DIR']
-    if (shotsDir !== undefined && shotsDir.length > 0) {
-      const win = getMainWindow()
-      if (win !== null) {
-        win.webContents.once('did-finish-load', () => {
-          setTimeout(() => {
-            void captureShots(win, shotsDir).then(() => app.quit())
-          }, 2500)
-        })
-      }
-    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

@@ -18,14 +18,28 @@ if (cli === undefined) {
   process.exit(1)
 }
 
+const args = process.argv.slice(2)
 const env = { ...process.env }
 delete env.ELECTRON_RUN_AS_NODE
 delete env.electron_run_as_node
+delete env.ELECTRON_EXEC_PATH
+delete env.electron_exec_path
+// Cursor/VS Code shells can launch Electron with a restricted sandbox.
+// electron-vite turns this into --no-sandbox for the development child.
+if (args.includes('dev')) {
+  env.NO_SANDBOX = '1'
+  env.ELECTRON_CLI_ARGS = JSON.stringify([
+    `--user-data-dir=${join(process.cwd(), '.userdata-dev')}`
+  ])
+}
 
-const args = process.argv.slice(2)
 const child = spawn(process.execPath, [cli, ...args], {
   stdio: 'inherit',
   env
+})
+child.on('error', error => {
+  console.error(`Could not start electron-vite: ${error.message}`)
+  process.exitCode = 1
 })
 child.on('exit', code => {
   process.exit(code ?? 0)

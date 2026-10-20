@@ -2,6 +2,7 @@ import type { JSX, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useStore, useStoreState } from '../store'
 import type { DeskView } from '../store'
+import { ConfettiBurst, useCelebration } from './Celebration'
 
 /** Placeholder for the command strip's filter, per desk view. */
 const FILTER_LABELS: Record<DeskView, string> = {
@@ -20,6 +21,7 @@ export function Header(): JSX.Element {
   const state = useStoreState()
   const store = useStore()
   const [openMenu, setOpenMenu] = useState<'repo' | 'branch' | null>(null)
+  const [filterFocused, setFilterFocused] = useState(false)
   const branchFilterRef = useRef<HTMLInputElement | null>(null)
   const deskFilterRef = useRef<HTMLInputElement | null>(null)
 
@@ -48,6 +50,7 @@ export function Header(): JSX.Element {
   const behind = status?.behind ?? 0
   const hasUpstream = status?.upstream !== undefined
   const busy = state.busy
+  const { nonce: celebrateNonce, celebrating } = useCelebration('push')
 
   return (
     <header className="header">
@@ -81,10 +84,17 @@ export function Header(): JSX.Element {
             title="Focus with Ctrl+K · Esc clears"
             value={state.deskFilter}
             onChange={e => store.setDeskFilter(e.target.value)}
+            onFocus={() => setFilterFocused(true)}
+            onBlur={() => setFilterFocused(false)}
             onKeyDown={e => {
               if (e.key === 'Escape') store.setDeskFilter('')
             }}
           />
+          {state.deskFilter.length === 0 && !filterFocused && (
+            <span className="kbd-hint" aria-hidden="true">
+              Ctrl K
+            </span>
+          )}
         </div>
       )}
 
@@ -99,7 +109,7 @@ export function Header(): JSX.Element {
             }}
             title="Refresh status"
           >
-            {busy === 'refresh' ? <span className="spinner" /> : '⟳'}
+            ⟳
           </button>
           <button
             className="btn"
@@ -116,16 +126,29 @@ export function Header(): JSX.Element {
             title="Pull from upstream"
           >
             {busy === 'pull' ? <span className="spinner" /> : null} ↓ Pull
-            {behind > 0 ? ` ${behind}` : ''}
+            {behind > 0 ? (
+              <span className="count-pop" key={`pull-count-${behind}`}>
+                {' '}{behind}
+              </span>
+            ) : (
+              ''
+            )}
           </button>
           <button
-            className="btn"
+            className={`btn${celebrating ? ' celebrating' : ''}`}
             disabled={busy !== null || status === null}
             onClick={() => void store.doSync('push')}
             title="Push to origin"
           >
             {busy === 'push' ? <span className="spinner" /> : null} ↑ Push
-            {ahead > 0 ? ` ${ahead}` : ''}
+            {ahead > 0 ? (
+              <span className="count-pop" key={`push-count-${ahead}`}>
+                {' '}{ahead}
+              </span>
+            ) : (
+              ''
+            )}
+            {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
           </button>
           {!hasUpstream && status !== null && (
             <span className="hint" title="No upstream branch — Push will set one on origin">
@@ -133,17 +156,7 @@ export function Header(): JSX.Element {
             </span>
           )}
           {state.remoteUrl === null && status !== null && (
-            <button
-              className="btn"
-              disabled={busy !== null}
-              title="This repository has no origin remote — add one to push"
-              onClick={() => {
-                const url = window.prompt('Origin remote URL (https or ssh git URL)')
-                if (url !== null && url.trim().length > 0) void store.addRemote(url)
-              }}
-            >
-              Add remote…
-            </button>
+            <AddRemoteButton disabled={busy !== null} />
           )}
           {state.remoteUrl !== null && (
             <button
@@ -162,9 +175,9 @@ export function Header(): JSX.Element {
 }
 
 /**
- * The signature readout: the route this checkout travels — branch ⇄ origin,
- * one arrow-count per direction, always in mono. It reports git truth only;
- * when there is nothing to say (0/0, upstream set) it stays quiet.
+ * The route this checkout travels — branch ⇄ origin, one arrow-count per
+ * direction, always in mono. It reports git truth only; when there is
+ * nothing to say (0/0, upstream set) it stays quiet.
  */
 function RouteReadout(): JSX.Element | null {
   const state = useStoreState()
@@ -182,9 +195,96 @@ function RouteReadout(): JSX.Element | null {
     <span className="route-readout" title={title} aria-label={title}>
       {status.branch} <span className="route-arrow">⇄</span>{' '}
       {upstream ?? 'no remote'}
-      {ahead > 0 && <> · ↑{ahead}</>}
-      {behind > 0 && <> · ↓{behind}</>}
+      {ahead > 0 && (
+        <>
+          {' · ↑'}
+          <span className="count-pop" key={`route-ahead-${ahead}`}>
+            {ahead}
+          </span>
+        </>
+      )}
+      {behind > 0 && (
+        <>
+          {' · ↓'}
+          <span className="count-pop" key={`route-behind-${behind}`}>
+            {behind}
+          </span>
+        </>
+      )}
     </span>
+  )
+}
+
+/**
+ * In-world replacement for the old native prompt: a small popover form on
+ * the strip itself, styled like the rest of the desk.
+ */
+function AddRemoteButton({ disabled }: { disabled: boolean }): JSX.Element {
+  const store = useStore()
+  const [open, setOpen] = useState(false)
+  const [url, setUrl] = useState('')
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    inputRef.current?.focus()
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current !== null && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const save = (): void => {
+    if (url.trim().length > 0) void store.addRemote(url.trim())
+    setOpen(false)
+    setUrl('')
+  }
+
+  return (
+    <div className="menu-wrap" ref={wrapRef}>
+      <button
+        className="btn"
+        disabled={disabled}
+        title="This repository has no origin remote — add one to push"
+        onClick={() => setOpen(o => !o)}
+      >
+        Add remote…
+      </button>
+      {open && (
+        <div className="popover">
+          <input
+            ref={inputRef}
+            className="popover-filter"
+            placeholder="Origin remote URL (https or ssh git URL)"
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') setOpen(false)
+            }}
+          />
+          <div className="popover-sep" />
+          <div className="popover-item-row">
+            <button
+              className="btn"
+              disabled={url.trim().length === 0}
+              onClick={save}
+            >
+              Save remote
+            </button>
+            <span className="popover-item-actions">
+              <button className="mini" onClick={() => setOpen(false)}>
+                Cancel
+              </button>
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

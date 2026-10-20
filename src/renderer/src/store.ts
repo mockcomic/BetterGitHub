@@ -86,6 +86,10 @@ export interface AppState {
   /** Text in the command strip's filter; scopes the current view. */
   readonly deskFilter: string
   readonly selectedStashIndex: number | null
+  /** Line-count stats behind the commit tray's scope line (`N of M · +A −D`). */
+  readonly scopeAdds: number
+  readonly scopeDels: number
+  readonly scopeLoading: boolean
   readonly selectedFilePath: string | null
   readonly selectedFileDiff: string | null
   readonly selectedFileError: string | null
@@ -104,6 +108,8 @@ export interface AppState {
   readonly remoteUrl: string | null
   readonly busy: string | null
   readonly aiBusy: boolean
+  /** Last completing-verb success, so the button that did it can celebrate. */
+  readonly celebration: CelebrationPulse | null
   readonly settings: PublicSettings | null
   readonly toasts: ReadonlyArray<Toast>
   readonly showSettings: boolean
@@ -116,6 +122,15 @@ export interface AppState {
   readonly confirm: ConfirmRequest | null
   readonly initError: string | null
   readonly lastRefreshedAt: number | null
+}
+
+export type CelebrationKind = 'commit' | 'push'
+
+/** A one-shot success signal; the nonce changes on every event so
+ *  components can re-trigger even when the same verb fires twice. */
+export interface CelebrationPulse {
+  readonly kind: CelebrationKind
+  readonly nonce: number
 }
 
 const initialState: AppState = {
@@ -135,6 +150,9 @@ const initialState: AppState = {
   view: 'review',
   deskFilter: '',
   selectedStashIndex: null,
+  scopeAdds: 0,
+  scopeDels: 0,
+  scopeLoading: false,
   selectedFilePath: null,
   selectedFileDiff: null,
   selectedFileError: null,
@@ -153,6 +171,7 @@ const initialState: AppState = {
   remoteUrl: null,
   busy: null,
   aiBusy: false,
+  celebration: null,
   settings: null,
   toasts: [],
   showSettings: false,
@@ -171,6 +190,7 @@ const PAGE_SIZE = 300
 const DRAFT_KEY_PREFIX = 'gitdesk.draft.'
 
 let toastId = 0
+let celebrationNonce = 0
 
 function draftKey(repoPath: string): string {
   return `${DRAFT_KEY_PREFIX}${repoPath}`
@@ -240,6 +260,11 @@ export class AppStore {
 
   dismissToast(id: number): void {
     this.update({ toasts: this.state.toasts.filter(t => t.id !== id) })
+  }
+
+  /** Fire the one-shot success signal for a completing verb (Commit/Push). */
+  celebrate(kind: CelebrationKind): void {
+    this.update({ celebration: { kind, nonce: ++celebrationNonce } })
   }
 
   private draftFor(repoPath: string): RepoDraft {
@@ -453,6 +478,9 @@ export class AppStore {
       view: 'review',
       deskFilter: '',
       selectedStashIndex: null,
+  scopeAdds: 0,
+  scopeDels: 0,
+  scopeLoading: false,
       logSearch: '',
       logAuthor: '',
       commits: []
@@ -906,6 +934,45 @@ export class AppStore {
     })
   }
 
+  private scopeToken = 0
+
+  /**
+   * Refreshes the tray's scope stats: the added/removed line totals across
+   * exactly the checked paths, so "what will ship" is honest before commit.
+   */
+  async recomputeScope(): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const draft = this.state.drafts.get(repo.path)
+    const checked = draft?.checked ?? new Set<string>()
+    if (checked.size === 0) {
+      this.update({ scopeAdds: 0, scopeDels: 0, scopeLoading: false })
+      return
+    }
+    const token = ++this.scopeToken
+    this.update({ scopeLoading: true })
+    const paths = [...checked].slice(0, 40)
+    try {
+      const diffs = await Promise.all(
+        paths.map(p =>
+          call('getPathDiff', repo.path, p, this.fileByPath(p)?.oldPath ?? undefined)
+        )
+      )
+      if (token !== this.scopeToken) return
+      let adds = 0
+      let dels = 0
+      for (const d of diffs) {
+        for (const line of d.split('\n')) {
+          if (line.startsWith('+') && !line.startsWith('+++')) adds += 1
+          else if (line.startsWith('-') && !line.startsWith('---')) dels += 1
+        }
+      }
+      this.update({ scopeAdds: adds, scopeDels: dels, scopeLoading: false })
+    } catch {
+      if (token === this.scopeToken) this.update({ scopeLoading: false })
+    }
+  }
+
   async stageAll(): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null || this.state.status === null) return
@@ -1180,6 +1247,7 @@ export class AppStore {
           ? undefined
           : [{ label: 'Undo', onClick: () => this.undoCommit() }]
       )
+      this.celebrate('commit')
       await this.refresh()
       void this.refreshBranches()
       void this.refreshStashes()
@@ -1348,6 +1416,7 @@ export class AppStore {
         'success',
         `${op === 'fetch' ? 'Fetched' : op === 'pull' ? 'Pulled' : 'Pushed'} — ${summary.slice(0, 140)}`
       )
+      if (op === 'push') this.celebrate('push')
       await this.refresh()
       void this.refreshBranches()
       void this.refreshStashes()

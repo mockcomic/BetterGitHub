@@ -1,5 +1,5 @@
 import { clipboard, dialog, ipcMain, shell } from 'electron'
-import { execFile } from 'child_process'
+import { spawn } from 'child_process'
 import { existsSync, statSync } from 'fs'
 import { join, resolve, sep } from 'path'
 import type {
@@ -13,7 +13,6 @@ import type {
   RequestResponseChannels
 } from '../shared/ipc'
 import { friendlyGitError } from './git/exec'
-import { logDiagnostics } from './diagnostics'
 import { getStatus } from './git/status'
 import { getCommitFileDiff, getCommitFileNames, getPathsDiffText, getPathDiff } from './git/diff'
 import {
@@ -98,44 +97,37 @@ function safeJoin(repoPath: string, path: string): string {
   return target
 }
 
+/**
+ * Starts a Windows shell helper (explorer.exe, rundll32.exe) and resolves as
+ * soon as the process exists. Waiting for it to exit is not an option:
+ * `explorer.exe /select,<path>` hands the request to the running shell and
+ * then leaves with exit code 1 *on success*, so the exit code cannot be the
+ * failure signal. A real failure — a binary that cannot be started at all —
+ * arrives through the `error` event instead of the exit code.
+ */
+function launchDetached(
+  command: string,
+  args: ReadonlyArray<string>
+): Promise<void> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' })
+    child.once('error', rejectPromise)
+    child.once('spawn', () => {
+      child.unref()
+      resolvePromise()
+    })
+  })
+}
+
 async function openUrl(url: string): Promise<void> {
   if (!/^https?:\/\//i.test(url)) {
     throw new Error(`Refusing to open a non-http(s) URL: ${url}`)
   }
-  // TEMP [dbg-vog] while chasing "View on GitHub does nothing".
-  logDiagnostics(
-    `[dbg-vog] openUrl: calling shell.openExternal(${url}) env SystemRoot=${JSON.stringify(
-      process.env['SystemRoot'] ?? process.env['SYSTEMROOT'] ?? null
-    )} windir=${JSON.stringify(process.env['windir'] ?? null)} ComSpec=${JSON.stringify(
-      process.env['ComSpec'] ?? null
-    )} pathLen=${(process.env['PATH'] ?? '').length} dshVars=${Object.keys(process.env)
-      .filter(k => k.startsWith('DSH_') || k.startsWith('ELECTRON_'))
-      .join(',')} cwd=${process.cwd()}`
-  )
-  try {
-    const ret = await shell.openExternal(url)
-    logDiagnostics(`[dbg-vog] openUrl: resolved=${JSON.stringify(ret)}`)
-  } catch (err) {
-    logDiagnostics(`[dbg-vog] openUrl: rejected ${String(err)}`)
-    throw err
-  }
-  // TEMP [dbg-vog] A/B: launch through explorer.exe (ShellExecute inside the
-  // Explorer process) so we can tell an Electron-shell failure apart from a
-  // process-launch restriction around this app instance.
-  execFile('explorer.exe', [url], (err, stdout, stderr) => {
-    logDiagnostics(
-      `[dbg-vog] openUrl: explorer.exe ${url} err=${err ? `${err.name} ${err.code} ${err.message}` : 'none'} out=${stdout.trim()} errout=${stderr.trim()}`
-    )
-  })
+  await shell.openExternal(url)
 }
 
 async function resolveWebRepo(repoPath: string) {
-  const remote = await getRemoteUrl(repoPath)
-  const repo = toWebRepository(remote)
-  // TEMP [dbg-vog] while chasing "View on GitHub does nothing".
-  logDiagnostics(
-    `[dbg-vog] resolveWebRepo: repoPath=${repoPath} remote=${remote} webUrl=${repo?.webUrl ?? 'null'}`
-  )
+  const repo = toWebRepository(await getRemoteUrl(repoPath))
   if (repo === null) {
     throw new Error(
       'No browsable URL for this repository — the origin remote is missing or not an http/ssh URL.'
@@ -488,12 +480,21 @@ const handlers: Handlers = {
     if (!existsSync(target)) {
       throw new Error(`${path} does not exist on disk any more.`)
     }
-    // TEMP diagnostics while chasing "Show in Explorer does nothing".
-    logDiagnostics(
-      `revealInFolder: repoPath=${repoPath} path=${path} target=${target} isDir=${statSync(target).isDirectory()}`
-    )
+    if (process.platform === 'win32') {
+      // shell.showItemInFolder is fire-and-forget — when the shell refuses it
+      // the menu item looks dead, because nothing can report the failure.
+      // Launching explorer ourselves gives a real error path (launchDetached
+      // explains why the exit code can't be the failure signal).
+      try {
+        await launchDetached('explorer.exe', [`/select,${target}`])
+        return
+      } catch {
+        // Best effort: fall back to Electron's own reveal.
+        shell.showItemInFolder(target)
+        return
+      }
+    }
     shell.showItemInFolder(target)
-    logDiagnostics('revealInFolder: showItemInFolder returned')
   },
   async openFile(repoPath: string, path: string) {
     const target = safeJoin(repoPath, path)
@@ -501,10 +502,19 @@ const handlers: Handlers = {
       throw new Error(`${path} does not exist on disk any more.`)
     }
     const failure = await shell.openPath(target)
-    // TEMP diagnostics while chasing "Show in Explorer does nothing".
-    logDiagnostics(`openFile: target=${target} openPathResult=${failure || 'ok'}`)
-    if (failure.length > 0) {
-      throw new Error(`Could not open ${path}: ${failure}`)
+    if (failure.length === 0) return
+    // A reported failure usually means the type has no usable open command —
+    // an extension with no association at all (`.md`), or one pointing at a
+    // ProgID that no longer exists (`assoc .gitignore=txtfile` with no
+    // HKEY_CLASSES_ROOT\txtfile). ShellExecute hides that behind a generic
+    // string, so ask the shell for its own "How do you want to open this?"
+    // picker instead of ending on a dead menu item.
+    try {
+      await launchDetached('rundll32.exe', ['shell32.dll,OpenAs_RunDLL', target])
+    } catch {
+      throw new Error(
+        `Could not open ${path}: ${failure}. Windows has no app associated with this file type.`
+      )
     }
   },
   async openExternal(url: string) {
@@ -573,10 +583,6 @@ export function registerIpc(): void {
       channel,
       async (event, ...args): Promise<IpcResult<unknown>> => {
         if (!isTrustedSender(event.sender.id)) {
-          // TEMP [dbg-vog] while chasing "View on GitHub does nothing".
-          logDiagnostics(
-            `[dbg-vog] IPC rejected (untrusted sender id=${event.sender.id}) for ${channel}`
-          )
           return { ok: false, error: `Untrusted IPC sender for ${channel}` }
         }
         try {

@@ -29,7 +29,10 @@
       { "name": "spinner", "value": "0.8s linear infinite", "purpose": "The app's only animation: the busy ring on AI/git operations." },
       { "name": "hover-lift-directional", "value": "150ms ease-out", "purpose": "Accepted-but-unimplemented direction: subtle lift/shadow response on button and row hover." }
     ],
-    "breakpoints": []
+    "breakpoints": [
+      { "name": "compact", "value": "max-width: 1160px", "purpose": "Queue and tray shrink to 290/260px." },
+      { "name": "stacked", "value": "max-width: 980px", "purpose": "The three body zones stack vertically — queue (38%), work area, tray (46%)." }
+    ]
   },
   "components": [
     {
@@ -89,12 +92,28 @@
       "css": ".ds-toast { background: var(--bg, #fff); border: 1px solid var(--border, #d0d7de); border-left-width: 4px; border-radius: 8px; box-shadow: var(--shadow, 0 8px 24px rgba(31,35,40,0.16)); padding: 9px 12px; font: 400 12.5px -apple-system, 'Segoe UI', sans-serif; color: var(--text, #1f2328); max-width: 420px; } .ds-toast-success { border-left-color: var(--primary, #1a7f37); } .ds-toast-error { border-left-color: var(--danger, #cf222e); } .ds-toast-info { border-left-color: var(--accent, #0969da); }"
     },
     {
-      "name": "Segmented Tabs",
+      "name": "Desk Switch",
       "kind": "nav",
       "refersTo": null,
-      "description": "Changes/History toggle; the active tab's Beacon Blue border is the sole active signal.",
-      "html": "<div class=\"ds-seg\"><button class=\"ds-seg-item\">Changes</button><button class=\"ds-seg-item ds-seg-active\">History</button></div>",
-      "css": ".ds-seg { display: flex; } .ds-seg-item { flex: 1; padding: 6px 0; border: 1px solid var(--border, #d0d7de); background: var(--bg, #fff); color: var(--text-muted, #656d76); cursor: pointer; font: 400 13px -apple-system, 'Segoe UI', sans-serif; } .ds-seg-item:first-child { border-radius: 6px 0 0 6px; } .ds-seg-item:last-child { border-radius: 0 6px 6px 0; border-left: none; } .ds-seg-active { background: var(--bg-header, #f3f5f7); color: var(--text, #1f2328); font-weight: 600; border-color: var(--accent, #0969da); }"
+      "description": "Four-tab Review/History/Conflicts/Stash switch; the active tab's Beacon Blue border is the sole active signal, count badges are mono pills, conflicts badge turns Alarm Red.",
+      "html": "<div class=\"ds-desk\"><button class=\"ds-desk-tab\">Review <span class=\"ds-desk-badge\">8</span></button><button class=\"ds-desk-tab ds-desk-active\">History</button><button class=\"ds-desk-tab\">Conflicts</button><button class=\"ds-desk-tab\">Stash <span class=\"ds-desk-badge\">1</span></button></div>",
+      "css": ".ds-desk { display: flex; gap: 4px; } .ds-desk-tab { padding: 6px 12px; border: 1px solid var(--border, #d0d7de); background: var(--bg, #fff); color: var(--text-muted, #656d76); border-radius: 4px; cursor: pointer; font: 400 13px -apple-system, 'Segoe UI', sans-serif; display: inline-flex; align-items: center; gap: 6px; } .ds-desk-active { background: var(--bg-header, #f3f5f7); color: var(--text, #1f2328); font-weight: 600; border-color: var(--accent, #0969da); } .ds-desk-tab:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0969da) 25%, transparent); } .ds-desk-badge { font: 400 10.5px 'Cascadia Code', Consolas, monospace; border: 1px solid var(--border, #d0d7de); border-radius: 999px; padding: 0 5px; color: var(--text-muted, #656d76); }"
+    },
+    {
+      "name": "Commit Tray Scope Line",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The tray's mono `N of M files · +A −D` declaration of exactly what will ship; the commit verb sits disabled whenever N is 0.",
+      "html": "<div class=\"ds-scope\"><b>3 of 11</b> files · +42 −7</div>",
+      "css": ".ds-scope { font: 400 11px 'Cascadia Code', Consolas, monospace; color: var(--text-muted, #656d76); cursor: help; } .ds-scope b { color: var(--text, #1f2328); font-weight: 600; }"
+    },
+    {
+      "name": "Route Readout & Ctrl K Chip",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The strip's signature mono `branch ⇄ origin` readout with Beacon Blue arrow and ↑↓ counts, plus the Ctrl K chip riding inside the filter field's right edge while it is empty.",
+      "html": "<span class=\"ds-route\">main <span class=\"ds-route-arrow\">⇄</span> origin · ↑1</span><span class=\"ds-kbd\">Ctrl K</span>",
+      "css": ".ds-route { font: 400 11.5px 'Cascadia Code', Consolas, monospace; color: var(--text-muted, #656d76); } .ds-route-arrow { color: var(--accent, #0969da); } .ds-kbd { font: 400 10.5px 'Cascadia Code', Consolas, monospace; color: var(--text-muted, #656d76); background: var(--bg-panel, #f6f8fa); border: 1px solid var(--border, #d0d7de); border-radius: 4px; padding: 0 5px; line-height: 16px; }"
     }
   ],
   "narrative": {
@@ -105,7 +124,7 @@
       "Git state is the only protagonist: status glyphs, diff washes, badges, and the Commit button carry all meaning.",
       "One shadow token, one use: floating layers only (popovers, dialogs, toasts, context menus).",
       "Machine truth in monospace, human text in the system stack — the split is meaningful, never stylistic.",
-      "Compact, instrument-panel density: 13px base, 4-16px spacing scale, fixed 400px working rail.",
+      "Compact, instrument-panel density: 13px base, 4-16px spacing scale, command strip over a 340px queue, dominant main pane, and a docked 300px commit tray.",
       "Light and dark themes are first-class equals driven by html[data-theme] custom properties."
     ],
     "rules": [
@@ -124,7 +143,8 @@
       "Do set repository-verbatim text (paths, diffs, commit messages, shortcut keys) in the mono stack, and UI prose in the system stack.",
       "Do use the Float shadow only for dismissible floating layers, and give new overlays 8-10px radius + 4px inner item radius like its existing consumers.",
       "Do express selection with the green Selected Surface and never with a checkbox-only or border-only treatment in the file/commit lists.",
-      "Do truncate with ellipsis at min-width: 0 rather than wrapping paths or breaking the 400px rail."
+      "Do truncate with ellipsis at min-width: 0 rather than wrapping paths or breaking the 340px queue column.",
+      "Do keep the commit verb disabled while its scope line reads 0 of N — the button that owns Green never promises what it will not do."
     ],
     "donts": [
       "Don't introduce chromatic color that encodes no git or task state; the palette is exhausted at Green/Blue/Red/Amber plus the three diff washes.",

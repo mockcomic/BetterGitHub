@@ -39,6 +39,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     void store.init()
   }, [store])
+  // Keep the tray's scope line honest: recompute +A −D whenever the checked
+  // set or the underlying status changes.
+  useEffect(() => {
+    void store.recomputeScope()
+  }, [store, state.selectedRepo, state.status, state.drafts])
 
   if (state.selectedRepo === null) {
     return (
@@ -58,6 +63,7 @@ export function App(): JSX.Element {
   }
 
   const view = state.view
+  const conflictCount = state.status?.conflictCount ?? 0
 
   return (
     <div className="app">
@@ -72,13 +78,19 @@ export function App(): JSX.Element {
       )}
       <SegmentedSwitch />
       <div className="body work-area">
-        <aside className="queue-col">
+        <aside className="queue-col pane-enter" key={`queue-${view}`}>
           {view === 'review' && <ChangesQueue />}
           {view === 'history' && <HistoryQueue />}
           {view === 'conflicts' && <ConflictsQueue />}
           {view === 'stash' && <StashQueue />}
         </aside>
-        <main className="main-pane">
+        <main
+          className="main-pane pane-enter"
+          id="desk-panel"
+          key={view}
+          role="tabpanel"
+          aria-labelledby={`desk-tab-${view}`}
+        >
           {view === 'review' && (
             <DiffView
               diff={state.selectedFileDiff}
@@ -113,8 +125,12 @@ export function App(): JSX.Element {
                   ? () => void store.openFile(state.selectedFilePath!)
                   : undefined
               }
-              emptyTitle="Select a conflicted file"
-              emptyHint="Pick a conflicted file to see the markers as they sit on disk."
+              emptyTitle={conflictCount === 0 ? 'Nothing is conflicted' : 'Select a conflicted file'}
+              emptyHint={
+                conflictCount === 0
+                  ? 'The worktree is clear — resolve nothing, and commit when you are ready.'
+                  : 'Pick a conflicted file to see the markers as they sit on disk.'
+              }
             />
           )}
           {view === 'history' && <HistoryView />}
@@ -186,8 +202,10 @@ function SegmentedSwitch(): JSX.Element {
         return (
           <button
             key={tab.id}
+            id={`desk-tab-${tab.id}`}
             role="tab"
             aria-selected={active}
+            aria-controls="desk-panel"
             tabIndex={active ? 0 : -1}
             className={`desk-tab${active ? ' active' : ''}${
               tab.id === 'conflicts' && count > 0 ? ' danger' : ''
