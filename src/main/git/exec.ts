@@ -11,6 +11,8 @@ export interface GitExecOptions {
   readonly input?: string
   /** Exit codes beyond 0 that count as success. */
   readonly successExitCodes?: ReadonlySet<number>
+  /** Extra variables merged on top of the default git environment. */
+  readonly env?: Readonly<Record<string, string>>
   readonly maxOutputBytes?: number
   /** Skip the default `-c core.quotepath=false` (used for plumbing we parse raw). */
   readonly noDefaults?: boolean
@@ -68,6 +70,7 @@ export async function execGit(
   delete env.GIT_EXTERNAL_DIFF
   delete env.GIT_PAGER
   delete env.EDITOR
+  if (options.env !== undefined) Object.assign(env, options.env)
 
   const command = finalArgs.join(' ')
 

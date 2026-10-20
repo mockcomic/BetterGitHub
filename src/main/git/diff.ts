@@ -16,14 +16,25 @@ export async function getPathDiff(
   if (oldPath !== undefined) args.push(oldPath)
   args.push(path)
 
-  const result = await execGit(args, {
-    cwd: repoPath,
-    timeoutMs: 30_000,
-    successExitCodes: new Set([0, 1])
-  })
+  let stdout = ''
+  try {
+    stdout = (
+      await execGit(args, {
+        cwd: repoPath,
+        timeoutMs: 30_000,
+        successExitCodes: new Set([0, 1])
+      })
+    ).stdout
+  } catch (err) {
+    // git aborts with exit 128 when the path is absent from the index/working
+    // tree (deleted since the caller's status snapshot, or ignored). Fall
+    // through to the synthesized diff below instead of failing the payload.
+    if (!(err instanceof GitExecError)) throw err
+    stdout = ''
+  }
 
-  if (result.stdout.trim().length > 0) {
-    return result.stdout
+  if (stdout.trim().length > 0) {
+    return stdout
   }
 
   // Likely untracked: synthesize an added-file diff from file contents.
@@ -117,6 +128,24 @@ export function parseNameStatusZ(
 }
 
 /**
+ * The subset of `paths` that currently exists in the index. `git diff HEAD --
+ * <paths>` aborts the whole command (exit 128, "no such path in the working
+ * tree") on a single path the index does not know, so callers must know which
+ * paths are safe to hand to the batched command.
+ */
+async function filterIndexedPaths(
+  repoPath: string,
+  paths: ReadonlyArray<string>
+): Promise<Set<string>> {
+  if (paths.length === 0) return new Set()
+  const result = await execGit(
+    ['ls-files', '-z', '--end-of-options', ...paths],
+    { cwd: repoPath, timeoutMs: 10_000 }
+  )
+  return new Set(result.stdout.split('\0').filter(p => p.length > 0))
+}
+
+/**
  * Combined diff text (vs HEAD) for a set of paths — this is the payload
  * handed to the AI commit-message agent, wrapped in a trust boundary there.
  */
@@ -127,22 +156,39 @@ export async function getPathsDiffText(
 ): Promise<string> {
   if (paths.length === 0) return ''
 
-  const tracked: string[] = []
-  const untracked: string[] = []
+  const candidates: string[] = []
+  const synthesized: string[] = []
   for (const p of paths) {
-    if (statusByPath.get(p)?.untracked === true) untracked.push(p)
-    else tracked.push(p)
+    if (statusByPath.get(p)?.untracked === true) synthesized.push(p)
+    else candidates.push(p)
   }
+
+  // Files deleted (or newly ignored) after the caller captured its status are
+  // checked in the sidebar but absent from the index; batching them kills the
+  // whole diff, so route them through the per-path fallback which tolerates a
+  // missing file. This also covers the race where a file vanishes between the
+  // index probe and the batched command.
+  const indexed = await filterIndexedPaths(repoPath, candidates)
+  const tracked = candidates.filter(p => indexed.has(p))
+  const stale = candidates.filter(p => !indexed.has(p))
 
   const parts: string[] = []
   if (tracked.length > 0) {
-    const r = await execGit(
-      ['diff', '--no-ext-diff', 'HEAD', '-U3', '--end-of-options', ...tracked],
-      { cwd: repoPath, timeoutMs: 30_000, successExitCodes: new Set([0, 1]) }
-    )
-    parts.push(r.stdout)
+    try {
+      const r = await execGit(
+        ['diff', '--no-ext-diff', 'HEAD', '-U3', '--end-of-options', ...tracked],
+        { cwd: repoPath, timeoutMs: 30_000, successExitCodes: new Set([0, 1]) }
+      )
+      parts.push(r.stdout)
+    } catch (err) {
+      if (!(err instanceof GitExecError)) throw err
+      for (const p of tracked) parts.push(await getPathDiff(repoPath, p))
+    }
   }
-  for (const p of untracked) {
+  for (const p of stale) {
+    parts.push(await getPathDiff(repoPath, p))
+  }
+  for (const p of synthesized) {
     parts.push(await getPathDiff(repoPath, p))
   }
 

@@ -1,5 +1,6 @@
 import type { JSX, ReactNode } from 'react'
 import { useEffect } from 'react'
+import { contextMenuIsOpen } from './ContextMenu'
 
 export function Dialog({
   title,
@@ -19,7 +20,8 @@ export function Dialog({
 }): JSX.Element {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      // A context menu above the dialog owns the first Escape.
+      if (e.key === 'Escape' && !contextMenuIsOpen()) onClose()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)

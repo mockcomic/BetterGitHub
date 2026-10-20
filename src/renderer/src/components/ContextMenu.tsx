@@ -17,6 +17,16 @@ export interface ContextMenuState {
 }
 
 /**
+ * Escape belongs to the menu while one is on screen: dialogs consult this
+ * instead of closing underneath it.
+ */
+let openMenus = 0
+
+export function contextMenuIsOpen(): boolean {
+  return openMenus > 0
+}
+
+/**
  * Lightweight right-click menu (GitHub Desktop's context menu for files and
  * commits). Reuses the popover styling and closes on outside click/Escape.
  */
@@ -28,6 +38,13 @@ export function ContextMenu({
   onClose: () => void
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    openMenus += 1
+    return () => {
+      openMenus -= 1
+    }
+  }, [])
 
   useEffect(() => {
     const closeOnClick = (e: MouseEvent): void => {
