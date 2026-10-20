@@ -13,6 +13,7 @@ declare global {
         ...args: ReadonlyArray<unknown>
       ): Promise<unknown>
       onMenuAction(callback: (action: MenuAction) => void): () => void
+      onRepoChanged(callback: (repoPath: string) => void): () => void
     }
   }
 }
@@ -37,4 +38,10 @@ export async function call<K extends RequestResponseChannel>(
 
 export function onMenuAction(callback: (action: MenuAction) => void): () => void {
   return window.gitdesk.onMenuAction(callback)
+}
+
+export function onRepoChanged(
+  callback: (repoPath: string) => void
+): () => void {
+  return window.gitdesk.onRepoChanged(callback)
 }

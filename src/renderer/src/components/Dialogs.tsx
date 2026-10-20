@@ -14,6 +14,7 @@ export function SettingsDialog(): JSX.Element | null {
   const [apiKey, setApiKey] = useState('')
   const [customInstructions, setCustomInstructions] = useState('')
   const [confirmOverride, setConfirmOverride] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(true)
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
@@ -24,6 +25,7 @@ export function SettingsDialog(): JSX.Element | null {
       setModel(settings.ai.model)
       setCustomInstructions(settings.ai.customInstructions)
       setConfirmOverride(settings.confirmOverrideWithGeneratedMessage)
+      setAutoRefresh(settings.autoRefresh)
       setTheme(settings.theme)
       setApiKey('')
       setTestResult(null)
@@ -54,6 +56,7 @@ export function SettingsDialog(): JSX.Element | null {
                     ...(apiKey.length > 0 ? { apiKey } : {})
                   },
                   confirmOverrideWithGeneratedMessage: confirmOverride,
+                  autoRefresh,
                   theme
                 })
                 .then(s => {
@@ -146,6 +149,14 @@ export function SettingsDialog(): JSX.Element | null {
           />
           Confirm before replacing a typed commit message with a generated one
         </label>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={autoRefresh}
+            onChange={e => setAutoRefresh(e.target.checked)}
+          />
+          Refresh the changes list automatically when files change on disk
+        </label>
       </section>
 
       <section className="settings-section">
@@ -172,6 +183,7 @@ export function CloneDialog(): JSX.Element | null {
   const store = useStore()
   const [url, setUrl] = useState('')
   const [folderName, setFolderName] = useState('')
+  const [suggested, setSuggested] = useState('')
   const [baseDir, setBaseDir] = useState('')
   const [folderTouched, setFolderTouched] = useState(false)
 
@@ -179,14 +191,25 @@ export function CloneDialog(): JSX.Element | null {
     if (!state.showClone) {
       setUrl('')
       setFolderName('')
+      setSuggested('')
       setBaseDir('')
       setFolderTouched(false)
+      return
     }
-  }, [state.showClone])
+    // Ask main for the folder name so the clone dialog and `git clone`
+    // agree on one rule.
+    const timer = setTimeout(() => {
+      if (url.trim().length === 0) return
+      void call('suggestCloneFolder', url)
+        .then(name => setSuggested(name))
+        .catch(() => setSuggested(''))
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [state.showClone, url])
 
   if (!state.showClone) return null
 
-  const derivedName = suggestedFolder(url)
+  const derivedName = folderTouched ? folderName : suggested
 
   return (
     <Dialog
@@ -203,14 +226,10 @@ export function CloneDialog(): JSX.Element | null {
             disabled={
               url.trim().length === 0 ||
               baseDir.length === 0 ||
-              (folderTouched ? folderName : derivedName).length === 0
+              derivedName.trim().length === 0
             }
             onClick={() =>
-              void store.clone(
-                url,
-                baseDir,
-                folderTouched ? folderName : derivedName
-              )
+              void store.clone(url, baseDir, derivedName.trim())
             }
           >
             Clone
@@ -218,7 +237,10 @@ export function CloneDialog(): JSX.Element | null {
         </>
       }
     >
-      <Field label="Repository URL">
+      <Field
+        label="Repository URL"
+        hint="https://github.com/owner/repo.git or git@github.com:owner/repo.git — authentication uses your git credential helper."
+      >
         <input
           autoFocus
           placeholder="https://github.com/owner/repo.git"
@@ -228,8 +250,8 @@ export function CloneDialog(): JSX.Element | null {
       </Field>
       <Field label="Name">
         <input
-          placeholder={derivedName || 'repository'}
-          value={folderTouched ? folderName : derivedName}
+          placeholder={suggested || 'repository'}
+          value={derivedName}
           onChange={e => {
             setFolderTouched(true)
             setFolderName(e.target.value)
@@ -263,12 +285,6 @@ export function CloneDialog(): JSX.Element | null {
   )
 }
 
-function suggestedFolder(url: string): string {
-  const cleaned = url.trim().replace(/\/+$/, '').replace(/\.git$/, '')
-  const last = cleaned.split(/[/:]/).pop() ?? ''
-  return last.replace(/[^a-zA-Z0-9._-]/g, '')
-}
-
 export function NewBranchDialog(): JSX.Element | null {
   const state = useStoreState()
   const store = useStore()
@@ -280,9 +296,11 @@ export function NewBranchDialog(): JSX.Element | null {
 
   if (!state.showNewBranch) return null
 
+  const base = state.newBranchBase ?? state.status?.branch ?? 'HEAD'
+
   return (
     <Dialog
-      title={`Create branch from "${state.status?.branch ?? 'HEAD'}"`}
+      title={`Create branch from "${base}"`}
       onClose={() => store.setNewBranchOpen(false)}
       footer={
         <>
@@ -292,14 +310,26 @@ export function NewBranchDialog(): JSX.Element | null {
           <button
             className="btn primary"
             disabled={name.trim().length === 0}
-            onClick={() => void store.createBranch(name)}
+            onClick={() =>
+              void store.createBranch(
+                name,
+                state.newBranchBase ?? undefined
+              )
+            }
           >
             Create branch
           </button>
         </>
       }
     >
-      <Field label="Branch name" hint="From the current branch">
+      <Field
+        label="Branch name"
+        hint={
+          state.newBranchBase !== null
+            ? `Starting at commit ${state.newBranchBase}, and switching to it.`
+            : 'From the current branch.'
+        }
+      >
         <input
           autoFocus
           placeholder="my-new-branch"
@@ -307,10 +337,115 @@ export function NewBranchDialog(): JSX.Element | null {
           onChange={e => setName(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter' && name.trim().length > 0)
-              void store.createBranch(name)
+              void store.createBranch(name, state.newBranchBase ?? undefined)
           }}
         />
       </Field>
+    </Dialog>
+  )
+}
+
+export function RenameBranchDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  const [name, setName] = useState('')
+  const oldName = state.renameBranchTarget
+
+  useEffect(() => {
+    if (state.renameBranchTarget === null) setName('')
+  }, [state.renameBranchTarget])
+
+  if (oldName === null) return null
+
+  const valid = name.trim().length > 0 && name.trim() !== oldName
+
+  return (
+    <Dialog
+      title={`Rename branch "${oldName}"`}
+      onClose={() => store.setRenameBranchTarget(null)}
+      footer={
+        <>
+          <button className="btn" onClick={() => store.setRenameBranchTarget(null)}>
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            disabled={!valid}
+            onClick={() => void store.renameBranch(oldName, name)}
+          >
+            Rename
+          </button>
+        </>
+      }
+    >
+      <Field label="New branch name" hint="Only the local branch is renamed.">
+        <input
+          autoFocus
+          defaultValue={oldName}
+          placeholder={oldName}
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && valid) void store.renameBranch(oldName, name)
+          }}
+        />
+      </Field>
+    </Dialog>
+  )
+}
+
+export function AboutDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+
+  if (!state.showAbout) return null
+
+  return (
+    <Dialog
+      title="About GitDesk"
+      width={420}
+      onClose={() => store.setAboutOpen(false)}
+      footer={
+        <button className="btn primary" onClick={() => store.setAboutOpen(false)}>
+          Close
+        </button>
+      }
+    >
+      <p className="confirm-message">
+        <strong>GitDesk</strong> — a GitHub Desktop-style git client with an
+        AI commit-message agent.
+      </p>
+      <p className="confirm-message">
+        Version 0.1.0 · git operations run through your system{' '}
+        <code>git</code>; AI requests go to the OpenAI-compatible endpoint
+        configured in Preferences.
+      </p>
+      <div className="settings-section">
+        <h3>Keyboard shortcuts</h3>
+        <ul className="shortcut-list">
+          <li>
+            <code>Ctrl+Enter</code> commit selected files
+          </li>
+          <li>
+            <code>Ctrl+Shift+X</code> / <code>Ctrl+Shift+Z</code> stage / unstage all
+          </li>
+          <li>
+            <code>Ctrl+Shift+S</code> stash all changes
+          </li>
+          <li>
+            <code>Ctrl+Shift+M</code> edit the latest commit
+          </li>
+          <li>
+            <code>Ctrl+Shift+F</code> / <code>P</code> / <code>U</code> fetch / pull / push
+          </li>
+          <li>
+            <code>Ctrl+Shift+G</code> view on GitHub · <code>Ctrl+R</code> refresh
+          </li>
+          <li>
+            <code>Ctrl+,</code> preferences
+          </li>
+        </ul>
+      </div>
     </Dialog>
   )
 }
@@ -320,7 +455,7 @@ export function ConfirmDialog(): JSX.Element | null {
   const store = useStore()
 
   if (state.confirm === null) return null
-  const { title, message, confirmLabel, onConfirm } = state.confirm
+  const { title, message, confirmLabel, altLabel, onAlt, onConfirm } = state.confirm
 
   return (
     <Dialog
@@ -331,6 +466,11 @@ export function ConfirmDialog(): JSX.Element | null {
           <button className="btn" onClick={() => store.dismissConfirm()}>
             Cancel
           </button>
+          {altLabel !== undefined && onAlt !== undefined && (
+            <button className="btn" onClick={onAlt}>
+              {altLabel}
+            </button>
+          )}
           <button className="btn primary" onClick={onConfirm}>
             {confirmLabel}
           </button>

@@ -1,14 +1,22 @@
 import type {
-  BranchInfo,
+  AddRepositoriesResult,
+  BranchList,
   CommitInfo,
   FileStatus,
   GeneratedCommitMessage,
+  GitHubTarget,
   GitConfigInfo,
   IpcResult,
+  LogQuery,
+  ManagedRepository,
   PublicSettings,
+  RemoveRepositoriesResult,
+  RepoSummaryEntry,
   Repository,
   RepositoryStatus,
-  SettingsPatch
+  SettingsPatch,
+  StashEntry,
+  WorkflowKind
 } from './models'
 
 /**
@@ -23,19 +31,47 @@ import type {
  */
 export interface RequestResponseChannels {
   // repositories / settings
-  listRepositories: () => Repository[]
+  /** All stored repos, including ones whose folder is missing on disk. */
+  listRepositories: () => ManagedRepository[]
   addRepository: (path: string) => Repository
-  removeRepository: (id: string) => void
+  /** Native multi-select directory picker; null when cancelled. */
+  selectDirectories: () => ReadonlyArray<string> | null
+  /** Bulk add used by the repository manager (validates each folder). */
+  addRepositories: (paths: ReadonlyArray<string>) => AddRepositoriesResult
+  /** Live status for the manager hub list; one bounded batch per call. */
+  getRepoSummaries: (paths: ReadonlyArray<string>) => RepoSummaryEntry[]
+  /**
+   * Bulk remove. Deletion is id-based so the renderer can only target folders
+   * already stored in settings; `deleteFromDisk` moves each folder that still
+   * exists to the OS Recycle Bin.
+   */
+  removeRepositories: (
+    ids: ReadonlyArray<string>,
+    deleteFromDisk: boolean
+  ) => RemoveRepositoriesResult
   getSettings: () => PublicSettings
   saveSettings: (patch: SettingsPatch) => PublicSettings
   selectDirectory: () => string | null
   testAiConnection: () => { ok: boolean; message: string }
+  suggestCloneFolder: (url: string) => string
+
+  // filesystem watching (main pushes REPO_CHANGED_CHANNEL)
+  startWatching: (repoPath: string) => void
+  stopWatching: () => void
 
   // status / staging
   getStatus: (repoPath: string) => RepositoryStatus
   stagePaths: (repoPath: string, paths: ReadonlyArray<string>) => void
   unstagePaths: (repoPath: string, paths: ReadonlyArray<string>) => void
   discardPaths: (repoPath: string, paths: ReadonlyArray<string>) => void
+  /** Pick one side of a conflict (or just stage it as resolved). */
+  resolveConflict: (
+    repoPath: string,
+    path: string,
+    side: 'ours' | 'theirs' | 'resolved'
+  ) => void
+  /** Append an ignore rule for a path to the repository's .gitignore. */
+  addToGitignore: (repoPath: string, path: string) => void
 
   // diffs
   /** Diff of a single path vs HEAD; synthesized +diff for untracked files. */
@@ -55,22 +91,56 @@ export interface RequestResponseChannels {
     description: string,
     paths: ReadonlyArray<string>
   ) => string
+  amendCommit: (
+    repoPath: string,
+    summary: string,
+    description: string,
+    paths: ReadonlyArray<string>
+  ) => string
+  /** Soft-reset the tip, but only while HEAD is still `expectedSha`. */
+  undoLastCommit: (repoPath: string, expectedSha: string) => void
+  revertCommit: (repoPath: string, sha: string) => void
+  cherryPickCommit: (repoPath: string, sha: string) => void
+
+  // paused operations (merge / rebase / cherry-pick / revert)
+  continueOperation: (repoPath: string, kind: WorkflowKind) => void
+  abortOperation: (repoPath: string, kind: WorkflowKind) => void
+
+  // stash
+  listStashes: (repoPath: string) => StashEntry[]
+  stashAll: (repoPath: string, message?: string) => void
+  applyStash: (repoPath: string, index: number) => void
+  popStash: (repoPath: string, index: number) => void
+  dropStash: (repoPath: string, index: number) => void
 
   // branches
-  getBranches: (repoPath: string) => BranchInfo[]
-  checkoutBranch: (repoPath: string, name: string) => void
-  createBranch: (repoPath: string, name: string) => void
+  getBranches: (repoPath: string) => BranchList
+  checkoutBranch: (repoPath: string, name: string, fromRemote?: string) => void
+  createBranch: (repoPath: string, name: string, startPoint?: string) => void
+  deleteBranch: (repoPath: string, name: string, force: boolean) => void
+  renameBranch: (repoPath: string, oldName: string, newName: string) => void
+  deleteRemoteBranch: (repoPath: string, remote: string, name: string) => void
 
   // history
-  getLog: (repoPath: string, maxCount?: number) => CommitInfo[]
+  getLog: (repoPath: string, query?: LogQuery) => CommitInfo[]
 
   // sync
   fetch: (repoPath: string) => string
   push: (repoPath: string) => string
   pull: (repoPath: string) => string
   getRemoteUrl: (repoPath: string) => string | null
+  addRemote: (repoPath: string, url: string) => void
   getConfigInfo: (repoPath: string) => GitConfigInfo
+  setConfigInfo: (repoPath: string, name: string, email: string) => void
   cloneRepository: (url: string, destinationPath: string) => string
+  /** Resolve a GitHub-style web URL from origin and open it externally. */
+  viewOnGitHub: (repoPath: string, target: GitHubTarget) => void
+
+  // shell integration
+  revealInFolder: (repoPath: string, path: string) => void
+  openFile: (repoPath: string, path: string) => void
+  openExternal: (url: string) => void
+  writeClipboard: (text: string) => void
 
   // AI commit messages
   generateCommitMessage: (
@@ -100,5 +170,20 @@ export type MenuAction =
   | 'show-preferences'
   | 'add-repository'
   | 'clone-repository'
+  | 'manage-repositories'
+  | 'stash-all'
+  | 'edit-last-commit'
+  | 'undo-commit'
+  | 'copy-sha'
+  | 'revert-commit'
+  | 'cherry-pick-commit'
+  | 'create-branch-from-commit'
+  | 'delete-branch'
+  | 'rename-branch'
+  | 'view-on-github'
+  | 'show-about'
 
 export const MENU_ACTION_CHANNEL = 'menu-action'
+
+/** Main -> renderer push: the working tree of a watched repository changed. */
+export const REPO_CHANGED_CHANNEL = 'repo-changed'

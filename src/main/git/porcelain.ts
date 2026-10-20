@@ -92,9 +92,11 @@ export function parsePorcelainStatus(output: string): PorcelainStatus {
 
     if (marker === 'u') {
       const parts = record.split(' ')
-      // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <hW> <Xscore> <path>
+      // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
+      // (verified against `git status --porcelain=2 -z` output: unmerged
+      // records carry no <Xscore>, unlike rename records)
       entries.push({
-        path: parts.slice(11).join(' '),
+        path: parts.slice(10).join(' '),
         indexCode: parts[1]?.[0] ?? 'U',
         worktreeCode: parts[1]?.[1] ?? 'U',
         untracked: false

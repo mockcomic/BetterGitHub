@@ -1,7 +1,8 @@
 import type { JSX } from 'react'
-import { useStore } from '../store'
+import { useStore, useStoreState } from '../store'
 
 export function EmptyState(): JSX.Element {
+  const state = useStoreState()
   const store = useStore()
   return (
     <div className="empty-state">
@@ -21,13 +22,41 @@ export function EmptyState(): JSX.Element {
           <button className="btn" onClick={() => store.setCloneOpen(true)}>
             Clone repository…
           </button>
+          <button className="btn" onClick={() => store.setRepoManagerOpen(true)}>
+            Manage repositories…
+          </button>
         </div>
-        <button
-          className="link"
-          onClick={() => store.setSettingsOpen(true)}
-        >
-          Configure the AI agent in Preferences
-        </button>
+
+        {state.repositories.some(r => !r.missing) && (
+          <div className="recent-repos">
+            <h2>Recent repositories</h2>
+            {state.repositories
+              .filter(r => !r.missing)
+              .map(r => (
+                <button
+                  key={r.id}
+                  className="recent-repo"
+                  onClick={() => void store.selectRepo(r)}
+                >
+                  <strong>{r.name}</strong>
+                  <small title={r.path}>{r.path}</small>
+                </button>
+              ))}
+          </div>
+        )}
+
+        {state.initError !== null && (
+          <p className="busy-line">{state.initError}</p>
+        )}
+
+        <div className="onboarding-links">
+          <button className="link" onClick={() => store.setSettingsOpen(true)}>
+            Configure the AI agent in Preferences
+          </button>
+          <button className="link" onClick={() => store.setAboutOpen(true)}>
+            Keyboard shortcuts
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -1,18 +1,37 @@
 import type { JSX } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Header } from './components/Header'
-import { ChangesSidebar } from './components/ChangesSidebar'
+import {
+  ChangesQueue,
+  CommitTray,
+  ConflictsQueue,
+  HistoryQueue,
+  ResolveHelp,
+  StashDetail,
+  StashQueue
+} from './components/ChangesSidebar'
 import { DiffView } from './components/DiffView'
 import { HistoryView } from './components/HistoryView'
 import { Toasts } from './components/Toasts'
 import {
+  AboutDialog,
   CloneDialog,
   ConfirmDialog,
   NewBranchDialog,
+  RenameBranchDialog,
   SettingsDialog
 } from './components/Dialogs'
+import { RepoManagerDialog } from './components/RepoManagerDialog'
 import { EmptyState } from './components/EmptyState'
 import { useStore, useStoreState } from './store'
+import type { DeskView } from './store'
+
+const DESK_TABS: ReadonlyArray<{ id: DeskView; label: string }> = [
+  { id: 'review', label: 'Review' },
+  { id: 'history', label: 'History' },
+  { id: 'conflicts', label: 'Conflicts' },
+  { id: 'stash', label: 'Stash' }
+]
 
 export function App(): JSX.Element {
   const state = useStoreState()
@@ -29,38 +48,211 @@ export function App(): JSX.Element {
         <Toasts />
         <SettingsDialog />
         <CloneDialog />
+        <RepoManagerDialog />
         <NewBranchDialog />
+        <RenameBranchDialog />
+        <AboutDialog />
         <ConfirmDialog />
       </div>
     )
   }
 
+  const view = state.view
+
   return (
     <div className="app">
       <Header />
-      <div className="body">
-        <ChangesSidebar />
+      {state.initError !== null && (
+        <div className="app-banner error">
+          <strong>GitDesk could not start correctly.</strong> {state.initError}{' '}
+          <button className="mini" onClick={() => void store.init()}>
+            Retry
+          </button>
+        </div>
+      )}
+      <SegmentedSwitch />
+      <div className="body work-area">
+        <aside className="queue-col">
+          {view === 'review' && <ChangesQueue />}
+          {view === 'history' && <HistoryQueue />}
+          {view === 'conflicts' && <ConflictsQueue />}
+          {view === 'stash' && <StashQueue />}
+        </aside>
         <main className="main-pane">
-          {state.activeTab === 'changes' ? (
+          {view === 'review' && (
             <DiffView
               diff={state.selectedFileDiff}
               title={state.selectedFilePath}
+              error={state.selectedFileError}
+              onRetry={
+                state.selectedFilePath !== null
+                  ? () => void store.selectFile(state.selectedFilePath!)
+                  : undefined
+              }
+              onOpenFile={
+                state.selectedFilePath !== null
+                  ? () => void store.openFile(state.selectedFilePath!)
+                  : undefined
+              }
               emptyTitle="Select a changed file"
               emptyHint="Pick a file from the list to see what changed before committing."
             />
-          ) : (
-            <HistoryView />
           )}
+          {view === 'conflicts' && (
+            <DiffView
+              diff={state.selectedFileDiff}
+              title={state.selectedFilePath}
+              error={state.selectedFileError}
+              onRetry={
+                state.selectedFilePath !== null
+                  ? () => void store.selectFile(state.selectedFilePath!)
+                  : undefined
+              }
+              onOpenFile={
+                state.selectedFilePath !== null
+                  ? () => void store.openFile(state.selectedFilePath!)
+                  : undefined
+              }
+              emptyTitle="Select a conflicted file"
+              emptyHint="Pick a conflicted file to see the markers as they sit on disk."
+            />
+          )}
+          {view === 'history' && <HistoryView />}
+          {view === 'stash' && <StashDetail />}
         </main>
+        {view === 'review' && (
+          <aside className="commit-tray" aria-label="Commit tray">
+            <CommitTray />
+          </aside>
+        )}
+        {view === 'conflicts' && (
+          <aside className="commit-tray" aria-label="Conflict guidance">
+            <ResolveHelp />
+          </aside>
+        )}
       </div>
       <StatusBar />
       <Toasts />
       <SettingsDialog />
       <CloneDialog />
+      <RepoManagerDialog />
       <NewBranchDialog />
+      <RenameBranchDialog />
+      <AboutDialog />
       <ConfirmDialog />
     </div>
   )
+}
+
+/** The four-way switch under the command strip; arrow keys move between tabs. */
+function SegmentedSwitch(): JSX.Element {
+  const state = useStoreState()
+  const store = useStore()
+  const tabsRef = useRef<HTMLDivElement | null>(null)
+
+  const conflicts = state.status?.conflictCount ?? 0
+  const files = state.status?.files.length ?? 0
+  const stashes = state.stashes.length
+
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    e.preventDefault()
+    const order = DESK_TABS.map(t => t.id)
+    const at = order.indexOf(state.view)
+    const next =
+      order[
+        (at + (e.key === 'ArrowRight' ? 1 : order.length - 1)) % order.length
+      ]
+    store.setView(next)
+    // Keep focus on the newly active tab when the switch itself has focus.
+    const active = tabsRef.current?.querySelector<HTMLButtonElement>(
+      '[role="tab"][aria-selected="true"]'
+    )
+    if (document.activeElement instanceof HTMLButtonElement) active?.focus()
+  }
+
+  return (
+    <nav className="desk-switch" ref={tabsRef} onKeyDown={onKeyDown} aria-label="Desk view">
+      {DESK_TABS.map(tab => {
+        const active = state.view === tab.id
+        const count =
+          tab.id === 'review'
+            ? files
+            : tab.id === 'conflicts'
+              ? conflicts
+              : tab.id === 'stash'
+                ? stashes
+                : 0
+        return (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={active}
+            tabIndex={active ? 0 : -1}
+            className={`desk-tab${active ? ' active' : ''}${
+              tab.id === 'conflicts' && count > 0 ? ' danger' : ''
+            }`}
+            onClick={() => store.setView(tab.id)}
+            title={
+              tab.id === 'review'
+                ? 'Review and commit your changes'
+                : tab.id === 'history'
+                  ? 'Browse the commit history'
+                  : tab.id === 'conflicts'
+                    ? conflicts > 0
+                      ? `${conflicts} file${conflicts === 1 ? '' : 's'} waiting to be resolved`
+                      : 'No conflicts right now'
+                    : 'Restore previously stashed changes'
+            }
+          >
+            {tab.label}
+            {count > 0 && (
+              <span className={`tab-badge${tab.id === 'conflicts' ? ' danger' : ''}`}>
+                {count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+const BUSY_LABELS: Record<string, string> = {
+  commit: 'Committing…',
+  amend: 'Amending…',
+  undo: 'Undoing commit…',
+  revert: 'Reverting…',
+  'cherry-pick': 'Cherry-picking…',
+  clone: 'Cloning…',
+  fetch: 'Fetching…',
+  pull: 'Pulling…',
+  push: 'Pushing…',
+  stage: 'Staging…',
+  unstage: 'Unstaging…',
+  discard: 'Discarding changes…',
+  resolve: 'Resolving conflict…',
+  continue: 'Continuing operation…',
+  abort: 'Aborting operation…',
+  stash: 'Stashing changes…',
+  'stash-apply': 'Applying stash…',
+  'stash-pop': 'Popping stash…',
+  'stash-drop': 'Dropping stash…',
+  reveal: 'Revealing in Explorer…',
+  open: 'Opening…',
+  copy: 'Copying…',
+  ignore: 'Updating .gitignore…',
+  remote: 'Saving remote…',
+  'delete-remote': 'Deleting remote branch…'
+}
+
+function busyLabel(busy: string): string {
+  return BUSY_LABELS[busy] ?? `${busy}…`
+}
+
+function clockTime(ms: number): string {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 function StatusBar(): JSX.Element | null {
@@ -68,19 +260,35 @@ function StatusBar(): JSX.Element | null {
   const { status, selectedRepo } = state
   if (selectedRepo === null) return null
   const dirty = status?.files.length ?? 0
+  const conflicts = status?.conflictCount ?? 0
   return (
     <footer className="status-bar">
       <span className="status-item" title={selectedRepo.path}>
         {selectedRepo.name}
       </span>
-      <span className="status-item">{status?.branch ?? '—'}</span>
       <span className="status-item">
-        {dirty === 0 ? 'Clean' : `${dirty} changed file${dirty === 1 ? '' : 's'}`}
+        {dirty === 0
+          ? 'Clean'
+          : `${dirty} changed file${dirty === 1 ? '' : 's'}`}
+        {conflicts > 0 && ` · ${conflicts} conflicted`}
       </span>
-      {state.busy !== null && (
-        <span className="status-item busy">{state.busy}…</span>
+      {state.stashes.length > 0 && (
+        <span className="status-item" title="Stashed changes">
+          {state.stashes.length} stashed
+        </span>
       )}
-      <span className="status-item right">GitDesk</span>
+      {state.busy !== null && (
+        <span className="status-item busy">{busyLabel(state.busy)}</span>
+      )}
+      {state.aiBusy && (
+        <span className="status-item busy">Writing commit message…</span>
+      )}
+      <span className="status-item right">
+        {state.lastRefreshedAt !== null && (
+          <span title="Last refreshed">updated {clockTime(state.lastRefreshedAt)} · </span>
+        )}
+        GitDesk
+      </span>
     </footer>
   )
 }

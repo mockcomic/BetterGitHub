@@ -1,5 +1,11 @@
 import type { JSX } from 'react'
+import { useState } from 'react'
 import { DiffView } from './DiffView'
+import {
+  ContextMenu,
+  menuStateFromEvent,
+  type ContextMenuState
+} from './ContextMenu'
 import { useStore, useStoreState } from '../store'
 
 /**
@@ -10,6 +16,7 @@ import { useStore, useStoreState } from '../store'
 export function HistoryView(): JSX.Element {
   const state = useStoreState()
   const store = useStore()
+  const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const commit = state.selectedCommit
 
   if (commit === null) {
@@ -27,10 +34,62 @@ export function HistoryView(): JSX.Element {
         <div className="commit-detail-head">
           <strong>{commit.summary}</strong>
           {commit.isMerge && <span className="badge">merge</span>}
+          <div className="commit-actions-inline">
+            <button
+              className="mini"
+              title="Copy the full SHA"
+              onClick={() => void store.copyText(commit.sha, 'Commit SHA')}
+            >
+              Copy SHA
+            </button>
+            {state.commits[0]?.sha === commit.sha && (
+              <button
+                className="mini"
+                title="Load this commit's message into the commit box for rewriting"
+                disabled={state.busy !== null}
+                onClick={() => void store.editLastCommit()}
+              >
+                Edit latest
+              </button>
+            )}
+            <button
+              className="mini"
+              title="Create a branch starting at this commit"
+              onClick={() => store.createBranchFromSelectedCommit()}
+            >
+              Branch from here
+            </button>
+            <button
+              className="mini"
+              title="Apply this commit onto the current branch"
+              disabled={state.busy !== null}
+              onClick={() => store.cherryPickSelectedCommit()}
+            >
+              Cherry-pick
+            </button>
+            <button
+              className="mini danger"
+              title="Create a commit that undoes this one"
+              disabled={state.busy !== null}
+              onClick={() => store.revertSelectedCommit()}
+            >
+              Revert
+            </button>
+            {state.remoteUrl !== null && (
+              <button
+                className="mini"
+                title="Open this commit in the browser"
+                onClick={() => void store.viewOnGitHub({ kind: 'commit', sha: commit.sha })}
+              >
+                View on GitHub
+              </button>
+            )}
+          </div>
         </div>
         <div className="commit-detail-meta">
           {commit.authorName} &lt;{commit.authorEmail}&gt; ·{' '}
           {new Date(commit.date).toLocaleString()} · {commit.sha.slice(0, 10)}
+          {commit.parents.length > 1 && ` · ${commit.parents.length} parents`}
         </div>
         {commit.body.length > 0 && (
           <pre className="commit-detail-body">{commit.body}</pre>
@@ -42,6 +101,31 @@ export function HistoryView(): JSX.Element {
           <div className="commit-files-head">
             Changed files ({state.commitFiles.length})
           </div>
+          {state.commitFilesLoading && (
+            <div className="sidebar-message">Loading files…</div>
+          )}
+          {state.commitFilesError !== null && (
+            <div className="sidebar-message error">
+              <strong>Can't list this commit's files.</strong>
+              <p>{state.commitFilesError}</p>
+              <p>
+                <button
+                  className="mini"
+                  onClick={() => void store.selectCommit(commit)}
+                >
+                  Try again
+                </button>
+              </p>
+            </div>
+          )}
+          {!state.commitFilesLoading &&
+            state.commitFilesError === null &&
+            state.commitFiles.length === 0 && (
+              <div className="sidebar-message">
+                <strong>No files</strong>
+                <p>This commit has no changes to show.</p>
+              </div>
+            )}
           {state.commitFiles.map(f => (
             <div
               key={f.path}
@@ -49,6 +133,21 @@ export function HistoryView(): JSX.Element {
                 state.selectedCommitFilePath === f.path ? ' selected' : ''
               }`}
               onClick={() => void store.selectCommitFile(f.path)}
+              onContextMenu={e => {
+                e.preventDefault()
+                setMenu(
+                  menuStateFromEvent(e, [
+                    {
+                      label: 'Copy path',
+                      onSelect: () => void store.copyText(f.path, 'Path')
+                    },
+                    {
+                      label: 'Show in Explorer',
+                      onSelect: () => void store.revealFile(f.path)
+                    }
+                  ])
+                )
+              }}
             >
               <span className={`status-glyph ${f.kind}`}>
                 {f.kind === 'new'
@@ -69,11 +168,18 @@ export function HistoryView(): JSX.Element {
           <DiffView
             diff={state.selectedCommitFileDiff}
             title={state.selectedCommitFilePath}
+            error={state.selectedCommitFileError}
+            onRetry={
+              state.selectedCommitFilePath !== null
+                ? () => void store.selectCommitFile(state.selectedCommitFilePath!)
+                : undefined
+            }
             emptyTitle="Select a file"
             emptyHint="Choose one of the changed files to see its diff."
           />
         </div>
       </div>
+      {menu !== null && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
     </div>
   )
 }

@@ -9,8 +9,9 @@ function sendAction(action: MenuAction): void {
 
 /**
  * App menu mirroring the categories GitHub Desktop exposes (File/Edit/View/
- * Repository/Help); repository operations are forwarded to the renderer as
- * menu actions, the same pattern the original uses with menu item indices.
+ * Repository/History/Help); repository operations are forwarded to the
+ * renderer as menu actions, the same pattern the original uses with menu item
+ * indices.
  */
 export function buildAppMenu(): void {
   const isMac = process.platform === 'darwin'
@@ -27,6 +28,11 @@ export function buildAppMenu(): void {
     {
       label: 'File',
       submenu: [
+        {
+          label: 'Manage repositories…',
+          accelerator: 'CmdOrCtrl+T',
+          click: () => sendAction('manage-repositories')
+        },
         { label: 'Add local repository…', click: () => sendAction('add-repository') },
         { label: 'Clone repository…', click: () => sendAction('clone-repository') },
         { type: 'separator' },
@@ -82,7 +88,24 @@ export function buildAppMenu(): void {
           click: () => sendAction('unstage-all')
         },
         { type: 'separator' },
+        {
+          label: 'Stash all my changes',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => sendAction('stash-all')
+        },
+        {
+          label: 'Edit latest commit…',
+          accelerator: 'CmdOrCtrl+Shift+M',
+          click: () => sendAction('edit-last-commit')
+        },
+        {
+          label: 'Undo latest commit',
+          click: () => sendAction('undo-commit')
+        },
+        { type: 'separator' },
         { label: 'New branch…', click: () => sendAction('new-branch') },
+        { label: 'Rename branch…', click: () => sendAction('rename-branch') },
+        { label: 'Delete branch…', click: () => sendAction('delete-branch') },
         { type: 'separator' },
         {
           label: 'Fetch',
@@ -101,9 +124,40 @@ export function buildAppMenu(): void {
         },
         { type: 'separator' },
         {
+          label: 'View on GitHub',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => sendAction('view-on-github')
+        },
+        {
           label: 'Refresh',
           accelerator: 'CmdOrCtrl+R',
           click: () => sendAction('refresh')
+        }
+      ]
+    },
+    {
+      label: 'History',
+      submenu: [
+        {
+          label: 'Copy SHA of selected commit',
+          click: () => sendAction('copy-sha')
+        },
+        {
+          label: 'Create branch from selected commit…',
+          click: () => sendAction('create-branch-from-commit')
+        },
+        {
+          label: 'Revert selected commit…',
+          click: () => sendAction('revert-commit')
+        },
+        {
+          label: 'Cherry-pick selected commit…',
+          click: () => sendAction('cherry-pick-commit')
+        },
+        { type: 'separator' },
+        {
+          label: 'View selected commit on GitHub',
+          click: () => sendAction('view-on-github')
         }
       ]
     },
@@ -112,9 +166,7 @@ export function buildAppMenu(): void {
       submenu: [
         {
           label: 'About GitDesk',
-          click: () => {
-            void getMainWindow()?.webContents.send(MENU_ACTION_CHANNEL, 'show-preferences')
-          }
+          click: () => sendAction('show-about')
         }
       ]
     }

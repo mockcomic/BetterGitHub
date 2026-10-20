@@ -68,6 +68,32 @@ export async function getRemoteUrl(
   }
 }
 
+/**
+ * Points `origin` at `url`, adding the remote when the repository has none.
+ * Refuses to silently move an existing, different origin.
+ */
+export async function addRemote(
+  repoPath: string,
+  url: string
+): Promise<void> {
+  const trimmed = url.trim()
+  if (trimmed.length === 0) {
+    throw new Error('Enter a repository URL.')
+  }
+  const existing = await getRemoteUrl(repoPath)
+  if (existing === null) {
+    await execGit(['remote', 'add', 'origin', trimmed], {
+      cwd: repoPath,
+      timeoutMs: 20_000
+    })
+    return
+  }
+  if (existing === trimmed) return
+  throw new Error(
+    `origin already points at ${existing}\nEnter a different remote URL or update .git/config manually.`
+  )
+}
+
 export async function getConfigInfo(
   repoPath: string
 ): Promise<{ name: string | null; email: string | null }> {
@@ -88,6 +114,33 @@ export async function getConfigInfo(
     read('user.email')
   ])
   return { name, email }
+}
+
+/**
+ * Writes the repository-local author identity — the fix for the missing
+ * `user.name`/`user.email` that otherwise fails only at commit time.
+ */
+export async function setConfigInfo(
+  repoPath: string,
+  name: string,
+  email: string
+): Promise<void> {
+  const trimmedName = name.trim()
+  const trimmedEmail = email.trim()
+  if (trimmedName.length === 0) {
+    throw new Error('Author name cannot be empty.')
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
+    throw new Error('Enter a valid email address, e.g. you@example.com.')
+  }
+  await execGit(['config', '--local', 'user.name', trimmedName], {
+    cwd: repoPath,
+    timeoutMs: 10_000
+  })
+  await execGit(['config', '--local', 'user.email', trimmedEmail], {
+    cwd: repoPath,
+    timeoutMs: 10_000
+  })
 }
 
 export function suggestedCloneDirectory(url: string): string {

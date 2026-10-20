@@ -1,31 +1,19 @@
-import type { CommitInfo } from '../../shared/models'
+import type { CommitInfo, LogQuery } from '../../shared/models'
 import { execGit } from './exec'
 
-const FIELD_SEP = '\u001f'
-const RECORD_SEP = '\u001e'
+const FIELD_SEP = ''
+const RECORD_SEP = ''
+
+const DEFAULT_MAX_COUNT = 300
 
 export async function getLog(
   repoPath: string,
-  maxCount = 300
+  query: LogQuery = {}
 ): Promise<CommitInfo[]> {
-  const format = [
-    '%H',
-    '%P',
-    '%an',
-    '%ae',
-    '%aI',
-    '%s',
-    '%B'
-  ].join(FIELD_SEP)
-
-  const result = await execGit(
-    [
-      'log',
-      `--max-count=${maxCount}`,
-      `--format=${format}${RECORD_SEP}`
-    ],
-    { cwd: repoPath, timeoutMs: 30_000 }
-  )
+  const result = await execGit(buildLogArgs(query), {
+    cwd: repoPath,
+    timeoutMs: 30_000
+  })
 
   return result.stdout
     .split(RECORD_SEP)
@@ -51,4 +39,37 @@ export async function getLog(
         isMerge: parentList.length > 1
       }
     })
+}
+
+/**
+ * Builds the `git log` argv. Exposed (and unit-tested) so the paging/search
+ * contract stays stable: `--skip` + `--max-count` give "load more", `-i
+ * --grep` / `--author` filter case-insensitively.
+ */
+export function buildLogArgs(query: LogQuery = {}): string[] {
+  const maxCount = positiveInt(query.maxCount) ?? DEFAULT_MAX_COUNT
+  const skip = positiveInt(query.skip) ?? 0
+
+  const args = [
+    'log',
+    `--max-count=${maxCount}`,
+    `--skip=${skip}`,
+    `--format=${['%H', '%P', '%an', '%ae', '%aI', '%s', '%B'].join(FIELD_SEP)}${RECORD_SEP}`
+  ]
+
+  const search = query.search?.trim()
+  if (search !== undefined && search.length > 0) {
+    args.push('-i', `--grep=${search}`)
+  }
+  const author = query.author?.trim()
+  if (author !== undefined && author.length > 0) {
+    args.push(`--author=${author}`)
+  }
+  return args
+}
+
+function positiveInt(value: number | undefined): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined
+  const int = Math.floor(value)
+  return int > 0 ? int : undefined
 }

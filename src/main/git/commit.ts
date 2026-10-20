@@ -1,4 +1,4 @@
-import { execGit } from './exec'
+import { execGit, GitExecError } from './exec'
 
 /**
  * Commits exactly the given paths with a summary/description message.
@@ -40,4 +40,136 @@ export async function commitPaths(
 
   return (await execGit(['rev-parse', 'HEAD'], { cwd: repoPath, timeoutMs: 10_000 }))
     .stdout.trim()
+}
+
+/**
+ * Rewrites the tip commit with a new message (and the given paths), the
+ * "Edit latest commit" flow. Uses the same `--only` semantics as a commit so
+ * checking files still scopes what the amendment includes.
+ */
+export async function amendCommit(
+  repoPath: string,
+  summary: string,
+  description: string,
+  paths: ReadonlyArray<string>
+): Promise<string> {
+  const trimmed = summary.trim()
+  if (trimmed.length === 0) {
+    throw new Error('A commit summary is required.')
+  }
+  await requireExistingCommit(repoPath)
+
+  if (paths.length > 0) {
+    await execGit(['add', '-A', '--end-of-options', ...paths], {
+      cwd: repoPath,
+      timeoutMs: 30_000
+    })
+  }
+
+  const args = ['commit', '--amend', '--only', '-m', trimmed]
+  const body = description.trim()
+  if (body.length > 0) args.push('-m', body)
+  if (paths.length > 0) args.push('--end-of-options', ...paths)
+
+  await execGit(args, { cwd: repoPath, timeoutMs: 30_000 })
+
+  return (await execGit(['rev-parse', 'HEAD'], { cwd: repoPath, timeoutMs: 10_000 }))
+    .stdout.trim()
+}
+
+/**
+ * GitHub Desktop's "Undo": move HEAD back one commit while keeping the
+ * changes staged, so the commit box can be refilled. Refuses when the tip is
+ * no longer the commit we just created (someone else committed/pulled).
+ */
+export async function undoLastCommit(
+  repoPath: string,
+  expectedSha: string
+): Promise<string> {
+  const head = await revParseHead(repoPath)
+  if (head.length === 0) {
+    throw new Error('This repository has no commits to undo.')
+  }
+  if (expectedSha.length > 0 && !sameSha(head, expectedSha)) {
+    throw new Error(
+      'The latest commit has changed since it was created, so it can no longer be undone.'
+    )
+  }
+
+  const parents = await execGit(
+    ['rev-list', '--max-count=2', 'HEAD'],
+    { cwd: repoPath, timeoutMs: 10_000 }
+  ).catch(() => null)
+  const hasParent =
+    parents !== null && parents.stdout.split(/\s+/).filter(l => l.length > 0).length > 1
+  if (!hasParent) {
+    throw new Error(
+      'This is the first commit in the repository; it cannot be undone.'
+    )
+  }
+
+  await execGit(['reset', '--quiet', '--soft', 'HEAD^'], {
+    cwd: repoPath,
+    timeoutMs: 30_000
+  })
+  return head
+}
+
+/** `git revert --no-edit <sha>` (merge commits need -m and are refused). */
+export async function revertCommit(
+  repoPath: string,
+  sha: string
+): Promise<void> {
+  const parents = await execGit(['rev-list', '--parents', '-n', '1', sha], {
+    cwd: repoPath,
+    timeoutMs: 15_000
+  })
+  const parentCount = parents.stdout.trim().split(/\s+/).filter(l => l.length > 0).length - 1
+  if (parentCount > 1) {
+    throw new Error(
+      'Reverting a merge commit is not supported yet — pick one of its parent commits instead.'
+    )
+  }
+  await execGit(['revert', '--no-edit', '--end-of-options', sha], {
+    cwd: repoPath,
+    timeoutMs: 60_000
+  })
+}
+
+/** `git cherry-pick <sha>`. Callers check for a clean tree first. */
+export async function cherryPickCommit(
+  repoPath: string,
+  sha: string
+): Promise<void> {
+  await execGit(['cherry-pick', '--end-of-options', sha], {
+    cwd: repoPath,
+    timeoutMs: 60_000
+  })
+}
+
+async function revParseHead(repoPath: string): Promise<string> {
+  try {
+    const result = await execGit(['rev-parse', '--verify', 'HEAD'], {
+      cwd: repoPath,
+      timeoutMs: 10_000
+    })
+    return result.stdout.trim()
+  } catch (err) {
+    if (err instanceof GitExecError) return ''
+    throw err
+  }
+}
+
+async function requireExistingCommit(repoPath: string): Promise<void> {
+  const head = await revParseHead(repoPath)
+  if (head.length === 0) {
+    throw new Error('This repository has no commits yet.')
+  }
+}
+
+/** Compares two SHAs tolerating an abbreviated expected value. */
+function sameSha(head: string, expected: string): boolean {
+  const a = head.toLowerCase()
+  const b = expected.toLowerCase()
+  return a === b || a.startsWith(b) || b.startsWith(a)
 }

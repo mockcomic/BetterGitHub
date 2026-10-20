@@ -7,25 +7,44 @@ import type {
   BranchInfo,
   CommitInfo,
   FileStatus,
+  GitConfigInfo,
+  GitHubTarget,
+  ManagedRepository,
   PublicSettings,
   Repository,
   RepositoryStatus,
-  SettingsPatch
+  SettingsPatch,
+  StashEntry,
+  WorkflowKind
 } from '../../shared/models'
-import { call, onMenuAction } from './api'
+import type { MenuAction } from '../../shared/ipc'
+import { call, onMenuAction, onRepoChanged } from './api'
+
+export interface ToastAction {
+  readonly label: string
+  readonly onClick: () => void
+}
 
 export interface Toast {
   readonly id: number
   readonly kind: 'info' | 'error' | 'success'
   readonly text: string
+  /** Buttons rendered inside the toast (e.g. Undo after a commit). */
+  readonly actions?: ReadonlyArray<ToastAction>
 }
 
 export interface ConfirmRequest {
   readonly title: string
   readonly message: string
   readonly confirmLabel: string
+  /** Optional second, destructive-flavoured button ("Delete anyway"). */
+  readonly altLabel?: string
+  readonly onAlt?: () => void
   readonly onConfirm: () => void
 }
+
+/** The four work modes of the command desk. */
+export type DeskView = 'review' | 'history' | 'conflicts' | 'stash'
 
 export interface RepoDraft {
   summary: string
@@ -33,29 +52,70 @@ export interface RepoDraft {
   checked: Set<string>
 }
 
+/** A commit message draft being rewritten in place. */
+export interface AmendState {
+  readonly sha: string
+  readonly summary: string
+  readonly description: string
+}
+
+/** What the commit box just produced, so the toast can offer an undo. */
+export interface LastCommitState {
+  readonly sha: string
+  readonly summary: string
+  readonly description: string
+  readonly paths: ReadonlyArray<string>
+}
+
 export interface AppState {
-  readonly repositories: ReadonlyArray<Repository>
+  /** Every stored repository, including folders missing on disk (flagged). */
+  readonly repositories: ReadonlyArray<ManagedRepository>
   readonly selectedRepo: Repository | null
   readonly status: RepositoryStatus | null
   readonly statusError: string | null
   readonly branches: ReadonlyArray<BranchInfo>
+  readonly remoteBranches: ReadonlyArray<BranchInfo>
+  readonly branchesError: string | null
   readonly commits: ReadonlyArray<CommitInfo>
-  readonly activeTab: 'changes' | 'history'
+  readonly commitsLoading: boolean
+  readonly logError: string | null
+  readonly logSearch: string
+  readonly logAuthor: string
+  readonly logExhausted: boolean
+  readonly view: DeskView
+  /** Text in the command strip's filter; scopes the current view. */
+  readonly deskFilter: string
+  readonly selectedStashIndex: number | null
   readonly selectedFilePath: string | null
   readonly selectedFileDiff: string | null
+  readonly selectedFileError: string | null
   readonly selectedCommit: CommitInfo | null
   readonly commitFiles: ReadonlyArray<FileStatus>
+  readonly commitFilesLoading: boolean
+  readonly commitFilesError: string | null
   readonly selectedCommitFilePath: string | null
   readonly selectedCommitFileDiff: string | null
+  readonly selectedCommitFileError: string | null
   readonly drafts: ReadonlyMap<string, RepoDraft>
+  readonly amend: AmendState | null
+  readonly lastCommit: LastCommitState | null
+  readonly stashes: ReadonlyArray<StashEntry>
+  readonly identity: GitConfigInfo | null
+  readonly remoteUrl: string | null
   readonly busy: string | null
   readonly aiBusy: boolean
   readonly settings: PublicSettings | null
   readonly toasts: ReadonlyArray<Toast>
   readonly showSettings: boolean
   readonly showClone: boolean
+  readonly showRepoManager: boolean
   readonly showNewBranch: boolean
+  readonly newBranchBase: string | null
+  readonly renameBranchTarget: string | null
+  readonly showAbout: boolean
   readonly confirm: ConfirmRequest | null
+  readonly initError: string | null
+  readonly lastRefreshedAt: number | null
 }
 
 const initialState: AppState = {
@@ -64,36 +124,96 @@ const initialState: AppState = {
   status: null,
   statusError: null,
   branches: [],
+  remoteBranches: [],
+  branchesError: null,
   commits: [],
-  activeTab: 'changes',
+  commitsLoading: false,
+  logError: null,
+  logSearch: '',
+  logAuthor: '',
+  logExhausted: false,
+  view: 'review',
+  deskFilter: '',
+  selectedStashIndex: null,
   selectedFilePath: null,
   selectedFileDiff: null,
+  selectedFileError: null,
   selectedCommit: null,
   commitFiles: [],
+  commitFilesLoading: false,
+  commitFilesError: null,
   selectedCommitFilePath: null,
   selectedCommitFileDiff: null,
+  selectedCommitFileError: null,
   drafts: new Map(),
+  amend: null,
+  lastCommit: null,
+  stashes: [],
+  identity: null,
+  remoteUrl: null,
   busy: null,
   aiBusy: false,
   settings: null,
   toasts: [],
   showSettings: false,
   showClone: false,
+  showRepoManager: false,
   showNewBranch: false,
-  confirm: null
+  newBranchBase: null,
+  renameBranchTarget: null,
+  showAbout: false,
+  confirm: null,
+  initError: null,
+  lastRefreshedAt: null
 }
+
+const PAGE_SIZE = 300
+const DRAFT_KEY_PREFIX = 'gitdesk.draft.'
 
 let toastId = 0
 
+function draftKey(repoPath: string): string {
+  return `${DRAFT_KEY_PREFIX}${repoPath}`
+}
+
+interface StoredDraft {
+  summary?: string
+  description?: string
+  checked?: ReadonlyArray<string>
+}
+
+function readStoredDraft(repoPath: string): RepoDraft | null {
+  try {
+    const raw = localStorage.getItem(draftKey(repoPath))
+    if (raw === null) return null
+    const parsed = JSON.parse(raw) as StoredDraft
+    return {
+      summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+      description: typeof parsed.description === 'string' ? parsed.description : '',
+      checked: new Set(
+        Array.isArray(parsed.checked) ? parsed.checked.filter(p => typeof p === 'string') : []
+      )
+    }
+  } catch {
+    return null
+  }
+}
+
 /**
  * Central observable store + action set — a compact take on the
- * AppStore/Dispatcher split observed in the shipped app, per-repository
- * commit drafts mirror its repository state cache.
+ * AppStore/Dispatcher split observed in the shipped app; per-repository
+ * commit drafts mirror its repository state cache and also survive restarts.
  */
 export class AppStore {
   private state: AppState = initialState
   private listeners = new Set<() => void>()
   private inited = false
+  private draftSaveTimer: ReturnType<typeof setTimeout> | null = null
+  private logDebounce: ReturnType<typeof setTimeout> | null = null
+  private refreshing = false
+  private pendingRefresh = false
+  private mediaQuery: MediaQueryList | null = null
+  private mediaHandler: ((e: MediaQueryListEvent) => void) | null = null
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
@@ -107,27 +227,60 @@ export class AppStore {
     for (const l of this.listeners) l()
   }
 
-  toast(kind: Toast['kind'], text: string): void {
+  toast(
+    kind: Toast['kind'],
+    text: string,
+    actions?: ReadonlyArray<ToastAction>
+  ): void {
     const id = ++toastId
-    this.update({ toasts: [...this.state.toasts, { id, kind, text }] })
-    setTimeout(() => {
-      this.update({
-        toasts: this.state.toasts.filter(t => t.id !== id)
-      })
-    }, kind === 'error' ? 9000 : 5000)
+    this.update({ toasts: [...this.state.toasts, { id, kind, text, actions }] })
+    const lifetime = actions !== undefined && actions.length > 0 ? 20_000 : kind === 'error' ? 9_000 : 5_000
+    setTimeout(() => this.dismissToast(id), lifetime)
+  }
+
+  dismissToast(id: number): void {
+    this.update({ toasts: this.state.toasts.filter(t => t.id !== id) })
   }
 
   private draftFor(repoPath: string): RepoDraft {
     const existing = this.state.drafts.get(repoPath)
     if (existing !== undefined) return existing
-    return { summary: '', description: '', checked: new Set<string>() }
+    const stored = readStoredDraft(repoPath)
+    return stored ?? { summary: '', description: '', checked: new Set<string>() }
   }
 
   private setDraft(repoPath: string, patch: Partial<RepoDraft>): void {
     const drafts = new Map(this.state.drafts)
     const draft = this.draftFor(repoPath)
-    drafts.set(repoPath, { ...draft, ...patch })
+    const next = { ...draft, ...patch }
+    drafts.set(repoPath, next)
     this.update({ drafts })
+    this.persistDraft(repoPath, next)
+  }
+
+  private persistDraft(repoPath: string, draft: RepoDraft): void {
+    if (this.draftSaveTimer !== null) clearTimeout(this.draftSaveTimer)
+    this.draftSaveTimer = setTimeout(() => {
+      this.draftSaveTimer = null
+      try {
+        const empty =
+          draft.summary.length === 0 &&
+          draft.description.length === 0 &&
+          draft.checked.size === 0
+        if (empty) localStorage.removeItem(draftKey(repoPath))
+        else
+          localStorage.setItem(
+            draftKey(repoPath),
+            JSON.stringify({
+              summary: draft.summary,
+              description: draft.description,
+              checked: [...draft.checked]
+            })
+          )
+      } catch {
+        /* storage full or unavailable: drafts are a convenience only */
+      }
+    }, 500)
   }
 
   async init(): Promise<void> {
@@ -138,16 +291,21 @@ export class AppStore {
         call('getSettings'),
         call('listRepositories')
       ])
-      this.update({ settings, repositories })
+      this.update({ settings, repositories, initError: null })
       this.applyTheme(settings.theme)
 
       const lastPath = localStorage.getItem('gitdesk.lastRepo')
+      // Missing folders never open silently — the manager surfaces them.
+      const usable = repositories.filter(r => !r.missing)
       const selected =
-        repositories.find(r => r.path === lastPath) ?? repositories[0] ?? null
+        usable.find(r => r.path === lastPath) ?? usable[0] ?? null
       if (selected !== null) {
         await this.selectRepo(selected)
       }
     } catch (err) {
+      this.update({
+        initError: err instanceof Error ? err.message : String(err)
+      })
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
 
@@ -155,31 +313,51 @@ export class AppStore {
       void this.handleMenuAction(action)
     })
 
+    onRepoChanged(repoPath => {
+      if (
+        this.state.selectedRepo !== null &&
+        this.state.selectedRepo.path === repoPath &&
+        this.state.busy === null &&
+        !this.state.aiBusy
+      ) {
+        void this.refresh({ silent: true })
+      }
+    })
+
     window.addEventListener('focus', () => {
-      if (this.state.selectedRepo !== null) void this.refresh()
+      if (this.state.selectedRepo !== null) void this.refresh({ silent: true })
     })
   }
 
   private applyTheme(theme: 'system' | 'light' | 'dark'): void {
+    // Replace any previous listener instead of stacking one per settings save.
+    if (this.mediaQuery !== null && this.mediaHandler !== null) {
+      this.mediaQuery.removeEventListener('change', this.mediaHandler)
+    }
+    this.mediaQuery = null
+    this.mediaHandler = null
+
     if (theme === 'system') {
-      document.documentElement.removeAttribute('data-theme')
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
-      document.documentElement.setAttribute(
-        'data-theme',
-        mq.matches ? 'dark' : 'light'
-      )
-      mq.addEventListener('change', e => {
+      const handler = (e: MediaQueryListEvent): void => {
         document.documentElement.setAttribute(
           'data-theme',
           e.matches ? 'dark' : 'light'
         )
-      })
+      }
+      document.documentElement.setAttribute(
+        'data-theme',
+        mq.matches ? 'dark' : 'light'
+      )
+      mq.addEventListener('change', handler)
+      this.mediaQuery = mq
+      this.mediaHandler = handler
     } else {
       document.documentElement.setAttribute('data-theme', theme)
     }
   }
 
-  private async handleMenuAction(action: string): Promise<void> {
+  private async handleMenuAction(action: MenuAction): Promise<void> {
     switch (action) {
       case 'commit':
         await this.commit()
@@ -203,7 +381,7 @@ export class AppStore {
         await this.doSync('push')
         break
       case 'new-branch':
-        this.update({ showNewBranch: true })
+        this.update({ showNewBranch: true, newBranchBase: null })
         break
       case 'show-preferences':
         this.update({ showSettings: true })
@@ -212,7 +390,43 @@ export class AppStore {
         await this.addLocalRepository()
         break
       case 'clone-repository':
-        this.update({ showClone: true })
+        this.setCloneOpen(true)
+        break
+      case 'manage-repositories':
+        this.setRepoManagerOpen(true)
+        break
+      case 'show-about':
+        this.update({ showAbout: true })
+        break
+      case 'stash-all':
+        this.stashAllChanges()
+        break
+      case 'edit-last-commit':
+        await this.editLastCommit()
+        break
+      case 'undo-commit':
+        this.undoCommit()
+        break
+      case 'copy-sha':
+        this.copySelectedCommitSha()
+        break
+      case 'revert-commit':
+        this.revertSelectedCommit()
+        break
+      case 'cherry-pick-commit':
+        this.cherryPickSelectedCommit()
+        break
+      case 'create-branch-from-commit':
+        this.createBranchFromSelectedCommit()
+        break
+      case 'delete-branch':
+        this.deleteCurrentBranch()
+        break
+      case 'rename-branch':
+        this.update({ renameBranchTarget: this.state.status?.branch ?? null })
+        break
+      case 'view-on-github':
+        await this.viewOnGitHub({ kind: 'repo' })
         break
     }
   }
@@ -227,13 +441,34 @@ export class AppStore {
       statusError: null,
       selectedFilePath: null,
       selectedFileDiff: null,
+      selectedFileError: null,
       selectedCommit: null,
       commitFiles: [],
+      commitFilesError: null,
       selectedCommitFilePath: null,
       selectedCommitFileDiff: null,
-      activeTab: 'changes'
+      amend: null,
+      lastCommit: null,
+      stashes: [],
+      view: 'review',
+      deskFilter: '',
+      selectedStashIndex: null,
+      logSearch: '',
+      logAuthor: '',
+      commits: []
     })
-    await Promise.all([this.refresh(), this.refreshBranches()])
+    void call('startWatching', repo.path).catch(() => undefined)
+    await Promise.all([
+      this.refresh(),
+      this.refreshBranches(),
+      this.refreshIdentity(),
+      this.refreshStashes()
+    ])
+    try {
+      this.update({ remoteUrl: await call('getRemoteUrl', repo.path) })
+    } catch {
+      this.update({ remoteUrl: null })
+    }
   }
 
   async addLocalRepository(): Promise<void> {
@@ -253,38 +488,169 @@ export class AppStore {
     }
   }
 
+  /** Bulk add from the repository manager's native multi-select picker. */
+  async addRepositoriesBulk(): Promise<void> {
+    const dirs = await call('selectDirectories')
+    if (dirs === null) return
+    try {
+      const result = await call('addRepositories', dirs)
+      this.update({ repositories: await call('listRepositories') })
+      const parts: string[] = []
+      if (result.added.length > 0) parts.push(`Added ${result.added.length}`)
+      if (result.skipped.length > 0)
+        parts.push(`${result.skipped.length} already in the list`)
+      this.toast(
+        result.added.length > 0 || result.skipped.length > 0
+          ? 'success'
+          : 'error',
+        parts.length > 0 ? `${parts.join(' · ')}.` : 'Nothing was added.'
+      )
+      for (const f of result.failed) {
+        const name = f.path.split(/[\\/]/).filter(p => p.length > 0).pop() ?? f.path
+        this.toast('error', `Could not add "${name}" — ${f.error}`)
+      }
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /**
+   * Bulk remove shared by the manager and the header popover's single-remove.
+   * `deleteFromDisk` moves whole folders to the Recycle Bin after an explicit
+   * warning.
+   */
+  removeRepositories(ids: ReadonlyArray<string>, deleteFromDisk: boolean): void {
+    const targets = this.state.repositories.filter(r => ids.includes(r.id))
+    if (targets.length === 0) return
+    const list = targets
+      .slice(0, 5)
+      .map(r => r.name)
+      .join(', ')
+    const more =
+      targets.length > 5 ? `, and ${targets.length - 5} more` : ''
+    const single = targets.length === 1 ? targets[0].name : null
+
+    const onConfirm = (): void => {
+      this.update({ confirm: null })
+      void this.runRemoveRepositories(ids, deleteFromDisk)
+    }
+
+    this.update({
+      confirm: deleteFromDisk
+        ? {
+            title: 'Move folders to the Recycle Bin?',
+            message:
+              `${targets.length === 1 ? `The folder for "${single}"` : `${targets.length} repository folders`} ` +
+              'will be moved to the Recycle Bin — entire folders, including working files, ' +
+              'uncommitted changes and git history. You can restore them from the Bin.\n\n' +
+              `${list}${more}`,
+            confirmLabel: 'Move to Recycle Bin',
+            onConfirm
+          }
+        : {
+            title:
+              targets.length === 1 ? 'Remove repository' : 'Remove repositories',
+            message: single !== null
+              ? `"${single}" will be removed from GitDesk. The folder and its git data stay on disk.`
+              : `These repositories (${list}${more}) will be removed from GitDesk. The folders and their git data stay on disk.`,
+            confirmLabel: 'Remove',
+            onConfirm
+          }
+    })
+  }
+
+  private async runRemoveRepositories(
+    ids: ReadonlyArray<string>,
+    deleteFromDisk: boolean
+  ): Promise<void> {
+    try {
+      const result = await call('removeRepositories', ids, deleteFromDisk)
+      const repositories = await call('listRepositories')
+      const patch: Partial<AppState> = { repositories }
+      const selected = this.state.selectedRepo
+      if (selected !== null && ids.includes(selected.id)) {
+        Object.assign(patch, {
+          selectedRepo: null,
+          status: null,
+          statusError: null,
+          commits: [],
+          branches: [],
+          remoteBranches: []
+        })
+        localStorage.removeItem('gitdesk.lastRepo')
+      }
+      this.update(patch)
+      const head = deleteFromDisk
+        ? `Moved ${result.removed} to the Recycle Bin`
+        : `Removed ${result.removed}`
+      if (result.trashFailed.length > 0) {
+        const detail = result.trashFailed
+          .map(
+            f =>
+              `${f.path.split(/[\\/]/).filter(p => p.length > 0).pop() ?? f.path} (${f.error})`
+          )
+          .join('; ')
+        this.toast('error', `${head} — could not move to the Bin: ${detail}`)
+      } else {
+        this.toast('success', `${head}.`)
+      }
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Header popover's "Remove this repository" — list-only removal. */
   removeRepository(): void {
     const repo = this.state.selectedRepo
     if (repo === null) return
-    this.update({
-      confirm: {
-        title: 'Remove repository',
-        message: `"${repo.name}" will be removed from GitDesk. The folder and its git data stay on disk.`,
-        confirmLabel: 'Remove',
-        onConfirm: async () => {
-          this.update({ confirm: null })
-          await call('removeRepository', repo.id)
-          const repositories = await call('listRepositories')
-          this.update({
-            repositories,
-            selectedRepo: null,
-            status: null,
-            commits: [],
-            branches: []
-          })
-          localStorage.removeItem('gitdesk.lastRepo')
-        }
+    this.removeRepositories([repo.id], false)
+  }
+
+  /** Fetch several repositories in a row; reports a per-repo tally. */
+  async fetchRepos(
+    paths: ReadonlyArray<string>
+  ): Promise<{ ok: number; failures: string[] }> {
+    let ok = 0
+    const failures: string[] = []
+    for (const p of paths) {
+      const name = p.split(/[\\/]/).filter(x => x.length > 0).pop() ?? p
+      try {
+        await call('fetch', p)
+        ok++
+      } catch (err) {
+        failures.push(`${name}: ${err instanceof Error ? err.message : String(err)}`)
       }
-    })
+    }
+    if (failures.length === 0) {
+      this.toast('success', `Fetched ${ok} of ${paths.length}.`)
+    } else {
+      this.toast(
+        'error',
+        `Fetched ${ok} of ${paths.length} — ${failures.join('; ').slice(0, 300)}`
+      )
+    }
+    return { ok, failures }
+  }
+
+  async copyPaths(paths: ReadonlyArray<string>): Promise<void> {
+    try {
+      await call('writeClipboard', paths.join('\n'))
+      this.toast(
+        'info',
+        `Copied ${paths.length} folder path${paths.length === 1 ? '' : 's'} to clipboard.`
+      )
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
   }
 
   async clone(url: string, baseDir: string, folderName: string): Promise<void> {
     const dest = `${baseDir.replace(/[\\/]+$/, '')}/${folderName}`
-    this.update({ showClone: false, busy: 'clone' })
+    this.update({ busy: 'clone' })
     try {
       const output = await call('cloneRepository', url, dest)
       const repositories = await call('listRepositories')
-      this.update({ repositories, busy: null })
+      this.update({ repositories, busy: null, showClone: false })
       const added = repositories.find(r => r.path.replace(/\\/g, '/') === dest)
       if (added !== undefined) await this.selectRepo(added)
       const tail = output.split('\n').filter(l => l.trim().length > 0).slice(-2).join(' ')
@@ -297,26 +663,60 @@ export class AppStore {
 
   // ---------------------------------------------------------------- refresh
 
-  async refresh(): Promise<void> {
+  async refresh(options?: { silent?: boolean }): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
+
+    // Coalesce bursts (a watcher firing per keystroke-save) into one re-read.
+    if (this.refreshing) {
+      this.pendingRefresh = true
+      return
+    }
+    this.refreshing = true
     try {
-      const status = await call('getStatus', repo.path)
-      const draft = this.draftFor(repo.path)
-      const valid = new Set(status.files.map(f => f.path))
-      const checked = new Set(
-        [...draft.checked].filter(p => valid.has(p))
-      )
-      this.update({ status, statusError: null })
-      if (checked.size !== draft.checked.size) {
-        this.setDraft(repo.path, { checked })
-      }
-      if (this.state.activeTab === 'history') await this.refreshLog()
-    } catch (err) {
-      this.update({
-        status: null,
-        statusError: err instanceof Error ? err.message : String(err)
-      })
+      do {
+        this.pendingRefresh = false
+        try {
+          const prevConflicts = this.state.status?.conflictCount ?? 0
+          const status = await call('getStatus', repo.path)
+          const draft = this.draftFor(repo.path)
+          const valid = new Set(status.files.map(f => f.path))
+          const checked = new Set([...draft.checked].filter(p => valid.has(p)))
+          this.update({
+            status,
+            statusError: null,
+            lastRefreshedAt: Date.now(),
+            initError: null
+          })
+          // A pull or edit that newly produces conflicts interrupts the
+          // review flow — the one state allowed to move the visitor.
+          if (
+            status.conflictCount > 0 &&
+            prevConflicts === 0 &&
+            this.state.view === 'review'
+          ) {
+            this.update({ view: 'conflicts' })
+          }
+          if (checked.size !== draft.checked.size) {
+            this.setDraft(repo.path, { checked })
+          }
+          if (this.state.selectedFilePath !== null && !valid.has(this.state.selectedFilePath)) {
+            this.update({
+              selectedFilePath: null,
+              selectedFileDiff: null,
+              selectedFileError: null
+            })
+          }
+          if (this.state.view === 'history') await this.loadLog(false)
+        } catch (err) {
+          this.update({
+            status: null,
+            statusError: options?.silent === true ? this.state.statusError : err instanceof Error ? err.message : String(err)
+          })
+        }
+      } while (this.pendingRefresh && this.state.selectedRepo === repo)
+    } finally {
+      this.refreshing = false
     }
   }
 
@@ -324,30 +724,132 @@ export class AppStore {
     const repo = this.state.selectedRepo
     if (repo === null) return
     try {
-      const branches = await call('getBranches', repo.path)
-      this.update({ branches })
-    } catch {
-      this.update({ branches: [] })
+      const list = await call('getBranches', repo.path)
+      this.update({
+        branches: list.local,
+        remoteBranches: list.remote,
+        branchesError: null
+      })
+    } catch (err) {
+      this.update({
+        branches: [],
+        remoteBranches: [],
+        branchesError: err instanceof Error ? err.message : String(err)
+      })
     }
   }
 
-  async refreshLog(): Promise<void> {
+  async refreshStashes(): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
     try {
-      const commits = await call('getLog', repo.path)
-      this.update({ commits })
-    } catch (err) {
-      this.update({ commits: [] })
-      this.toast('error', err instanceof Error ? err.message : String(err))
+      const stashes = await call('listStashes', repo.path)
+      const sel = this.state.selectedStashIndex
+      this.update({
+        stashes,
+        selectedStashIndex:
+          sel !== null && stashes.some(s => s.index === sel)
+            ? sel
+            : stashes[0]?.index ?? null
+      })
+    } catch {
+      this.update({ stashes: [], selectedStashIndex: null })
     }
   }
 
-  setActiveTab(tab: 'changes' | 'history'): void {
-    this.update({ activeTab: tab })
-    if (tab === 'history' && this.state.commits.length === 0) {
-      void this.refreshLog()
+  async refreshIdentity(): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    try {
+      this.update({ identity: await call('getConfigInfo', repo.path) })
+    } catch {
+      this.update({ identity: null })
     }
+  }
+
+  /** Loads one page of history into state (used by refresh and paging). */
+  private async loadLog(append: boolean): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const skip = append ? this.state.commits.length : 0
+    this.update({ commitsLoading: true, logError: null })
+    try {
+      const page = await call('getLog', repo.path, {
+        maxCount: PAGE_SIZE,
+        skip,
+        search: this.state.logSearch,
+        author: this.state.logAuthor
+      })
+      if (this.state.selectedRepo?.path !== repo.path) return
+      this.update({
+        commits: append ? [...this.state.commits, ...page] : page,
+        logExhausted: page.length < PAGE_SIZE,
+        commitsLoading: false
+      })
+    } catch (err) {
+      this.update({
+        commitsLoading: false,
+        commits: append ? this.state.commits : [],
+        logError: err instanceof Error ? err.message : String(err)
+      })
+    }
+  }
+
+  setLogSearch(value: string): void {
+    this.update({ logSearch: value })
+    this.scheduleLogReload()
+  }
+
+  setLogAuthor(value: string): void {
+    this.update({ logAuthor: value })
+    this.scheduleLogReload()
+  }
+
+  private scheduleLogReload(): void {
+    if (this.logDebounce !== null) clearTimeout(this.logDebounce)
+    this.logDebounce = setTimeout(() => {
+      this.logDebounce = null
+      void this.loadLog(false)
+    }, 250)
+  }
+
+  async loadMoreCommits(): Promise<void> {
+    if (this.state.commitsLoading || this.state.logExhausted) return
+    await this.loadLog(true)
+  }
+
+  async refreshLog(): Promise<void> {
+    await this.loadLog(false)
+  }
+
+  setView(view: DeskView): void {
+    const syncLog = this.state.logSearch !== this.state.deskFilter
+    this.update({ view })
+    if (view === 'history') {
+      if (syncLog) this.update({ logSearch: this.state.deskFilter })
+      if (syncLog || (this.state.commits.length === 0 && !this.state.commitsLoading)) {
+        this.scheduleLogReload()
+      }
+    }
+    if (view === 'conflicts') {
+      const first = this.state.status?.files.find(f => f.kind === 'conflicted')
+      if (first !== undefined && this.state.selectedFilePath === null) {
+        void this.selectFile(first.path)
+      }
+    }
+  }
+
+  /** The command strip's filter: scopes files, commits, or stashes. */
+  setDeskFilter(value: string): void {
+    this.update({ deskFilter: value })
+    if (this.state.view === 'history' && value !== this.state.logSearch) {
+      this.update({ logSearch: value })
+      this.scheduleLogReload()
+    }
+  }
+
+  selectStash(index: number | null): void {
+    this.update({ selectedStashIndex: index })
   }
 
   // ----------------------------------------------------------------- files
@@ -359,7 +861,11 @@ export class AppStore {
   async selectFile(path: string): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
-    this.update({ selectedFilePath: path, selectedFileDiff: '…' })
+    this.update({
+      selectedFilePath: path,
+      selectedFileDiff: '…',
+      selectedFileError: null
+    })
     try {
       const entry = this.fileByPath(path)
       const diff = await call(
@@ -369,11 +875,15 @@ export class AppStore {
         entry?.oldPath ?? undefined
       )
       if (this.state.selectedFilePath === path) {
-        this.update({ selectedFileDiff: diff })
+        this.update({ selectedFileDiff: diff, selectedFileError: null })
       }
     } catch (err) {
-      this.update({ selectedFileDiff: null })
-      this.toast('error', err instanceof Error ? err.message : String(err))
+      if (this.state.selectedFilePath === path) {
+        this.update({
+          selectedFileDiff: null,
+          selectedFileError: err instanceof Error ? err.message : String(err)
+        })
+      }
     }
   }
 
@@ -438,20 +948,157 @@ export class AppStore {
         title: 'Discard changes',
         message: `Discard changes in "${path}"? This cannot be undone.`,
         confirmLabel: 'Discard',
-        onConfirm: async () => {
+        onConfirm: () => {
           this.update({ confirm: null })
-          const entry = this.fileByPath(path)
-          const paths =
-            entry?.oldPath !== undefined ? [path, entry.oldPath!] : [path]
-          await this.runGit(async () => {
-            await call('discardPaths', repo.path, paths)
-          }, 'discard')
-          if (this.state.selectedFilePath === path) {
-            this.update({ selectedFilePath: null, selectedFileDiff: null })
-          }
+          void this.discardPaths([path])
         }
       }
     })
+  }
+
+  discardAllChanges(): void {
+    const repo = this.state.selectedRepo
+    const files = this.state.status?.files ?? []
+    if (repo === null || files.length === 0) return
+    this.update({
+      confirm: {
+        title: 'Discard all changes',
+        message: `Discard changes in all ${files.length} file${files.length === 1 ? '' : 's'}? This cannot be undone.`,
+        confirmLabel: 'Discard all',
+        onConfirm: () => {
+          this.update({ confirm: null })
+          void this.discardPaths(files.map(f => f.path))
+        }
+      }
+    })
+  }
+
+  private async discardPaths(paths: ReadonlyArray<string>): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const entries = paths
+      .map(p => this.fileByPath(p))
+      .filter((e): e is FileStatus => e !== undefined)
+    const expanded = new Set<string>(paths)
+    for (const e of entries) {
+      if (e.oldPath !== undefined) expanded.add(e.oldPath)
+    }
+    await this.runGit(async () => {
+      await call('discardPaths', repo.path, [...expanded])
+    }, 'discard')
+    const selected = this.state.selectedFilePath
+    if (selected !== null && expanded.has(selected)) {
+      this.update({
+        selectedFilePath: null,
+        selectedFileDiff: null,
+        selectedFileError: null
+      })
+    }
+  }
+
+  /** One-click resolution of a conflicted file. */
+  resolveConflict(
+    path: string,
+    side: 'ours' | 'theirs' | 'resolved'
+  ): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    void this.runGit(async () => {
+      await call('resolveConflict', repo.path, path, side)
+    }, 'resolve')
+  }
+
+  continueWorkflow(kind: WorkflowKind): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    void this.runGit(async () => {
+      await call('continueOperation', repo.path, kind)
+    }, 'continue').then(() => void this.refreshStashes())
+  }
+
+  abortWorkflow(kind: WorkflowKind): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    this.update({
+      confirm: {
+        title: 'Abort this operation',
+        message:
+          kind === 'merge'
+            ? 'Abort the merge? Your working tree returns to the state before the merge started.'
+            : kind === 'rebase'
+              ? 'Abort the rebase? The branch returns to where it was before the rebase.'
+              : 'Abort the operation and restore the working tree?',
+        confirmLabel: 'Abort',
+        onConfirm: () => {
+          this.update({ confirm: null })
+          void this.runGit(async () => {
+            await call('abortOperation', repo.path, kind)
+          }, 'abort')
+        }
+      }
+    })
+  }
+
+  // ------------------------------------------------------- shell integration
+
+  async revealFile(path: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    await this.guarded(() => call('revealInFolder', repo.path, path), 'reveal')
+  }
+
+  async openFile(path: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    await this.guarded(() => call('openFile', repo.path, path), 'open')
+  }
+
+  async copyText(text: string, label?: string): Promise<void> {
+    await this.guarded(
+      async () => {
+        await call('writeClipboard', text)
+      },
+      'copy'
+    )
+    this.toast('info', `${label ?? 'Copied'} to clipboard.`)
+  }
+
+  async ignoreFile(path: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    await this.guarded(async () => {
+      await call('addToGitignore', repo.path, path)
+    }, 'ignore')
+    await this.refresh()
+  }
+
+  async viewOnGitHub(target: GitHubTarget): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    await this.guarded(() => call('viewOnGitHub', repo.path, target), 'open')
+  }
+
+  async addRemote(url: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    await this.guarded(async () => {
+      await call('addRemote', repo.path, url)
+      this.update({ remoteUrl: url.trim() })
+    }, 'remote')
+  }
+
+  private async guarded(
+    fn: () => Promise<void>,
+    busyKey: string
+  ): Promise<void> {
+    this.update({ busy: busyKey })
+    try {
+      await fn()
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    } finally {
+      this.update({ busy: null })
+    }
   }
 
   // ---------------------------------------------------------------- commit
@@ -478,37 +1125,141 @@ export class AppStore {
       this.toast('error', 'Enter a commit summary first.')
       return
     }
-    if (draft.checked.size === 0) {
+    if (draft.checked.size === 0 && this.state.amend === null) {
       this.toast('error', 'Select at least one file to commit.')
+      return
+    }
+    if (this.identityMissing()) {
+      this.toast(
+        'error',
+        'Set your git author name and email in the changes panel before committing.'
+      )
       return
     }
 
     this.update({ busy: 'commit' })
+    const summary = draft.summary.trim()
     try {
-      const sha = await call(
-        'commitPaths',
-        repo.path,
-        draft.summary,
-        draft.description,
-        [...draft.checked]
-      )
+      const sha =
+        this.state.amend === null
+          ? await call(
+              'commitPaths',
+              repo.path,
+              summary,
+              draft.description,
+              [...draft.checked]
+            )
+          : await call(
+              'amendCommit',
+              repo.path,
+              summary,
+              draft.description,
+              [...draft.checked]
+            )
+
       this.setDraft(repo.path, {
         summary: '',
         description: '',
         checked: new Set()
       })
+      const wasAmend = this.state.amend !== null
+      this.update({
+        busy: null,
+        amend: null,
+        lastCommit: {
+          sha,
+          summary,
+          description: draft.description,
+          paths: [...draft.checked]
+        }
+      })
       this.toast(
         'success',
-        `Committed ${sha.slice(0, 7)} — ${draft.summary.trim().slice(0, 60)}`
+        `${wasAmend ? 'Amended' : 'Committed'} ${sha.slice(0, 7)} — ${summary.slice(0, 60)}`,
+        wasAmend
+          ? undefined
+          : [{ label: 'Undo', onClick: () => this.undoCommit() }]
       )
-      this.update({ busy: null })
       await this.refresh()
       void this.refreshBranches()
-      if (this.state.activeTab === 'history') void this.refreshLog()
+      void this.refreshStashes()
+      if (this.state.view === 'history') void this.loadLog(false)
     } catch (err) {
       this.update({ busy: null })
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
+  }
+
+  private identityMissing(): boolean {
+    const identity = this.state.identity
+    return (
+      identity !== null &&
+      (identity.name === null || identity.email === null)
+    )
+  }
+
+  /** Loads the latest commit into the commit box for rewriting. */
+  async editLastCommit(): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    try {
+      const [latest] = await call('getLog', repo.path, { maxCount: 1 })
+      if (latest === undefined) {
+        this.toast('error', 'This repository has no commits yet.')
+        return
+      }
+      const files = await call('getCommitFiles', repo.path, latest.sha)
+      this.update({
+        view: 'review',
+        amend: { sha: latest.sha, summary: latest.summary, description: latest.body },
+        busy: null
+      })
+      this.setDraft(repo.path, {
+        summary: latest.summary,
+        description: latest.body,
+        checked: new Set(files.map(f => f.path))
+      })
+      this.toast('info', `Editing ${latest.sha.slice(0, 7)} — press Commit to replace it.`)
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  cancelAmend(): void {
+    this.update({ amend: null })
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    this.setDraft(repo.path, { summary: '', description: '', checked: new Set() })
+  }
+
+  undoCommit(): void {
+    const repo = this.state.selectedRepo
+    const last = this.state.lastCommit
+    if (repo === null || last === null) {
+      this.toast('error', 'There is no GitDesk commit to undo.')
+      return
+    }
+    this.update({
+      confirm: {
+        title: 'Undo this commit?',
+        message: `"${last.summary}" will be undone. Its changes stay in your working directory, ready to commit again.`,
+        confirmLabel: 'Undo commit',
+        onConfirm: () => {
+          this.update({ confirm: null })
+          void this.runGit(async () => {
+            await call('undoLastCommit', repo.path, last.sha)
+          }, 'undo').then(() => {
+            this.setDraft(repo.path, {
+              summary: last.summary,
+              description: last.description,
+              checked: new Set(last.paths)
+            })
+            this.update({ lastCommit: null, amend: null })
+            void this.loadLog(false)
+          })
+        }
+      }
+    })
   }
 
   // ------------------------------------------------------------- AI agent
@@ -558,12 +1309,10 @@ export class AppStore {
       const result = await call('generateCommitMessage', repoPath, paths)
       const drafts = new Map(this.state.drafts)
       const draft = this.draftFor(repoPath)
-      drafts.set(repoPath, {
-        ...draft,
-        summary: result.title,
-        description: result.description
-      })
+      const next = { ...draft, summary: result.title, description: result.description }
+      drafts.set(repoPath, next)
       this.update({ drafts, aiBusy: false })
+      this.persistDraft(repoPath, next)
     } catch (err) {
       this.update({ aiBusy: false })
       const message = err instanceof Error ? err.message : String(err)
@@ -601,39 +1350,143 @@ export class AppStore {
       )
       await this.refresh()
       void this.refreshBranches()
-      if (this.state.activeTab === 'history') void this.refreshLog()
+      void this.refreshStashes()
+      if (this.state.view === 'history') void this.loadLog(false)
     } catch (err) {
       this.update({ busy: null })
-      this.toast('error', err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      this.toast('error', message)
+      // A pull that stopped on conflicts leaves the repo mid-merge: make the
+      // banner show up instead of only reporting the raw failure.
+      await this.refresh()
     }
   }
 
   // --------------------------------------------------------------- branches
 
-  async checkoutBranch(name: string): Promise<void> {
+  async checkoutBranch(name: string, fromRemote?: string): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
     try {
-      await call('checkoutBranch', repo.path, name)
+      await call('checkoutBranch', repo.path, name, fromRemote)
       await this.refresh()
       await this.refreshBranches()
-      void this.refreshLog()
+      void this.loadLog(false)
     } catch (err) {
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
   }
 
-  async createBranch(name: string): Promise<void> {
+  async createBranch(name: string, startPoint?: string): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
     try {
-      await call('createBranch', repo.path, name)
-      this.update({ showNewBranch: false })
+      await call('createBranch', repo.path, name, startPoint)
+      this.update({ showNewBranch: false, newBranchBase: null })
       await this.refresh()
       await this.refreshBranches()
+      void this.loadLog(false)
+      this.toast('success', `Switched to new branch ${name.trim()}`)
     } catch (err) {
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
+  }
+
+  deleteBranch(name: string, force = false): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    this.update({
+      confirm: {
+        title: `Delete branch "${name}"?`,
+        message: force
+          ? 'This branch has commits that are not merged into the current branch. Deleting anyway discards them.'
+          : `The local branch "${name}" will be deleted.`,
+        confirmLabel: force ? 'Delete anyway' : 'Delete branch',
+        onConfirm: async () => {
+          this.update({ confirm: null })
+          try {
+            await call('deleteBranch', repo.path, name, force)
+            await this.refreshBranches()
+            this.toast('success', `Deleted ${name}`)
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            this.toast('error', message)
+            if (/not fully merged/i.test(message)) {
+              this.update({
+                confirm: {
+                  title: `Delete "${name}" anyway?`,
+                  message:
+                    'git reports this branch has commits that are not merged anywhere yet.\n\nDelete anyway and lose those commits?',
+                  confirmLabel: 'Delete anyway',
+                  onConfirm: () => {
+                    this.update({ confirm: null })
+                    void call('deleteBranch', repo.path, name, true)
+                      .then(() => this.refreshBranches())
+                      .then(() => this.toast('success', `Deleted ${name}`))
+                      .catch(e =>
+                        this.toast('error', e instanceof Error ? e.message : String(e))
+                      )
+                  }
+                }
+              })
+            }
+          }
+        }
+      }
+    })
+  }
+
+  deleteCurrentBranch(): void {
+    const branch = this.state.status?.branch
+    if (branch === undefined || branch.length === 0 || branch === '(detached)') {
+      this.toast('error', 'There is no branch checked out to delete.')
+      return
+    }
+    this.deleteBranch(branch)
+  }
+
+  async renameBranch(oldName: string, newName: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    try {
+      await call('renameBranch', repo.path, oldName, newName)
+      this.update({ renameBranchTarget: null })
+      await this.refresh()
+      await this.refreshBranches()
+      this.toast('success', `Renamed ${oldName} to ${newName.trim()}`)
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async deleteRemoteBranch(remote: string, name: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    this.update({
+      confirm: {
+        title: `Delete ${remote}/${name}?`,
+        message: `The branch will be deleted on ${remote}. Other people will lose it after their next fetch.`,
+        confirmLabel: 'Delete on remote',
+        onConfirm: async () => {
+          this.update({ confirm: null })
+          await this.guarded(
+            async () => {
+              await call('deleteRemoteBranch', repo.path, remote, name)
+            },
+            'delete-remote'
+          )
+          await this.refreshBranches()
+        }
+      }
+    })
+  }
+
+  setNewBranchOpen(open: boolean): void {
+    this.update({ showNewBranch: open, newBranchBase: open ? this.state.newBranchBase : null })
+  }
+
+  setRenameBranchTarget(name: string | null): void {
+    this.update({ renameBranchTarget: name })
   }
 
   // --------------------------------------------------------------- history
@@ -644,16 +1497,24 @@ export class AppStore {
     this.update({
       selectedCommit: commit,
       commitFiles: [],
+      commitFilesLoading: true,
+      commitFilesError: null,
       selectedCommitFilePath: null,
-      selectedCommitFileDiff: null
+      selectedCommitFileDiff: null,
+      selectedCommitFileError: null
     })
     try {
       const files = await call('getCommitFiles', repo.path, commit.sha)
       if (this.state.selectedCommit?.sha === commit.sha) {
-        this.update({ commitFiles: files })
+        this.update({ commitFiles: files, commitFilesLoading: false })
       }
     } catch (err) {
-      this.toast('error', err instanceof Error ? err.message : String(err))
+      if (this.state.selectedCommit?.sha === commit.sha) {
+        this.update({
+          commitFilesLoading: false,
+          commitFilesError: err instanceof Error ? err.message : String(err)
+        })
+      }
     }
   }
 
@@ -661,16 +1522,165 @@ export class AppStore {
     const repo = this.state.selectedRepo
     const commit = this.state.selectedCommit
     if (repo === null || commit === null) return
-    this.update({ selectedCommitFilePath: path, selectedCommitFileDiff: '…' })
+    this.update({
+      selectedCommitFilePath: path,
+      selectedCommitFileDiff: '…',
+      selectedCommitFileError: null
+    })
     try {
       const diff = await call('getCommitFileDiff', repo.path, commit.sha, path)
       if (this.state.selectedCommitFilePath === path) {
         this.update({ selectedCommitFileDiff: diff })
       }
     } catch (err) {
-      this.update({ selectedCommitFileDiff: null })
-      this.toast('error', err instanceof Error ? err.message : String(err))
+      if (this.state.selectedCommitFilePath === path) {
+        this.update({
+          selectedCommitFileDiff: null,
+          selectedCommitFileError: err instanceof Error ? err.message : String(err)
+        })
+      }
     }
+  }
+
+  copySelectedCommitSha(): void {
+    const commit = this.state.selectedCommit
+    if (commit === null) {
+      this.toast('error', 'Select a commit first.')
+      return
+    }
+    void this.copyText(commit.sha, 'Commit SHA')
+  }
+
+  revertSelectedCommit(): void {
+    const repo = this.state.selectedRepo
+    const commit = this.state.selectedCommit
+    if (repo === null || commit === null) {
+      this.toast('error', 'Select a commit first.')
+      return
+    }
+    this.update({
+      confirm: {
+        title: 'Revert this commit?',
+        message: `A new commit will be created that undoes "${commit.summary.slice(0, 70)}".`,
+        confirmLabel: 'Revert commit',
+        onConfirm: async () => {
+          this.update({ confirm: null })
+          await this.runGit(async () => {
+            await call('revertCommit', repo.path, commit.sha)
+          }, 'revert')
+          void this.loadLog(false)
+          if (this.state.selectedCommit !== null) {
+            // The reverted commit is gone from the tip; keep the selection but
+            // refresh the file list which may now be empty.
+            void this.selectCommit({ ...commit })
+          }
+        }
+      }
+    })
+  }
+
+  cherryPickSelectedCommit(): void {
+    const repo = this.state.selectedRepo
+    const commit = this.state.selectedCommit
+    if (repo === null || commit === null) {
+      this.toast('error', 'Select a commit first.')
+      return
+    }
+    const dirty = this.state.status?.files.length ?? 0
+    if (dirty > 0) {
+      this.toast(
+        'error',
+        'Commit or stash your local changes before cherry-picking another commit.'
+      )
+      return
+    }
+    this.update({
+      confirm: {
+        title: 'Cherry-pick this commit?',
+        message: `"${commit.summary.slice(0, 70)}" will be applied to ${this.state.status?.branch ?? 'the current branch'}.`,
+        confirmLabel: 'Cherry-pick',
+        onConfirm: async () => {
+          this.update({ confirm: null })
+          await this.runGit(async () => {
+            await call('cherryPickCommit', repo.path, commit.sha)
+          }, 'cherry-pick')
+          void this.loadLog(false)
+        }
+      }
+    })
+  }
+
+  createBranchFromSelectedCommit(): void {
+    const commit = this.state.selectedCommit
+    if (commit === null) {
+      this.toast('error', 'Select a commit first.')
+      return
+    }
+    this.update({
+      showNewBranch: true,
+      newBranchBase: commit.sha.slice(0, 10)
+    })
+  }
+
+  // --------------------------------------------------------------- stash
+
+  stashAllChanges(): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const count = this.state.status?.files.length ?? 0
+    if (count === 0) {
+      this.toast('error', 'There is nothing to stash.')
+      return
+    }
+    this.update({
+      confirm: {
+        title: 'Stash your changes?',
+        message: `All ${count} changed file${count === 1 ? '' : 's'} will be moved to the stash and your working directory will be clean. Restore them later from the stash panel.`,
+        confirmLabel: 'Stash all',
+        onConfirm: async () => {
+          this.update({ confirm: null })
+          await this.runGit(async () => {
+            await call('stashAll', repo.path)
+          }, 'stash')
+          await this.refreshStashes()
+          this.update({ view: 'stash', selectedStashIndex: 0 })
+        }
+      }
+    })
+  }
+
+  restoreStash(entry: StashEntry, pop: boolean): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const dirty = this.state.status?.files.length ?? 0
+    if (dirty > 0 && !pop) {
+      this.toast(
+        'error',
+        'Commit or discard your local changes before restoring a stash.'
+      )
+      return
+    }
+    void this.runGit(async () => {
+      await call(pop ? 'popStash' : 'applyStash', repo.path, entry.index)
+    }, pop ? 'stash-pop' : 'stash-apply').then(() => void this.refreshStashes())
+  }
+
+  dropStash(entry: StashEntry): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    this.update({
+      confirm: {
+        title: 'Drop this stash?',
+        message: `"${entry.message}" will be deleted permanently.`,
+        confirmLabel: 'Drop stash',
+        onConfirm: () => {
+          this.update({ confirm: null })
+          void this.runGit(async () => {
+            await call('dropStash', repo.path, entry.index)
+          }, 'stash-drop')
+        }
+      }
+    })
   }
 
   // ------------------------------------------------------ dialogs/settings
@@ -683,8 +1693,12 @@ export class AppStore {
     this.update({ showClone: open })
   }
 
-  setNewBranchOpen(open: boolean): void {
-    this.update({ showNewBranch: open })
+  setRepoManagerOpen(open: boolean): void {
+    this.update({ showRepoManager: open })
+  }
+
+  setAboutOpen(open: boolean): void {
+    this.update({ showAbout: open })
   }
 
   dismissConfirm(): void {
@@ -712,6 +1726,20 @@ export class AppStore {
         ok: false,
         message: err instanceof Error ? err.message : String(err)
       }
+    }
+  }
+
+  async saveIdentity(name: string, email: string): Promise<boolean> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return false
+    try {
+      await call('setConfigInfo', repo.path, name, email)
+      await this.refreshIdentity()
+      this.toast('success', 'Author identity saved for this repository.')
+      return true
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+      return false
     }
   }
 

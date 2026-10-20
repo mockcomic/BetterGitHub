@@ -80,16 +80,17 @@ describe('parsePorcelainStatus', () => {
   })
 
   it('parses unmerged (conflicted) entries', () => {
+    // Verbatim record captured from `git status --branch --porcelain=2 -z`
+    // during a conflicted merge (no <Xscore> field on u-records).
     const out = parsePorcelainStatus(
       statusOutput(
-        'u UU N... 100644 100644 100644 100644 aaa bbb ccc UU15 app.conflict'
+        'u UU N... 100644 100644 100644 100644 8681f8b8f32615a16703053bc1eaffb3e5e720a5 424860eef4edb9f5a2dacbbd6dc8c2d2e7645035 228068dbe790983c15535164cd483eb77ade97e4 c.txt'
       )
     )
-    // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <hW> <Xscore> <path>
     expect(out.entries).toHaveLength(1)
     expect(out.entries[0].indexCode).toBe('U')
     expect(out.entries[0].worktreeCode).toBe('U')
-    expect(out.entries[0].path).toBe('app.conflict')
+    expect(out.entries[0].path).toBe('c.txt')
   })
 
   it('ignores ignored (!) records and empty input', () => {

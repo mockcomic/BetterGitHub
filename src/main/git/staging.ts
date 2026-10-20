@@ -14,7 +14,6 @@ export async function stagePaths(
     timeoutMs: 20_000
   })
 }
-
 /** Unstage the given paths (worktree content is preserved). */
 export async function unstagePaths(
   repoPath: string,
@@ -87,4 +86,26 @@ export async function discardPaths(
     }).catch(() => undefined)
     await rm(join(repoPath, ...p.split('/')), { force: true, recursive: false })
   }
+}
+
+/**
+ * Resolves one conflicted path: pick the incoming ("theirs") or current
+ * ("ours") side, then stage it so git considers it resolved. `resolved` only
+ * stages the working-tree content as-is.
+ */
+export async function resolveConflict(
+  repoPath: string,
+  path: string,
+  side: 'ours' | 'theirs' | 'resolved'
+): Promise<void> {
+  if (side === 'ours' || side === 'theirs') {
+    await execGit(
+      ['checkout', `--${side}`, '--end-of-options', path],
+      { cwd: repoPath, timeoutMs: 20_000 }
+    )
+  }
+  await execGit(['add', '-A', '--end-of-options', path], {
+    cwd: repoPath,
+    timeoutMs: 20_000
+  })
 }

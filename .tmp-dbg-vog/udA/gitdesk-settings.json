@@ -1,0 +1,22 @@
+{
+  "repositories": [
+    {
+      "id": "3834ddb9-16cc-4b78-82e6-bfd962e24fea",
+      "path": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub",
+      "name": "BetterGitHub"
+    },
+    {
+      "id": "ae3b848e-1f4e-42b8-83df-6f0f6e3bf3b9",
+      "path": "C:\\Users\\KH-PC\\Documents\\GitHub\\Game Engine",
+      "name": "Game Engine"
+    }
+  ],
+  "ai": {
+    "baseUrl": "http://100.78.46.114:8443/v1",
+    "model": "pennyroyal",
+    "customInstructions": ""
+  },
+  "confirmOverrideWithGeneratedMessage": true,
+  "autoRefresh": true,
+  "theme": "system"
+}

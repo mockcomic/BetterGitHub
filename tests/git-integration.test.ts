@@ -1,0 +1,424 @@
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { execGit } from '../src/main/git/exec'
+import { getStatus } from '../src/main/git/status'
+import { getLog } from '../src/main/git/log'
+import {
+  checkoutBranch,
+  deleteBranch,
+  getBranches,
+  renameBranch
+} from '../src/main/git/branches'
+import {
+  amendCommit,
+  cherryPickCommit,
+  commitPaths,
+  revertCommit,
+  undoLastCommit
+} from '../src/main/git/commit'
+import {
+  applyStash,
+  dropStash,
+  listStashes,
+  popStash,
+  stashAll
+} from '../src/main/git/stash'
+import { resolveConflict, stagePaths } from '../src/main/git/staging'
+import { abortOperation, continueOperation } from '../src/main/git/workflow'
+import { appendGitignoreRule, gitignoreRuleFor } from '../src/main/git/ignore'
+
+/**
+ * Integration coverage for the git verb modules: runs the real `git` binary in
+ * a throwaway repository, which is what catches wrong argv. Requires git on
+ * PATH (a documented app requirement); if it is missing, beforeAll fails loud.
+ */
+
+let repo = ''
+let origin = ''
+
+function git(args: ReadonlyArray<string>): Promise<string> {
+  return execGit(args, { cwd: repo, timeoutMs: 30_000 }).then(r =>
+    (r.stdout + r.stderr).trim()
+  )
+}
+
+function write(path: string, content: string): void {
+  writeFileSync(join(repo, ...path.split('/')), content, 'utf8')
+}
+
+/** Discards every leftover change so each test starts from a clean tree. */
+async function resetClean(): Promise<void> {
+  // -x too: ignored files would otherwise survive a clean and confuse counts.
+  await execGit(['reset', '--quiet', '.'], { cwd: repo })
+  await execGit(['checkout', '--quiet', '.'], { cwd: repo })
+  await execGit(['clean', '-qfdx'], { cwd: repo })
+  expect((await getStatus(repo)).files).toHaveLength(0)
+}
+
+async function commitAll(message: string): Promise<string> {
+  await execGit(['add', '-A'], { cwd: repo })
+  await execGit(['commit', '--quiet', '--no-verify', '--allow-empty', '-m', message], {
+    cwd: repo
+  })
+  return (await execGit(['rev-parse', 'HEAD'], { cwd: repo })).stdout.trim()
+}
+
+beforeAll(async () => {
+  // Isolate from the developer's global/system config and hooks.
+  process.env['GIT_CONFIG_GLOBAL'] = join(tmpdir(), 'gitdesk-it-no-global-config')
+  process.env['GIT_CONFIG_SYSTEM'] = join(tmpdir(), 'gitdesk-it-no-system-config')
+
+  repo = mkdtempSync(join(tmpdir(), 'gitdesk-it-'))
+  origin = mkdtempSync(join(tmpdir(), 'gitdesk-origin-'))
+
+  await git(['init', '--initial-branch=main', '--quiet', repo])
+  await git(['init', '--bare', '--quiet', origin])
+  await git(['config', 'user.name', 'Test Author'])
+  await git(['config', 'user.email', 'test@example.com'])
+  await git(['config', 'commit.gpgsign', 'false'])
+  await git(['config', 'core.autocrlf', 'false'])
+  await git(['remote', 'add', 'origin', origin])
+
+  write('README.md', '# hello\n')
+  await commitAll('initial commit')
+})
+
+describe('git integration', () => {
+  it('reports branch, oid, flags and file status', async () => {
+    const status = await getStatus(repo)
+    expect(status.branch).toBe('main')
+    expect(status.oid).toHaveLength(40)
+    expect(status.conflictCount).toBe(0)
+    expect(status.inProgress).toEqual({
+      merge: false,
+      rebase: false,
+      cherryPick: false,
+      revert: false
+    })
+
+    write('README.md', '# hello world\n')
+    const dirty = await getStatus(repo)
+    expect(dirty.files.map(f => f.path)).toContain('README.md')
+    expect(dirty.files.find(f => f.path === 'README.md')).toMatchObject({
+      kind: 'modified',
+      staged: false,
+      hasWorktreeChanges: true,
+      untracked: false
+    })
+    await resetClean()
+  })
+
+  it('commits only the selected paths', async () => {
+    write('README.md', '# hello world\n')
+    write('notes.txt', 'unrelated\n')
+    const sha = await commitPaths(repo, 'Update readme', 'More detail.', [
+      'README.md'
+    ])
+    expect(sha).toHaveLength(40)
+    const shown = await git(['show', '--name-only', '--format=', sha])
+    expect(shown).toContain('README.md')
+    expect(shown).not.toContain('notes.txt')
+    const body = (await git(['log', '-1', '--format=%B', sha])).trim()
+    expect(body.startsWith('Update readme')).toBe(true)
+    expect(body).toContain('More detail.')
+
+    // The unselected file is still dirty.
+    expect((await getStatus(repo)).files.map(f => f.path)).toContain('notes.txt')
+    await resetClean()
+  })
+
+  it('amends the tip commit message and content', async () => {
+    const before = await git(['rev-parse', 'HEAD'])
+    write('extra.txt', 'added by amend\n')
+    const after = await amendCommit(repo, 'Update readme (amended)', '', ['extra.txt'])
+    expect(after).not.toBe(before)
+    expect(await git(['log', '-1', '--format=%s'])).toBe('Update readme (amended)')
+    expect(await git(['rev-parse', 'HEAD'])).toBe(after)
+    const shown = await git(['show', '--name-only', '--format=', after])
+    expect(shown).toContain('extra.txt')
+    await commitAll('amend base checkpoint')
+  })
+
+  it('undoes the last commit, keeping changes staged', async () => {
+    write('notes.txt', 'work\n')
+    const sha = await commitPaths(repo, 'Temporary commit', '', ['notes.txt'])
+    expect(await undoLastCommit(repo, sha)).toBe(sha)
+
+    const head = await git(['rev-parse', 'HEAD'])
+    expect(head).not.toBe(sha)
+    const notes = (await getStatus(repo)).files.find(f => f.path === 'notes.txt')
+    expect(notes).toBeDefined()
+    expect(notes?.staged).toBe(true)
+    // The content survived the undo.
+    expect(readFileSync(join(repo, 'notes.txt'), 'utf8')).toBe('work\n')
+    await resetClean()
+  })
+
+  it('refuses to undo a moved tip or a root commit', async () => {
+    const head = await git(['rev-parse', 'HEAD'])
+    await expect(
+      undoLastCommit(repo, 'ffffffffffffffffffffffffffffffffffffffff')
+    ).rejects.toThrow(/no longer be undone/)
+    expect(await git(['rev-parse', 'HEAD'])).toBe(head)
+
+    const orphan = mkdtempSync(join(tmpdir(), 'gitdesk-root-'))
+    await execGit(['init', '--initial-branch=main', '--quiet', orphan], { cwd: orphan })
+    await execGit(['config', 'user.name', 'T'], { cwd: orphan })
+    await execGit(['config', 'user.email', 't@example.com'], { cwd: orphan })
+    writeFileSync(join(orphan, 'a.txt'), 'a\n', 'utf8')
+    await execGit(['add', '-A'], { cwd: orphan })
+    await execGit(['commit', '--quiet', '-m', 'root'], { cwd: orphan })
+    const rootSha = (await execGit(['rev-parse', 'HEAD'], { cwd: orphan })).stdout.trim()
+    await expect(undoLastCommit(orphan, rootSha)).rejects.toThrow(/first commit/)
+  })
+
+  it('reverts a commit and refuses merge commits', async () => {
+    write('revertme.txt', 'content\n')
+    const sha = await commitPaths(repo, 'Add revertme', '', ['revertme.txt'])
+    expect(existsSync(join(repo, 'revertme.txt'))).toBe(true)
+
+    await revertCommit(repo, sha)
+    expect(existsSync(join(repo, 'revertme.txt'))).toBe(false)
+    expect((await git(['log', '-1', '--format=%s'])).toLowerCase()).toContain('revert')
+
+    await git(['checkout', '-q', '-b', 'side'])
+    write('side.txt', 'side\n')
+    await commitAll('side commit')
+    await git(['checkout', '-q', 'main'])
+    write('mainline.txt', 'main\n')
+    await commitAll('main commit')
+    await git(['merge', '--no-edit', '--no-ff', 'side'])
+    const mergeSha = (await git(['rev-parse', 'HEAD'])).trim()
+    expect((await git(['rev-list', '--parents', '-n', '1', mergeSha])).split(/\s+/)).toHaveLength(3)
+    await expect(revertCommit(repo, mergeSha)).rejects.toThrow(/merge commit/)
+    await resetClean()
+  })
+
+  it('cherry-picks a commit onto another branch', async () => {
+    await git(['checkout', '-q', 'main'])
+    write('picked.txt', 'picked\n')
+    const sha = await commitPaths(repo, 'Pick me', '', ['picked.txt'])
+    await git(['checkout', '-q', 'side'])
+    await cherryPickCommit(repo, sha)
+    expect(readFileSync(join(repo, 'picked.txt'), 'utf8')).toBe('picked\n')
+    await git(['checkout', '-q', 'main'])
+    await resetClean()
+  })
+
+  it('finishes a conflicted cherry-pick through continueOperation', async () => {
+    await resetClean()
+    write('cp.txt', 'base\n')
+    await commitAll('cp base')
+    await git(['checkout', '-q', '-b', 'cp-src'])
+    write('cp.txt', 'theirs\n')
+    await commitAll('cp theirs')
+    const sha = (await git(['rev-parse', 'HEAD'])).trim()
+    await git(['checkout', '-q', 'main'])
+    write('cp.txt', 'ours\n')
+    await commitAll('cp ours')
+
+    await expect(cherryPickCommit(repo, sha)).rejects.toThrow(/cherry-pick/)
+    const conflicted = await getStatus(repo)
+    expect(conflicted.conflictCount).toBe(1)
+    expect(conflicted.inProgress.cherryPick).toBe(true)
+    expect(conflicted.inProgress.revert).toBe(false)
+
+    // Continue refuses until the conflict is resolved.
+    await expect(continueOperation(repo, 'cherryPick')).rejects.toThrow(
+      /Resolve all 1 conflicted file/
+    )
+
+    write('cp.txt', 'hand merged\n')
+    await resolveConflict(repo, 'cp.txt', 'resolved')
+    expect((await getStatus(repo)).conflictCount).toBe(0)
+
+    await continueOperation(repo, 'cherryPick')
+    const done = await getStatus(repo)
+    expect(done.inProgress.cherryPick).toBe(false)
+    expect(done.files).toHaveLength(0)
+    expect(readFileSync(join(repo, 'cp.txt'), 'utf8')).toBe('hand merged\n')
+    await resetClean()
+  })
+
+  it('stashes untracked work, then applies, pops and drops', async () => {
+    write('tracked.txt', 'work in progress\n')
+    write('untracked-new.txt', 'fresh\n')
+    expect((await getStatus(repo)).files).toHaveLength(2)
+
+    await stashAll(repo, 'my work')
+    expect((await getStatus(repo)).files).toHaveLength(0)
+    expect(existsSync(join(repo, 'untracked-new.txt'))).toBe(false)
+
+    const listed = await listStashes(repo)
+    expect(listed).toHaveLength(1)
+    expect(listed[0].message).toContain('my work')
+    expect(listed[0].branch).toBe('main')
+    expect(listed[0].label).toBe('stash@{0}')
+
+    // apply keeps the entry…
+    await applyStash(repo, 0)
+    expect((await getStatus(repo)).files).toHaveLength(2)
+    expect(await listStashes(repo)).toHaveLength(1)
+    await resetClean()
+    expect((await getStatus(repo)).files).toHaveLength(0)
+
+    // …while pop removes it.
+    await popStash(repo, 0)
+    expect((await getStatus(repo)).files).toHaveLength(2)
+    expect(await listStashes(repo)).toHaveLength(0)
+    await resetClean()
+
+    // A stash with no message gets a generated one; drop discards it.
+    write('discardme.txt', 'x\n')
+    await stashAll(repo)
+    expect((await getStatus(repo)).files).toHaveLength(0)
+    const auto = await listStashes(repo)
+    expect(auto).toHaveLength(1)
+    expect(auto[0].message).toContain('GitDesk on main')
+    await dropStash(repo, 0)
+    expect(await listStashes(repo)).toHaveLength(0)
+    expect((await getStatus(repo)).files).toHaveLength(0)
+  })
+
+  it('refuses to stash mid-merge and can abort the merge', async () => {
+    await resetClean()
+    write('conflict.txt', 'base\n')
+    await commitAll('conflict base')
+    await git(['checkout', '-q', '-b', 'conf'])
+    write('conflict.txt', 'theirs\n')
+    await commitAll('conflict theirs')
+    await git(['push', '-q', 'origin', 'conf'])
+    await git(['checkout', '-q', 'main'])
+    write('conflict.txt', 'ours\n')
+    await commitAll('conflict ours')
+
+    await execGit(['merge', '--no-commit', 'conf'], {
+      cwd: repo,
+      timeoutMs: 30_000,
+      successExitCodes: new Set([0, 1])
+    })
+
+    const conflicted = await getStatus(repo)
+    expect(conflicted.conflictCount).toBe(1)
+    expect(conflicted.inProgress.merge).toBe(true)
+    expect(conflicted.files.find(f => f.path === 'conflict.txt')?.kind).toBe('conflicted')
+    await expect(stashAll(repo, 'nope')).rejects.toThrow(/conflicted/)
+
+    await abortOperation(repo, 'merge')
+    const after = await getStatus(repo)
+    expect(after.inProgress.merge).toBe(false)
+    expect(after.conflictCount).toBe(0)
+    expect(readFileSync(join(repo, 'conflict.txt'), 'utf8')).toBe('ours\n')
+  })
+
+  it('resolves with one side and continues the merge', async () => {
+    await resetClean()
+    await execGit(['merge', '--no-commit', 'conf'], {
+      cwd: repo,
+      timeoutMs: 30_000,
+      successExitCodes: new Set([0, 1])
+    })
+    expect((await getStatus(repo)).conflictCount).toBe(1)
+
+    await resolveConflict(repo, 'conflict.txt', 'ours')
+    expect(readFileSync(join(repo, 'conflict.txt'), 'utf8')).toBe('ours\n')
+    expect((await getStatus(repo)).conflictCount).toBe(0)
+
+    await continueOperation(repo, 'merge')
+    const done = await getStatus(repo)
+    expect(done.inProgress.merge).toBe(false)
+    expect(done.files).toHaveLength(0)
+    expect(readFileSync(join(repo, 'conflict.txt'), 'utf8')).toBe('ours\n')
+  })
+
+  it('lists local and remote branches and tracks a remote one', async () => {
+    await git(['push', '-q', '--set-upstream', 'origin', 'main'])
+    const list = await getBranches(repo)
+    expect(list.local.map(b => b.name)).toEqual(
+      expect.arrayContaining(['main', 'conf', 'side'])
+    )
+    expect(list.local.find(b => b.current)?.name).toBe('main')
+    const remoteNames = list.remote.map(b => `${b.remote}/${b.name}`)
+    expect(remoteNames).toEqual(expect.arrayContaining(['origin/conf', 'origin/main']))
+    expect(list.remote.every(b => b.remote === 'origin')).toBe(true)
+    expect(list.remote.map(b => b.name)).not.toContain('HEAD')
+
+    // A remote branch with no local counterpart becomes a tracking branch.
+    await git(['branch', '-D', 'conf'])
+    await checkoutBranch(repo, 'conf', 'origin')
+    const status = await getStatus(repo)
+    expect(status.branch).toBe('conf')
+    expect(status.upstream).toBe('origin/conf')
+    await git(['checkout', '-q', 'main'])
+  })
+
+  it('guards branch deletion and supports rename', async () => {
+    await expect(deleteBranch(repo, 'main', false)).rejects.toThrow(/Switch to another branch/)
+
+    await git(['checkout', '-q', '-b', 'scratch'])
+    write('scratch.txt', 'only here\n')
+    await commitAll('scratch commit')
+    await git(['checkout', '-q', 'main'])
+    await expect(deleteBranch(repo, 'scratch', false)).rejects.toThrow(/not fully merged|not yet merged/i)
+    await deleteBranch(repo, 'scratch', true)
+    expect((await getBranches(repo)).local.map(b => b.name)).not.toContain('scratch')
+
+    await git(['checkout', '-q', '-b', 'rename-me'])
+    await renameBranch(repo, 'rename-me', 'renamed-ok')
+    expect((await getStatus(repo)).branch).toBe('renamed-ok')
+    await git(['checkout', '-q', 'main'])
+  })
+
+  it('pages and filters the log', async () => {
+    const all = await getLog(repo, { maxCount: 100 })
+    expect(all.length).toBeGreaterThan(3)
+    expect(all[all.length - 1].summary).toBe('initial commit')
+    expect(all[all.length - 1].parents).toHaveLength(0)
+    expect(all[all.length - 1].body).toBe('')
+
+    const first = all.slice(0, 2)
+    const paged = await getLog(repo, { maxCount: 2, skip: 2 })
+    expect(paged).toHaveLength(2)
+    expect(paged[0].sha).not.toBe(first[0].sha)
+
+    const found = await getLog(repo, { search: 'readme' })
+    expect(found.length).toBeGreaterThan(0)
+    for (const c of found) expect(c.summary.toLowerCase()).toContain('readme')
+
+    const mine = await getLog(repo, { author: 'test@example.com' })
+    expect(mine).toHaveLength(all.length)
+    expect(await getLog(repo, { author: 'nobody@nowhere.test' })).toHaveLength(0)
+
+    const mergeCommit = all.find(c => c.isMerge)
+    expect(mergeCommit).toBeDefined()
+    expect(mergeCommit?.parents).toHaveLength(2)
+  })
+
+  it('stages paths and honours .gitignore rules', async () => {
+    write('staged.txt', 'x\n')
+    await stagePaths(repo, ['staged.txt'])
+    expect(
+      (await getStatus(repo)).files.find(f => f.path === 'staged.txt')?.staged
+    ).toBe(true)
+    await resetClean()
+
+    const rule = gitignoreRuleFor('ignored.log', false)
+    expect(rule).toBe('ignored.log')
+    expect(await appendGitignoreRule(repo, rule)).toBe(true)
+    expect(await appendGitignoreRule(repo, 'ignored.log')).toBe(false)
+    const content = readFileSync(join(repo, '.gitignore'), 'utf8')
+    expect(content.match(/ignored\.log/g)).toHaveLength(1)
+
+    write('ignored.log', 'noise\n')
+    write('keepme.txt', 'kept\n')
+    const status = await getStatus(repo)
+    expect(status.files.map(f => f.path)).not.toContain('ignored.log')
+    expect(status.files.map(f => f.path)).toContain('keepme.txt')
+
+    // A directory rule keeps its trailing slash.
+    expect(gitignoreRuleFor('build', true)).toBe('build/')
+    await resetClean()
+  })
+})

@@ -6,18 +6,34 @@ export type DiffLineKind =
   | 'ctx'
   | 'warning'
 
+/** A run of characters inside a changed line, marked when it actually differs. */
+export interface DiffSegment {
+  readonly text: string
+  readonly changed: boolean
+}
+
 export interface DiffLine {
   readonly kind: DiffLineKind
   readonly text: string
   readonly oldNo: number | null
   readonly newNo: number | null
+  /**
+   * Present on paired add/del lines: the same text split into unchanged and
+   * changed runs (GitHub Desktop's word-level diff highlighting).
+   */
+  readonly segments?: ReadonlyArray<DiffSegment>
+}
+
+interface MutableDiffLine extends DiffLine {
+  segments?: ReadonlyArray<DiffSegment>
 }
 
 /**
- * Parse unified diff text into renderable lines with old/new line numbers.
+ * Parse unified diff text into renderable lines with old/new line numbers,
+ * then annotate paired changes with character-level "what really moved".
  */
 export function parseDiff(text: string): DiffLine[] {
-  const lines: DiffLine[] = []
+  const lines: MutableDiffLine[] = []
   let oldNo = 0
   let newNo = 0
   let binary = false
@@ -87,7 +103,130 @@ export function parseDiff(text: string): DiffLine[] {
     return lines.filter(l => l.kind === 'warning' || l.kind === 'meta')
   }
 
+  annotateWordDiff(lines)
   return lines
+}
+
+/**
+ * Walks the parsed lines and, for each run of deletions immediately followed
+ * by a run of additions, pairs them up index-wise and records the character
+ * runs that differ. Lines beyond a token budget are left unannotated (the LCS
+ * is quadratic) — they still render normally.
+ */
+export function annotateWordDiff(lines: MutableDiffLine[]): void {
+  let i = 0
+  while (i < lines.length) {
+    if (lines[i].kind !== 'del') {
+      i++
+      continue
+    }
+    let delEnd = i
+    while (delEnd < lines.length && lines[delEnd].kind === 'del') delEnd++
+    let addEnd = delEnd
+    while (addEnd < lines.length && lines[addEnd].kind === 'add') addEnd++
+
+    const dels = lines.slice(i, delEnd)
+    const adds = lines.slice(delEnd, addEnd)
+    const pairs = Math.min(dels.length, adds.length)
+    for (let p = 0; p < pairs; p++) {
+      const left = dels[p].text
+      const right = adds[p].text
+      if (
+        left.length > MAX_WORD_DIFF_CHARS ||
+        right.length > MAX_WORD_DIFF_CHARS
+      ) {
+        continue
+      }
+      const parts = charDiff(left, right)
+      dels[p].segments = parts
+        .filter(part => !part.inserted)
+        .map(part => ({ text: part.text, changed: part.changed }))
+      adds[p].segments = parts
+        .filter(part => !part.deleted)
+        .map(part => ({ text: part.text, changed: part.changed }))
+    }
+    i = addEnd > i ? addEnd : i + 1
+  }
+}
+
+const MAX_WORD_DIFF_CHARS = 2000
+
+interface CharPart {
+  readonly text: string
+  readonly changed: boolean
+  readonly deleted: boolean
+  readonly inserted: boolean
+}
+
+/** Tokenizes into words / runs of spaces / single punctuation marks. */
+export function tokenizeForDiff(text: string): string[] {
+  return text.match(/\s+|\w+|[^\s\w]/g) ?? []
+}
+
+/** Classic LCS diff over tokens, with equal runs merged. */
+export function charDiff(a: string, b: string): CharPart[] {
+  const left = tokenizeForDiff(a)
+  const right = tokenizeForDiff(b)
+  const n = left.length
+  const m = right.length
+
+  // Longest-common-subsequence table (rows of n+1 x m+1).
+  const table: number[][] = Array.from({ length: n + 1 }, () =>
+    new Array<number>(m + 1).fill(0)
+  )
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      table[i][j] =
+        left[i] === right[j]
+          ? table[i + 1][j + 1] + 1
+          : Math.max(table[i + 1][j], table[i][j + 1])
+    }
+  }
+
+  const parts: CharPart[] = []
+  const push = (
+    text: string,
+    changed: boolean,
+    deleted: boolean,
+    inserted: boolean
+  ): void => {
+    const last = parts[parts.length - 1]
+    if (
+      last !== undefined &&
+      last.changed === changed &&
+      last.deleted === deleted &&
+      last.inserted === inserted
+    ) {
+      parts[parts.length - 1] = { text: last.text + text, changed, deleted, inserted }
+    } else {
+      parts.push({ text, changed, deleted, inserted })
+    }
+  }
+
+  let i = 0
+  let j = 0
+  while (i < n && j < m) {
+    if (left[i] === right[j]) {
+      push(left[i], false, false, false)
+      i++
+      j++
+    } else if (table[i + 1][j] >= table[i][j + 1]) {
+      push(left[i], true, true, false)
+      i++
+    } else {
+      push(right[j], true, false, true)
+      j++
+    }
+  }
+  while (i < n) {
+    push(left[i], true, true, false)
+    i++
+  }
+  while (j < m) {
+    push(right[j], true, false, true)
+    j++
+  }
+  return parts
 }
 
 export function isBinaryDiff(text: string): boolean {

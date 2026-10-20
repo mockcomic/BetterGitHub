@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { RequestResponseChannel } from '../shared/ipc'
-import { MENU_ACTION_CHANNEL, type MenuAction } from '../shared/ipc'
+import {
+  MENU_ACTION_CHANNEL,
+  REPO_CHANGED_CHANNEL,
+  type MenuAction
+} from '../shared/ipc'
 
 /**
  * The only surface exposed to the renderer. The renderer-side wrapper in
@@ -18,6 +22,15 @@ const api = {
     ipcRenderer.on(MENU_ACTION_CHANNEL, listener)
     return () => {
       ipcRenderer.removeListener(MENU_ACTION_CHANNEL, listener)
+    }
+  },
+  /** Main pushes the repository path when a watched working tree changes. */
+  onRepoChanged: (callback: (repoPath: string) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, repoPath: string) =>
+      callback(repoPath)
+    ipcRenderer.on(REPO_CHANGED_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(REPO_CHANGED_CHANNEL, listener)
     }
   }
 }

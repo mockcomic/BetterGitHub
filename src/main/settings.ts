@@ -3,7 +3,12 @@ import { existsSync } from 'fs'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
 import { app, safeStorage } from 'electron'
-import type { PublicSettings, Repository, SettingsPatch } from '../shared/models'
+import type {
+  ManagedRepository,
+  PublicSettings,
+  Repository,
+  SettingsPatch
+} from '../shared/models'
 
 /**
  * JSON settings + repository list in userData, and an API key kept in an
@@ -15,6 +20,7 @@ interface StoredSettings {
   repositories: Repository[]
   ai: { baseUrl: string; model: string; customInstructions: string }
   confirmOverrideWithGeneratedMessage: boolean
+  autoRefresh: boolean
   theme: 'system' | 'light' | 'dark'
 }
 
@@ -26,6 +32,7 @@ const DEFAULTS: StoredSettings = {
     customInstructions: ''
   },
   confirmOverrideWithGeneratedMessage: true,
+  autoRefresh: true,
   theme: 'system'
 }
 
@@ -78,6 +85,7 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       hasApiKey: (await readApiKey()) !== null
     },
     confirmOverrideWithGeneratedMessage: s.confirmOverrideWithGeneratedMessage,
+    autoRefresh: s.autoRefresh,
     theme: s.theme
   }
 }
@@ -98,6 +106,7 @@ export async function saveSettings(patch: SettingsPatch): Promise<PublicSettings
     s.confirmOverrideWithGeneratedMessage =
       patch.confirmOverrideWithGeneratedMessage
   }
+  if (patch.autoRefresh !== undefined) s.autoRefresh = patch.autoRefresh
   if (patch.theme !== undefined) s.theme = patch.theme
   await persist()
   return getPublicSettings()
@@ -110,11 +119,11 @@ function normalizeBaseUrl(raw: string): string {
   return url
 }
 
-export async function listRepositories(): Promise<Repository[]> {
+export async function listRepositories(): Promise<ManagedRepository[]> {
   const s = await load()
-  // Drop repositories whose folder no longer exists (reported, kept on disk
-  // until explicitly removed, but hidden from the list).
-  return s.repositories.filter(r => existsSync(r.path))
+  // Repositories whose folder vanished from disk stay in the list, flagged
+  // `missing`, so the repository manager can show and clean them up.
+  return s.repositories.map(r => ({ ...r, missing: !existsSync(r.path) }))
 }
 
 export async function addRepository(path: string): Promise<Repository> {
@@ -132,14 +141,28 @@ export async function addRepository(path: string): Promise<Repository> {
   return repo
 }
 
-export async function removeRepository(id: string): Promise<void> {
+/**
+ * Removes all matching entries with a single persist and returns the removed
+ * records, so the caller knows their on-disk paths (for Recycle-Bin delete).
+ */
+export async function removeRepositoriesByIds(
+  ids: ReadonlyArray<string>
+): Promise<Repository[]> {
   const s = await load()
-  s.repositories = s.repositories.filter(r => r.id !== id)
+  const idSet = new Set(ids)
+  const removed = s.repositories.filter(r => idSet.has(r.id))
+  if (removed.length === 0) return []
+  s.repositories = s.repositories.filter(r => !idSet.has(r.id))
   await persist()
+  return removed
 }
 
 export async function getThemeSetting(): Promise<'system' | 'light' | 'dark'> {
   return (await load()).theme
+}
+
+export async function isAutoRefreshEnabled(): Promise<boolean> {
+  return (await load()).autoRefresh
 }
 
 // ---------------------------------------------------------------------------

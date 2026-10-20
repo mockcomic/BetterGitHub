@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T05:15:00Z",
+  "title": "Design System: GitDesk",
+  "extensions": {
+    "colorMeta": {
+      "commit-green": { "role": "primary", "displayName": "Commit Green", "canonical": "#1a7f37", "darkCounterpart": "#2ea043", "tonalRamp": ["#082010", "#0f3a1d", "#165729", "#1a7f37", "#2ea043", "#4ac261", "#7fd893", "#c8f0d3"] },
+      "beacon-blue": { "role": "secondary", "displayName": "Beacon Blue", "canonical": "#0969da", "darkCounterpart": "#4493f8", "tonalRamp": ["#071c3d", "#0b3a75", "#0d52a3", "#0969da", "#4493f8", "#79b8ff", "#b6d9ff", "#ddefff"] },
+      "alarm-red": { "role": "tertiary", "displayName": "Alarm Red", "canonical": "#cf222e", "darkCounterpart": "#f85149", "tonalRamp": ["#3d0710", "#75101a", "#a31321", "#cf222e", "#f85149", "#ff8a80", "#ffb3ab", "#ffe0dd"] },
+      "caution-amber": { "role": "tertiary", "displayName": "Caution Amber", "canonical": "#d4a72c", "darkCounterpart": "#d4a72c", "tonalRamp": ["#3a2c07", "#6f5410", "#9c7816", "#d4a72c", "#e5c353", "#f0d789", "#f7e9bd", "#fcf6df"] },
+      "canvas": { "role": "neutral", "displayName": "Canvas", "canonical": "#ffffff", "darkCounterpart": "#0d1117", "tonalRamp": ["#0d1117", "#161b22", "#1c2128", "#eef1f4", "#f3f5f7", "#f6f8fa", "#ffffff", "#ffffff"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#d0d7de", "darkCounterpart": "#30363d", "tonalRamp": ["#30363d", "#484f58", "#656d76", "#8b949e", "#afb8c1", "#d0d7de", "#e7ebef", "#f6f8fa"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1f2328", "darkCounterpart": "#e6edf3", "tonalRamp": ["#1f2328", "#32383f", "#4b545d", "#656d76", "#8b949e", "#afb8c1", "#d0d7de", "#e6edf3"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Empty-state/onboarding h1 only (30px). Once per screen at most." },
+      "headline": { "displayName": "Headline", "purpose": "Dialog titles (h2, 15px)." },
+      "title": { "displayName": "Title", "purpose": "File basenames, picker values, active popover items (600 weight)." },
+      "body": { "displayName": "Body", "purpose": "App-wide default UI text (13px)." },
+      "label": { "displayName": "Label", "purpose": "Hints, meta, status bar, uppercase eyebrows (10.5-12.5px, usually Ink Muted)." },
+      "code": { "displayName": "Code", "purpose": "Repository-verbatim text: paths, diffs, commit bodies, code chips. Cascadia Code/Consolas." }
+    },
+    "shadows": [
+      { "name": "float-light", "value": "0 8px 24px rgba(31, 35, 40, 0.16)", "purpose": "The single ambient shadow. Popovers, dialogs, toasts, context menus (light theme)." },
+      { "name": "float-dark", "value": "0 8px 24px rgba(1, 4, 9, 0.6)", "purpose": "Same geometry, deepened for the dark theme's floating layers." },
+      { "name": "scrim", "value": "rgba(1, 4, 9, 0.55)", "purpose": "Full-viewport dialog overlay beneath a floated dialog." }
+    ],
+    "motion": [
+      { "name": "spinner", "value": "0.8s linear infinite", "purpose": "The app's only animation: the busy ring on AI/git operations." },
+      { "name": "hover-lift-directional", "value": "150ms ease-out", "purpose": "Accepted-but-unimplemented direction: subtle lift/shadow response on button and row hover." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The commit action. Commit Green is reserved for it and its confirmations.",
+      "html": "<button class=\"ds-btn-primary\">Commit to main</button>",
+      "css": ".ds-btn-primary { background: var(--primary, #1a7f37); border: 1px solid #12612a; color: #fff; font: 600 13px -apple-system, 'Segoe UI', sans-serif; padding: 5px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; } .ds-btn-primary:hover { background: var(--primary-hover, #21883a); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #1a7f37) 25%, transparent); }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "The workhorse control: panel-filled, hairline-bordered, quiet.",
+      "html": "<button class=\"ds-btn-default\">Fetch origin</button>",
+      "css": ".ds-btn-default { background: var(--bg-panel, #f6f8fa); border: 1px solid var(--border, #d0d7de); color: var(--text, #1f2328); font: 400 13px -apple-system, 'Segoe UI', sans-serif; padding: 5px 12px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; } .ds-btn-default:hover { background: var(--bg-hover, #eef1f4); } .ds-btn-default:disabled { opacity: 0.55; cursor: default; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Full-width field; focus replaces the outline with a Beacon Blue border and 25% ring.",
+      "html": "<input class=\"ds-input\" placeholder=\"Summary (required)\" />",
+      "css": ".ds-input { background: var(--bg, #fff); border: 1px solid var(--border, #d0d7de); color: var(--text, #1f2328); font: 400 13px -apple-system, 'Segoe UI', sans-serif; padding: 5px 8px; border-radius: 6px; width: 100%; } .ds-input:focus { outline: none; border-color: var(--accent, #0969da); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0969da) 25%, transparent); }"
+    },
+    {
+      "name": "Staged Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Pill chip coding file staging; staged variant is green, clickable, transparent.",
+      "html": "<button class=\"ds-badge-staged\">staged</button>",
+      "css": ".ds-badge-staged { font: 400 10.5px -apple-system, 'Segoe UI', sans-serif; color: var(--add-text, #1a7f37); background: transparent; border: 1px solid color-mix(in srgb, var(--add-text, #1a7f37) 45%, var(--border, #d0d7de)); padding: 1px 6px; border-radius: 999px; cursor: pointer; }"
+    },
+    {
+      "name": "File Row",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Changes-list row: status letter, muted directory + bold basename, hover-revealed discard.",
+      "html": "<div class=\"ds-file-row\"><span class=\"ds-glyph new\">N</span><span class=\"ds-path\"><span class=\"ds-dir\">src/renderer/</span><span class=\"ds-name\">styles.css</span></span><button class=\"ds-discard\">×</button></div>",
+      "css": ".ds-file-row { display: flex; align-items: center; gap: 7px; padding: 5px 10px; cursor: pointer; border-bottom: 1px solid transparent; background: transparent; font: 400 13px -apple-system, 'Segoe UI', sans-serif; color: var(--text, #1f2328); } .ds-file-row:hover { background: var(--bg-hover, #eef1f4); } .ds-glyph { flex: 0 0 14px; text-align: center; font-size: 11px; color: var(--add-text, #1a7f37); } .ds-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-dir { color: var(--text-muted, #656d76); } .ds-name { font-weight: 600; } .ds-discard { opacity: 0; border: none; background: transparent; color: var(--text-muted, #656d76); font-size: 14px; cursor: pointer; } .ds-file-row:hover .ds-discard { opacity: 1; } .ds-discard:hover { color: var(--danger, #cf222e); }"
+    },
+    {
+      "name": "Popover Menu",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Floating layer for branch/repo pickers: canvas face, float shadow, eyebrow headings, active item in Commit Green.",
+      "html": "<div class=\"ds-popover\"><div class=\"ds-pop-heading\">Recent branches</div><button class=\"ds-pop-item\">main</button><button class=\"ds-pop-item active\">feat/design</button><div class=\"ds-pop-sep\"></div><button class=\"ds-pop-item danger\">Remove</button></div>",
+      "css": ".ds-popover { position: relative; background: var(--bg, #fff); border: 1px solid var(--border, #d0d7de); border-radius: 8px; box-shadow: var(--shadow, 0 8px 24px rgba(31,35,40,0.16)); padding: 4px; min-width: 280px; font: 400 13px -apple-system, 'Segoe UI', sans-serif; } .ds-pop-heading { padding: 6px 10px 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #656d76); } .ds-pop-item { display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--text, #1f2328); padding: 7px 10px; border-radius: 6px; cursor: pointer; font: inherit; } .ds-pop-item:hover { background: var(--bg-hover, #eef1f4); } .ds-pop-item.active { color: var(--primary, #1a7f37); font-weight: 600; } .ds-pop-item.danger { color: var(--danger, #cf222e); } .ds-pop-sep { height: 1px; background: var(--border, #d0d7de); margin: 4px 0; }"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "Bottom-right floating notice with a 4px severity stripe: green success, red error, blue info.",
+      "html": "<div class=\"ds-toast ds-toast-success\">Committed to branch main.</div>",
+      "css": ".ds-toast { background: var(--bg, #fff); border: 1px solid var(--border, #d0d7de); border-left-width: 4px; border-radius: 8px; box-shadow: var(--shadow, 0 8px 24px rgba(31,35,40,0.16)); padding: 9px 12px; font: 400 12.5px -apple-system, 'Segoe UI', sans-serif; color: var(--text, #1f2328); max-width: 420px; } .ds-toast-success { border-left-color: var(--primary, #1a7f37); } .ds-toast-error { border-left-color: var(--danger, #cf222e); } .ds-toast-info { border-left-color: var(--accent, #0969da); }"
+    },
+    {
+      "name": "Segmented Tabs",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Changes/History toggle; the active tab's Beacon Blue border is the sole active signal.",
+      "html": "<div class=\"ds-seg\"><button class=\"ds-seg-item\">Changes</button><button class=\"ds-seg-item ds-seg-active\">History</button></div>",
+      "css": ".ds-seg { display: flex; } .ds-seg-item { flex: 1; padding: 6px 0; border: 1px solid var(--border, #d0d7de); background: var(--bg, #fff); color: var(--text-muted, #656d76); cursor: pointer; font: 400 13px -apple-system, 'Segoe UI', sans-serif; } .ds-seg-item:first-child { border-radius: 6px 0 0 6px; } .ds-seg-item:last-child { border-radius: 0 6px 6px 0; border-left: none; } .ds-seg-active { background: var(--bg-header, #f3f5f7); color: var(--text, #1f2328); font-weight: 600; border-color: var(--accent, #0969da); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Workbench",
+    "overview": "GitDesk presents itself as a well-lit workbench: everything the interface is made of — panels, headers, rails, status bars — is matte, neutral, and deliberately unremarkable, so that the only things permitted to speak are the facts of the repository. A file's status letter, a green add-row in a diff, the ahead/behind count, the commit button. The system's restraint is personality expressed as discipline. Depth comes from hairline borders and tonal surface shifts, never decoration. Motion is reduced to the honest machine signals that exist (a spinner while git or the AI is working), and elevation is a single soft ambient shadow reserved strictly for things floating above the app.\n\nThe type system is a two-voice arrangement: the platform-native UI stack (Segoe UI on Windows) for human text, and a programmer's monospace (Cascadia Code) for machine truth — file paths, diffs, commit bodies, shortcut keys. Wherever monospace appears, it signals \"this text is verbatim from your repository, do not paraphrase it.\" The system ships fully paired light and dark themes through one CSS custom-property contract; the dark theme is not an afterthought but the same philosophy rendered in cast iron.",
+    "keyCharacteristics": [
+      "Matte tonal surfaces separated by 1px hairline borders; no decorative color anywhere.",
+      "Git state is the only protagonist: status glyphs, diff washes, badges, and the Commit button carry all meaning.",
+      "One shadow token, one use: floating layers only (popovers, dialogs, toasts, context menus).",
+      "Machine truth in monospace, human text in the system stack — the split is meaningful, never stylistic.",
+      "Compact, instrument-panel density: 13px base, 4-16px spacing scale, fixed 400px working rail.",
+      "Light and dark themes are first-class equals driven by html[data-theme] custom properties."
+    ],
+    "rules": [
+      { "name": "The Green-Belongs-to-Commit Rule", "body": "Commit Green appears only on the commit action and its confirmations (staged badges, add-row text, success toasts). A generic primary button that does not commit must not wear it.", "section": "colors" },
+      { "name": "The Amber-Never-Shouts Rule", "body": "Caution Amber is reserved for soft warnings that permit the user to continue. Anything that blocks or failed uses Alarm Red. Amber is never a brand or highlight color.", "section": "colors" },
+      { "name": "The No-Decoration Rule", "body": "Every pixel of chromatic color in the interface encodes git or task state. A color with no state meaning does not ship.", "section": "colors" },
+      { "name": "The Two-Voice Rule", "body": "System UI for prose the app wrote; monospace for text your repository wrote (paths, diffs, commit messages, code chips). Never blend them in one element.", "section": "typography" },
+      { "name": "The 10.5px Floor", "body": "No UI text renders below 10.5px; the density lives in spacing and truncation, not in shrinking type.", "section": "typography" },
+      { "name": "The One Shadow Rule", "body": "One shadow token, four consumers (popover, dialog, toast, context menu). If it's in the document flow, it gets a hairline border, not a shadow.", "section": "elevation" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest; depth is reserved for state (floating layers) and never for decoration. Hover-lift on buttons/rows is an accepted evolution, not yet implemented.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do route every new surface through the html[data-theme] custom-property contract; both themes must receive the exact same roles.",
+      "Do express structure with 1px Hairline borders and tonal steps (canvas → panel → header-surface) before reaching for any shadow.",
+      "Do reserve Commit Green for commit-and-confirmation semantics and Beacon Blue for interaction/focus/busy semantics.",
+      "Do set repository-verbatim text (paths, diffs, commit messages, shortcut keys) in the mono stack, and UI prose in the system stack.",
+      "Do use the Float shadow only for dismissible floating layers, and give new overlays 8-10px radius + 4px inner item radius like its existing consumers.",
+      "Do express selection with the green Selected Surface and never with a checkbox-only or border-only treatment in the file/commit lists.",
+      "Do truncate with ellipsis at min-width: 0 rather than wrapping paths or breaking the 400px rail."
+    ],
+    "donts": [
+      "Don't introduce chromatic color that encodes no git or task state; the palette is exhausted at Green/Blue/Red/Amber plus the three diff washes.",
+      "Don't add a second shadow token or shadow an in-flow panel; borders do that work.",
+      "Don't display type larger than 30px or text smaller than 10.5px; density comes from the 4-16px spacing scale.",
+      "Don't use Caution Amber for blockers/errors and Alarm Red for soft warnings — the severity ladder is fixed.",
+      "Don't put package-UI webfonts or icon libraries on the product; the incumbent system uses the platform's own faces and glyph characters.",
+      "Don't animate anything except the busy spinner until the hover-lift direction is actually implemented; instant state changes are the current grammar."
+    ]
+  }
+}

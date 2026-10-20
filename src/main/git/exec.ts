@@ -136,16 +136,6 @@ export async function execGit(
   })
 }
 
-/** Convenience: run git and return stdout trimmed. */
-export async function gitStdout(
-  args: ReadonlyArray<string>,
-  cwd: string,
-  options?: Omit<GitExecOptions, 'cwd'>
-): Promise<string> {
-  const r = await execGit(args, { cwd, ...options })
-  return r.stdout.trim()
-}
-
 export function friendlyGitError(err: unknown): string {
   if (err instanceof GitExecError) {
     return err.message

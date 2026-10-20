@@ -23,7 +23,10 @@ export function createMainWindow(devServerUrl: string | undefined): BrowserWindo
     }
   })
 
-  trustedWebContents.add(window.webContents.id)
+  // Captured eagerly: after 'closed' fires, `window.webContents` is already
+  // destroyed and reading `.id` throws "Object has been destroyed".
+  const contentsId = window.webContents.id
+  trustedWebContents.add(contentsId)
 
   window.webContents.on(
     'did-fail-load',
@@ -66,7 +69,7 @@ export function createMainWindow(devServerUrl: string | undefined): BrowserWindo
   )
 
   window.on('closed', () => {
-    trustedWebContents.delete(window.webContents.id)
+    trustedWebContents.delete(contentsId)
     if (mainWindow === window) mainWindow = null
   })
 
