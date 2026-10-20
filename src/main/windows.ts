@@ -12,7 +12,9 @@ export function createMainWindow(devServerUrl: string | undefined): BrowserWindo
     height: 840,
     minWidth: 960,
     minHeight: 600,
-    backgroundColor: '#1c2128',
+    // Matches the dark theme's ground (styles.css), so the first paint and any
+    // resize gutter read as the desk, not as a grey box.
+    backgroundColor: '#0b1120',
     autoHideMenuBar: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

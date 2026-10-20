@@ -3,6 +3,14 @@ out/
 dist/
 *.log
 .DS_Store
-.userdata/
-.userdata-dev/
-.userdata-test/
+
+# Electron user-data dirs (one per environment / run mode)
+.userdata*/
+
+# Local QA scratch: throwaway git repos and fixtures
+.qa-work/
+
+# Local capture tooling plus disposable Edge profile
+.gk-capture/
+
+.impeccable/review/

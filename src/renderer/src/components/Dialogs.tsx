@@ -471,7 +471,10 @@ export function ConfirmDialog(): JSX.Element | null {
               {altLabel}
             </button>
           )}
-          <button className="btn primary" onClick={onConfirm}>
+          <button
+            className={`btn primary${state.confirm.tone === 'danger' ? ' destructive' : ''}`}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </button>
         </>

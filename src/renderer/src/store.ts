@@ -19,6 +19,7 @@ import type {
 } from '../../shared/models'
 import type { MenuAction } from '../../shared/ipc'
 import { call, onMenuAction, onRepoChanged } from './api'
+import { withViewTransition } from './view-transition'
 
 export interface ToastAction {
   readonly label: string
@@ -37,6 +38,12 @@ export interface ConfirmRequest {
   readonly title: string
   readonly message: string
   readonly confirmLabel: string
+  /**
+   * The verb's own colour. Confirmations that throw work away answer in Alarm
+   * Red; confirmations that keep or create work stay Commit Green — see
+   * DESIGN.md, "Named Hues Do Jobs".
+   */
+  readonly tone?: 'danger'
   /** Optional second, destructive-flavoured button ("Delete anyway"). */
   readonly altLabel?: string
   readonly onAlt?: () => void
@@ -723,7 +730,11 @@ export class AppStore {
             prevConflicts === 0 &&
             this.state.view === 'review'
           ) {
-            this.update({ view: 'conflicts' })
+            // The move is narrated by a view transition: the desk slid, it
+            // did not blink.
+            withViewTransition(() => {
+              this.update({ view: 'conflicts' })
+            }, 'fwd')
           }
           if (checked.size !== draft.checked.size) {
             this.setDraft(repo.path, { checked })
@@ -1015,6 +1026,7 @@ export class AppStore {
         title: 'Discard changes',
         message: `Discard changes in "${path}"? This cannot be undone.`,
         confirmLabel: 'Discard',
+        tone: 'danger',
         onConfirm: () => {
           this.update({ confirm: null })
           void this.discardPaths([path])
@@ -1032,6 +1044,7 @@ export class AppStore {
         title: 'Discard all changes',
         message: `Discard changes in all ${files.length} file${files.length === 1 ? '' : 's'}? This cannot be undone.`,
         confirmLabel: 'Discard all',
+        tone: 'danger',
         onConfirm: () => {
           this.update({ confirm: null })
           void this.discardPaths(files.map(f => f.path))
@@ -1096,6 +1109,7 @@ export class AppStore {
               ? 'Abort the rebase? The branch returns to where it was before the rebase.'
               : 'Abort the operation and restore the working tree?',
         confirmLabel: 'Abort',
+        tone: 'danger',
         onConfirm: () => {
           this.update({ confirm: null })
           void this.runGit(async () => {
@@ -1356,6 +1370,8 @@ export class AppStore {
           message:
             'You already typed a commit message. Generating one will replace your summary and description.',
           confirmLabel: 'Replace',
+          // The typed message is lost, not kept: this confirmation destroys work.
+          tone: 'danger',
           onConfirm: () => {
             this.update({ confirm: null })
             void this.runGeneration(repo.path, [...draft.checked])
@@ -1471,6 +1487,7 @@ export class AppStore {
           ? 'This branch has commits that are not merged into the current branch. Deleting anyway discards them.'
           : `The local branch "${name}" will be deleted.`,
         confirmLabel: force ? 'Delete anyway' : 'Delete branch',
+        tone: 'danger',
         onConfirm: async () => {
           this.update({ confirm: null })
           try {
@@ -1487,6 +1504,7 @@ export class AppStore {
                   message:
                     'git reports this branch has commits that are not merged anywhere yet.\n\nDelete anyway and lose those commits?',
                   confirmLabel: 'Delete anyway',
+        tone: 'danger',
                   onConfirm: () => {
                     this.update({ confirm: null })
                     void call('deleteBranch', repo.path, name, true)
@@ -1536,6 +1554,7 @@ export class AppStore {
         title: `Delete ${remote}/${name}?`,
         message: `The branch will be deleted on ${remote}. Other people will lose it after their next fetch.`,
         confirmLabel: 'Delete on remote',
+        tone: 'danger',
         onConfirm: async () => {
           this.update({ confirm: null })
           await this.guarded(
@@ -1712,7 +1731,9 @@ export class AppStore {
             await call('stashAll', repo.path)
           }, 'stash')
           await this.refreshStashes()
-          this.update({ view: 'stash', selectedStashIndex: 0 })
+          withViewTransition(() => {
+            this.update({ view: 'stash', selectedStashIndex: 0 })
+          }, 'fwd')
         }
       }
     })
@@ -1742,6 +1763,7 @@ export class AppStore {
         title: 'Drop this stash?',
         message: `"${entry.message}" will be deleted permanently.`,
         confirmLabel: 'Drop stash',
+        tone: 'danger',
         onConfirm: () => {
           this.update({ confirm: null })
           void this.runGit(async () => {

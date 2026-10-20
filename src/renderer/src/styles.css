@@ -3,50 +3,104 @@
   --mono: 'Cascadia Code', 'Consolas', 'SFMono-Regular', Menlo, monospace;
 }
 
+/*
+ * Named hue roles. Every chromatic value in GitDesk answers to one of these —
+ * a hue with no role does not ship (see DESIGN.md, "Named Hues Do Jobs"):
+ *
+ *   --primary Commit Green   the commit verb and its confirmations
+ *   --accent  Beacon Blue    interaction, focus, busy, and the History view
+ *   --danger  Alarm Red      deletion, conflicts, destructive actions
+ *   --caution Caution Amber  soft warnings you can continue past
+ *   --stash   Shelf Teal     stashed work (its own hue, its own view)
+ *   --ai      Agent Violet   the AI commit agent — the product's signature
+ *
+ * Each desk view also names a --view-accent (see .app[data-view] below); that
+ * hue carries view identity (rails, switch indicator, selection washes) and
+ * never borrows another role's meaning.
+ */
 html[data-theme='light'] {
-  --bg: #ffffff;
-  --bg-panel: #f6f8fa;
-  --bg-header: #f3f5f7;
+  --bg: #fbfcfe;
+  --bg-panel: #f2f5fa;
+  --bg-header: #eaeef6;
   --bg-selected: #daf4e4;
-  --bg-hover: #eef1f4;
-  --border: #d0d7de;
-  --text: #1f2328;
-  --text-muted: #656d76;
+  --bg-hover: #e3e9f3;
+  --border: #ccd5e3;
+  --text: #1c2433;
+  --text-muted: #5f6b80;
   --accent: #0969da;
   --primary: #1a7f37;
   --primary-hover: #21883a;
   --danger: #cf222e;
+  --stash: #0b6f7a;
+  --ai: #6639ba;
   --add-bg: #dafbe1;
   --add-text: #1a7f37;
   --del-bg: #ffebe9;
   --del-text: #cf222e;
   --hunk-bg: #ddf4ff;
   --hunk-text: #0969da;
-  --caution: #d4a72c;
+  --caution: #9a6700;
+  --scrim: rgba(31, 35, 40, 0.42);
   --shadow: 0 8px 24px rgba(31, 35, 40, 0.16);
+  --glow-hover: 0 1px 3px rgba(31, 35, 40, 0.18);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  /* Color dosage per theme: the light ground is whiter, so the same view hue
+     has to be spent more generously there for the desk to read the same way. */
+  --tint: 11%;
+  --tint-row: 8%;
+  --field: 16%;
+  /* A filled verb must hold its contrast at rest, so the face has its own
+     tokens: the state hues above stay the color of text, rails, and washes
+     (where they sit on dark or light grounds), while the button faces are the
+     deepened siblings that clear 4.5:1 against a white label. */
+  --primary-face: var(--primary);
+  --primary-face-hover: var(--primary-hover);
+  --danger-face: var(--danger);
+  /* Hover deepens a filled verb in the light theme: washing a white label out
+     over a paler face is how the 4.5:1 floor gets missed. */
+  --danger-face-hover: color-mix(in srgb, var(--danger) 90%, #000000);
+  --filled-disabled-ink: #0d1117;
+  --filled-disabled-face: color-mix(in srgb, var(--primary) 34%, var(--bg-panel));
+  --filled-disabled-face-danger: color-mix(in srgb, var(--danger) 34%, var(--bg-panel));
+  --filled-lit: 70%;
 }
 
 html[data-theme='dark'] {
-  --bg: #0d1117;
-  --bg-panel: #161b22;
-  --bg-header: #1c2128;
-  --bg-selected: #123424;
-  --bg-hover: #21262d;
-  --border: #30363d;
-  --text: #e6edf3;
-  --text-muted: #8b949e;
+  /* Dark first: a low-chroma indigo-ink ground, so the hues above read as
+     signal light on cast iron rather than as stickers on white paper. */
+  --bg: #0b1120;
+  --bg-panel: #121a2b;
+  --bg-header: #172033;
+  --bg-selected: #12332a;
+  --bg-hover: #1c2740;
+  --border: #2a3652;
+  --text: #e8edf6;
+  --text-muted: #94a3bf;
   --accent: #4493f8;
-  --primary: #2ea043;
-  --primary-hover: #3fb950;
+  --primary: #3fb950;
+  --primary-hover: #4ecb5c;
   --danger: #f85149;
+  --stash: #39c5cf;
+  --ai: #a371f7;
   --add-bg: #12261e;
   --add-text: #3fb950;
   --del-bg: #25171c;
   --del-text: #f85149;
-  --hunk-bg: #121d2e;
+  --hunk-bg: #12233a;
   --hunk-text: #4493f8;
   --caution: #d4a72c;
-  --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
+  --scrim: rgba(1, 4, 9, 0.6);
+  --shadow: 0 8px 24px rgba(1, 4, 9, 0.55);
+  --glow-hover: 0 1px 3px rgba(1, 4, 9, 0.5);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
+  --tint: 8%;
+  --tint-row: 6%;
+  --field: 12%;
+  --primary-face: color-mix(in srgb, var(--primary) 64%, #04080f);
+  --primary-face-hover: color-mix(in srgb, var(--primary-face) 88%, #ffffff);
+  --danger-face: color-mix(in srgb, var(--danger) 76%, #04080f);
+  --danger-face-hover: color-mix(in srgb, var(--danger-face) 88%, #ffffff);
+  --filled-disabled-ink: color-mix(in srgb, #ffffff 88%, var(--text-muted));
 }
 
 * {
@@ -75,6 +129,41 @@ body {
   flex-direction: column;
 }
 
+/* ---------------------------------------------------------------- view hue */
+/* The active desk view names one hue that colors everything speaking for it:
+   the queue rail, the switch indicator, selection washes, the diff title
+   underline, and the scrollbars. The hue identifies where you are; it never
+   claims a git state — those keep --primary/--danger/--caution. */
+
+.app {
+  --view-accent: var(--accent);
+  --view-wash: color-mix(in srgb, var(--view-accent) 9%, var(--bg-panel));
+  --view-edge: color-mix(in srgb, var(--view-accent) 38%, var(--border));
+  --view-glow: 0 0 10px color-mix(in srgb, var(--view-accent) 22%, transparent);
+  --view-selected: color-mix(in srgb, var(--view-accent) 17%, var(--bg));
+}
+
+.app[data-view='review'] {
+  --view-accent: var(--primary);
+}
+
+.app[data-view='history'] {
+  --view-accent: var(--accent);
+}
+
+.app[data-view='conflicts'] {
+  --view-accent: var(--danger);
+}
+
+.app[data-view='stash'] {
+  --view-accent: var(--stash);
+}
+
+/* No repository is selected: the desk wears its own blue rather than a view's. */
+.app[data-view='empty'] {
+  --view-accent: var(--accent);
+}
+
 input,
 textarea,
 select {
@@ -94,7 +183,7 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 button {
@@ -126,17 +215,105 @@ button {
 .btn:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
+/* The commit verb: Commit Green with a lit top face, and a sheen that sweeps
+   the button when the cursor arrives (background-position only, so the
+   celebration's confetti can still fly free of the box). */
 .btn.primary {
-  background: var(--primary);
-  border-color: color-mix(in srgb, var(--primary) 70%, black);
+  background-color: var(--primary-face);
+  background-image:
+    linear-gradient(
+      105deg,
+      transparent 42%,
+      color-mix(in srgb, #ffffff 30%, transparent) 50%,
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-face) 84%, #ffffff),
+      var(--primary-face) 65%
+    );
+  background-size: 240% 100%, 100% 100%;
+  background-position: -80% 0, 0 0;
+  background-repeat: no-repeat;
+  border-color: color-mix(in srgb, var(--primary-face) 72%, black);
   color: #ffffff;
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--primary-face) 60%, black);
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background-color: var(--primary-face-hover);
+  background-position: 180% 0, 0 0;
+  box-shadow:
+    0 1px 3px var(--glow-hover),
+    0 0 0 3px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+/* A confirmation that throws work away answers in Alarm Red: the green button
+   always means something was kept, never that something was lost. */
+.btn.primary.destructive {
+  background-color: var(--danger-face);
+  background-image:
+    linear-gradient(
+      105deg,
+      transparent 42%,
+      color-mix(in srgb, #ffffff 30%, transparent) 50%,
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--danger-face) 84%, #ffffff),
+      var(--danger-face) 65%
+    );
+  background-size: 240% 100%, 100% 100%;
+  background-position: -80% 0, 0 0;
+  background-repeat: no-repeat;
+  border-color: color-mix(in srgb, var(--danger) 70%, black);
+  color: #ffffff;
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--danger) 60%, black);
+}
+
+.btn.primary.destructive:hover:not(:disabled) {
+  background-color: var(--danger-face-hover);
+  background-position: 180% 0, 0 0;
+  box-shadow:
+    0 1px 3px var(--glow-hover),
+    0 0 0 3px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+/* A filled verb at 55% opacity reads as broken rather than unavailable, so an
+   unavailable commit keeps a solid face and dims its hue instead. */
+.btn.primary:disabled {
+  opacity: 1;
+  background-image: none;
+  background-color: color-mix(in srgb, var(--primary) 40%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--primary) 26%, var(--border));
+  color: var(--filled-disabled-ink);
+  text-shadow: none;
+}
+
+.btn.primary.destructive:disabled {
+  background-color: color-mix(in srgb, var(--danger) 40%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--danger) 26%, var(--border));
+}
+
+/* The AI agent's own signature: Agent Violet, held back from everything else
+   in the interface so the one button that writes your message for you reads
+   as the different machine in the room. */
+.btn.ai {
+  color: var(--ai);
+  border-color: color-mix(in srgb, var(--ai) 42%, var(--border));
+  background: color-mix(in srgb, var(--ai) 10%, var(--bg-panel));
+}
+
+.btn.ai:hover:not(:disabled) {
+  color: var(--ai);
+  background: color-mix(in srgb, var(--ai) 18%, var(--bg-panel));
+  box-shadow:
+    0 1px 3px var(--glow-hover),
+    0 0 0 3px color-mix(in srgb, var(--ai) 18%, transparent);
 }
 
 .icon-btn {
@@ -170,14 +347,22 @@ button {
 
 /* ---------------------------------------------------------------- header */
 
+/* The command strip wears the active view's hue as a light wash falling from
+   its top edge, and its bottom hairline is tinted with it: the strip tells you
+   which desk you are sitting at before you read a single label. */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  background: var(--bg-header);
-  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--view-accent) var(--tint), var(--bg-header)),
+      var(--bg-header) 78%
+    );
+  border-bottom: 1px solid var(--view-edge);
   flex: 0 0 auto;
 }
 
@@ -298,7 +483,7 @@ button {
 }
 
 .popover-item:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--view-accent) var(--tint), var(--bg-hover));
 }
 
 .popover-item.active {
@@ -347,7 +532,8 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--view-edge);
+  box-shadow: inset 2px 0 0 0 color-mix(in srgb, var(--view-accent) 45%, transparent);
   background: var(--bg-panel);
   min-height: 0;
 }
@@ -360,11 +546,16 @@ button {
 }
 
 /* ------------------------------------------------------------ desk switch */
+/* The four tabs sit on a rail and the active one is named by a sliding
+   indicator (positioned in App.tsx, --tab-x/--tab-w) tinted with the view's
+   own hue. Text weight carries the active tab too, so hue is never the only
+   signal. */
 
 .desk-switch {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
@@ -372,13 +563,15 @@ button {
 }
 
 .desk-tab {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--bg-panel);
+  background: transparent;
   color: var(--text-muted);
   font: inherit;
   cursor: pointer;
@@ -386,21 +579,19 @@ button {
 }
 
 .desk-tab:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--view-accent) var(--tint-row), var(--bg-hover));
   color: var(--text);
 }
 
 .desk-tab.active {
-  background: var(--bg-header);
   color: var(--text);
   font-weight: 600;
-  border-color: var(--accent);
 }
 
 .desk-tab:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 .tab-badge {
@@ -409,13 +600,13 @@ button {
   line-height: 1;
   padding: 2px 6px;
   border-radius: 999px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  background: var(--view-wash);
+  border: 1px solid var(--view-edge);
+  color: var(--view-accent);
 }
 
 .desk-tab.active .tab-badge {
-  background: var(--bg-panel);
+  background: color-mix(in srgb, var(--view-accent) 16%, var(--bg-panel));
 }
 
 .tab-badge.danger,
@@ -424,12 +615,42 @@ button {
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
 }
 
+/* Conflicts waiting: the label itself goes alarm-red wherever you are sitting,
+   so the interruption is legible before the badge count is read. */
+.desk-tab.danger {
+  color: color-mix(in srgb, var(--danger) 75%, var(--text-muted));
+}
+
+.desk-tab.danger:hover {
+  color: var(--danger);
+}
+
+/* Conflicts arriving is an event: the badge announces itself once, then rests. */
+.tab-badge.danger {
+  animation: badge-arrive 420ms var(--ease-arrive) both;
+}
+
+@keyframes badge-arrive {
+  0% {
+    transform: scale(0.7);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent);
+  }
+  45% {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);
+  }
+}
+
 .queue-label {
   padding: 8px 10px 3px;
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--view-accent) 55%, var(--text-muted));
 }
 
 .queue-label b {
@@ -495,6 +716,7 @@ button {
 }
 
 .file-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -503,12 +725,54 @@ button {
   border-bottom: 1px solid transparent;
 }
 
+/* A row's status hue grows a left rail when the cursor (or the selection)
+   arrives: the file tells you what it is by what changed in it. */
+.file-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--view-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.file-row:hover::before,
+.file-row.selected::before {
+  transform: scaleX(1);
+}
+
+.file-row:has(.status-glyph.new)::before {
+  background: var(--add-text);
+}
+
+.file-row:has(.status-glyph.deleted)::before {
+  background: var(--del-text);
+}
+
+.file-row:has(.status-glyph.conflicted)::before {
+  background: var(--danger);
+}
+
+.file-row:has(.status-glyph.renamed)::before,
+.file-row:has(.status-glyph.copied)::before {
+  background: var(--hunk-text);
+}
+
+.file-row:has(.status-glyph.modified)::before,
+.file-row:has(.status-glyph.type-changed)::before {
+  background: var(--caution);
+}
+
 .file-row:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--view-accent) var(--tint-row), var(--bg-hover));
 }
 
 .file-row.selected {
-  background: var(--bg-selected);
+  background: var(--view-selected);
 }
 
 .file-row.conflicted {
@@ -518,6 +782,7 @@ button {
 .file-row input[type='checkbox'] {
   width: auto;
   flex: 0 0 auto;
+  accent-color: var(--primary);
 }
 
 .file-row.compact {
@@ -582,8 +847,8 @@ button {
 .badge.staged {
   color: var(--add-text);
   border-color: color-mix(in srgb, var(--add-text) 45%, var(--border));
+  background: color-mix(in srgb, var(--add-text) 12%, transparent);
   cursor: pointer;
-  background: transparent;
   font-family: inherit;
 }
 
@@ -605,8 +870,10 @@ button {
   opacity: 1;
 }
 
+/* The × turns its head when the cursor reaches it: discard is a decision. */
 .discard:hover {
   color: var(--danger);
+  transform: rotate(90deg);
 }
 
 /* ------------------------------------------------------------ commit tray */
@@ -618,8 +885,14 @@ button {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  border-left: 1px solid var(--border);
-  background: var(--bg-panel);
+  border-left: 1px solid var(--view-edge);
+  box-shadow: inset -2px 0 0 0 color-mix(in srgb, var(--view-accent) 45%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--view-accent) var(--tint), var(--bg-panel)),
+      var(--bg-panel) 22%
+    );
   min-height: 0;
   overflow-y: auto;
 }
@@ -634,6 +907,16 @@ button {
 .scope-line b {
   color: var(--text);
   font-weight: 600;
+}
+
+/* The numbers in the scope line are git truth, so they speak the diff's own
+   colors — green for what ships as additions, red for deletions. */
+.scope-adds {
+  color: var(--add-text);
+}
+
+.scope-dels {
+  color: var(--del-text);
 }
 
 .commit-tray .commit-actions {
@@ -675,7 +958,9 @@ button {
 }
 
 .btn.ai {
-  color: var(--accent);
+  /* The violet signature lives with the button base above; this rule only
+     keeps the AI verb's label from inheriting the tray's ink. */
+  color: var(--ai);
 }
 
 .commit {
@@ -792,17 +1077,20 @@ button {
 }
 
 /* ---------------------------------------------------------------- motion */
-/* The Quiet Workbench moves only to acknowledge something that happened:
-   buttons answer the cursor, floated layers arrive instead of blink in,
-   and state changes (tab swap, new rows, changed counts) read as events.
-   Transform/opacity only, 90–180 ms, exponential ease-out. The one
-   authored spectacle stays the commit/push celebration above. */
+/* GitDesk moves to acknowledge something that happened, and now also to say
+   which desk you are sitting at: controls answer the cursor, the switch
+   indicator slides to the active view, panes travel in the direction you were
+   heading, and floated layers arrive instead of blink in. Four tiers, all
+   under 250 ms — the commit/push celebration below stays the one long moment.
+   Transform, opacity, box-shadow, and background-position only. */
 
 :root {
   --motion-instant: 90ms;
-  --motion-fast: 130ms;
-  --motion-layer: 180ms;
+  --motion-fast: 140ms;
+  --motion-layer: 200ms;
+  --motion-slide: 220ms;
   --ease-arrive: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* --- controls answer the cursor (the sanctioned hover-lift) ------------ */
@@ -810,6 +1098,7 @@ button {
 .btn {
   transition:
     background-color var(--motion-instant) ease-out,
+    background-position var(--motion-slide) ease-out,
     border-color var(--motion-instant) ease-out,
     color var(--motion-instant) ease-out,
     box-shadow var(--motion-instant) ease-out,
@@ -818,20 +1107,26 @@ button {
 
 .btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 18%, transparent);
+  box-shadow: 0 1px 3px var(--glow-hover);
 }
 
-/* Pressed: the lift comes back down — the hover is the answer, the click
-   is the commitment. */
+/* Pressed: the lift comes back down and the button takes the press — the
+   hover is the answer, the click is the commitment. */
 .btn:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.97);
   box-shadow: none;
 }
 
 .icon-btn,
 .mini,
 .link {
-  transition: color var(--motion-instant) ease-out;
+  transition:
+    color var(--motion-instant) ease-out,
+    transform var(--motion-instant) ease-out;
+}
+
+.icon-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .desk-tab {
@@ -839,6 +1134,39 @@ button {
     background-color var(--motion-fast) ease-out,
     border-color var(--motion-fast) ease-out,
     color var(--motion-fast) ease-out;
+}
+
+/* The sliding view indicator: transform + width only, on the arrival curve. */
+.desk-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 6px;
+  left: 0;
+  height: calc(100% - 12px);
+  width: 1px;
+  border-radius: 6px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--view-accent) 26%, var(--bg-panel)),
+      color-mix(in srgb, var(--view-accent) 14%, var(--bg-panel))
+    );
+  border: 1px solid var(--view-edge);
+  box-shadow: var(--view-glow);
+  transform: translateX(var(--tab-x, 0px));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--motion-slide) var(--ease-arrive),
+    width var(--motion-slide) var(--ease-arrive),
+    background-color var(--motion-layer) ease-out,
+    border-color var(--motion-layer) ease-out,
+    box-shadow var(--motion-layer) ease-out,
+    opacity var(--motion-fast) ease-out;
+}
+
+.desk-indicator.shown {
+  opacity: 1;
 }
 
 input,
@@ -856,13 +1184,20 @@ select {
 .recent-repo {
   transition:
     background-color var(--motion-instant) ease-out,
+    border-color var(--motion-instant) ease-out,
     color var(--motion-instant) ease-out;
+}
+
+/* The status rail answers the cursor at the same speed as the row wash. */
+.file-row::before {
+  transition: transform var(--motion-fast) var(--ease-arrive);
 }
 
 .discard {
   transition:
     opacity var(--motion-fast) ease-out,
-    color var(--motion-instant) ease-out;
+    color var(--motion-instant) ease-out,
+    transform var(--motion-fast) var(--ease-arrive);
 }
 
 /* --- floated layers arrive, never blink in ------------------------------ */
@@ -951,7 +1286,7 @@ select {
 .commit-row,
 .stash-row {
   animation: row-in var(--motion-fast) var(--ease-arrive)
-    calc(var(--row-i, 0) * 18ms) both;
+    calc(var(--row-i, 0) * 16ms) both;
 }
 
 .changes-list > :nth-child(1) {
@@ -975,17 +1310,14 @@ select {
 .changes-list > :nth-child(7) {
   --row-i: 6;
 }
-.changes-list > :nth-child(8) {
-  --row-i: 7;
-}
-.changes-list > :nth-child(n + 9) {
-  --row-i: 8;
+.changes-list > :nth-child(n + 8) {
+  --row-i: 6;
 }
 
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateX(var(--pane-from, 14px));
   }
   to {
     opacity: 1;
@@ -994,9 +1326,89 @@ select {
 }
 
 /* The desk re-settles when the tab changes; keyed on the view so React
-   remounts and the entrance replays exactly once per switch. */
+   remounts and the entrance replays exactly once per switch, traveling the way
+   you moved (html[data-nav-dir] flips --pane-from). While a View Transition is
+   running it owns the movement, and this stays out of the way. */
 .pane-enter {
-  animation: view-in var(--motion-fast) var(--ease-arrive) both;
+  animation: view-in var(--motion-slide) var(--ease-arrive) both;
+}
+
+html[data-nav-dir='back'] .pane-enter {
+  --pane-from: -14px;
+}
+
+.vt-run .pane-enter {
+  animation: none;
+}
+
+/* --- the desk view swap, explained across states (View Transitions API) --- */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--motion-slide);
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  animation-name: vt-out-fwd;
+  animation-timing-function: var(--ease-exit);
+}
+
+::view-transition-new(root) {
+  animation-name: vt-in-fwd;
+  animation-timing-function: var(--ease-arrive);
+}
+
+html[data-nav-dir='back']::view-transition-old(root) {
+  animation-name: vt-out-back;
+}
+
+html[data-nav-dir='back']::view-transition-new(root) {
+  animation-name: vt-in-back;
+}
+
+@keyframes vt-in-fwd {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vt-out-fwd {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+
+@keyframes vt-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vt-out-back {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
 }
 
 @keyframes count-pop {
@@ -1018,7 +1430,7 @@ select {
 }
 
 .empty-state {
-  animation: view-in 200ms var(--ease-arrive) both;
+  animation: view-in var(--motion-layer) var(--ease-arrive) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1030,6 +1442,15 @@ select {
     transform: none;
   }
 
+  .icon-btn:hover:not(:disabled) {
+    transform: none;
+  }
+
+  /* The commit verb still lights up; the sheen just doesn't sweep. */
+  .btn.primary:hover:not(:disabled) {
+    background-position: -80% 0, 0 0;
+  }
+
   .popover,
   .context-menu,
   .dialog,
@@ -1039,6 +1460,33 @@ select {
   .commit-row,
   .stash-row,
   .empty-state {
+    animation-name: scrim-in;
+  }
+
+  /* The indicator jumps to its tab instead of sliding; its color change stays. */
+  .desk-indicator {
+    transition:
+      background-color var(--motion-layer) ease-out,
+      border-color var(--motion-layer) ease-out,
+      box-shadow var(--motion-layer) ease-out,
+      opacity var(--motion-fast) ease-out;
+  }
+
+  .file-row::before,
+  .discard {
+    transition: none;
+  }
+
+  .discard:hover {
+    transform: none;
+  }
+
+  .tab-badge.danger {
+    animation: none;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
     animation-name: scrim-in;
   }
 
@@ -1064,6 +1512,14 @@ select {
   text-align: center;
   color: var(--text-muted);
   padding: 40px;
+  /* An empty pane is the one place a quiet field of light is allowed: the wash
+     is the view's own hue, and it says "this desk is ready", not "broken". */
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      color-mix(in srgb, var(--view-accent) var(--field), transparent),
+      transparent 62%
+    );
 }
 
 .diff-title {
@@ -1072,8 +1528,12 @@ select {
   z-index: 1;
   font-family: var(--mono);
   padding: 6px 12px;
-  background: var(--bg-header);
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--view-accent) var(--tint), var(--bg-header)),
+    var(--bg-header) 70%
+  );
+  border-bottom: 1px solid var(--view-edge);
   font-size: 12px;
 }
 
@@ -1084,6 +1544,18 @@ select {
   font-size: 12px;
   line-height: 1.55;
   table-layout: auto;
+}
+
+/* A new file's diff arrives rather than appearing mid-scroll — the whole table
+   fades as one layer so a thousand-row diff costs one composited animation. */
+.diff-view .diff-table {
+  animation: scrim-in var(--motion-fast) ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diff-view .diff-table {
+    animation: none;
+  }
 }
 
 .diff-line.add {
@@ -1209,24 +1681,34 @@ select {
 }
 
 .commit-row:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--view-accent) var(--tint-row), var(--bg-hover));
 }
 
 .commit-row.selected {
-  background: var(--bg-selected);
+  background: var(--view-selected);
 }
 
+/* Author avatars are lit with Beacon Blue — the interaction voice, since
+   clicking one is a way to filter — and answer the cursor with a halo. */
 .avatar {
   flex: 0 0 24px;
   height: 24px;
   border-radius: 50%;
   background: color-mix(in srgb, var(--accent) 25%, var(--bg-panel));
   color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
   font-size: 10px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: box-shadow var(--motion-fast) var(--ease-arrive);
+}
+
+.commit-row:hover .avatar {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .commit-summary {
@@ -1321,19 +1803,32 @@ select {
 /* ---------------------------------------------------------------- chrome bits */
 
 .status-bar {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   gap: 14px;
   align-items: center;
   padding: 3px 10px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-header);
+  border-top: 1px solid var(--view-edge);
+  background: linear-gradient(
+    180deg,
+    var(--bg-header),
+    color-mix(in srgb, var(--view-accent) var(--tint), var(--bg-header))
+  );
   color: var(--text-muted);
   font-size: 11.5px;
 }
 
+/* The machine-thinking signal: Beacon Blue, with the ring riding the item's own
+   currentColor. The AI variant answers in Agent Violet, so the two kinds of
+   waiting — git working and the agent writing — look different. */
 .status-item.busy {
+  position: relative;
   color: var(--accent);
+}
+
+.status-item.busy.ai {
+  color: var(--ai);
 }
 
 .status-item.busy::before {
@@ -1341,12 +1836,47 @@ select {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-top-color: var(--accent);
+  border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-right: 5px;
   vertical-align: -1px;
+}
+
+/* A hairline of the same hue travels the length of the busy item while the
+   operation runs, and disappears the moment it is not the truth. */
+.status-item.busy::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    currentColor,
+    transparent
+  );
+  opacity: 0.5;
+  animation: busy-sheen 1.2s linear infinite;
+}
+
+@keyframes busy-sheen {
+  from {
+    transform: translateX(-70%);
+  }
+  to {
+    transform: translateX(70%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-item.busy::after {
+    animation: none;
+    opacity: 0.35;
+  }
 }
 
 .status-item.right {
@@ -1358,7 +1888,9 @@ select {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(1, 4, 9, 0.55);
+  background: var(--scrim);
+  /* The only blur in the app: the desk behind a dialog is present but silent. */
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1381,7 +1913,13 @@ select {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--view-edge);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--view-accent) var(--tint), var(--bg-header)),
+    var(--bg-header) 60%
+  );
+  border-radius: 10px 10px 0 0;
 }
 
 .dialog-head h2 {
@@ -1483,6 +2021,9 @@ select {
 .onboarding h1 {
   font-size: 30px;
   margin: 0 0 8px;
+  /* Solid ink: the wordmark does not need a gradient to be the brand, and the
+     desk already says what colors mean. */
+  color: var(--text);
 }
 
 .onboarding p {
@@ -1520,16 +2061,33 @@ select {
   font-size: 12.5px;
 }
 
+/* The stripe names the severity; a faint wash of the same hue carries it across
+   the card so a toast is legible in peripheral vision. */
 .toast.error {
   border-left-color: var(--danger);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--danger) 10%, var(--bg)),
+    var(--bg) 42%
+  );
 }
 
 .toast.success {
   border-left-color: var(--primary);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--primary) 10%, var(--bg)),
+    var(--bg) 42%
+  );
 }
 
 .toast.info {
   border-left-color: var(--accent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 10%, var(--bg)),
+    var(--bg) 42%
+  );
 }
 
 ::-webkit-scrollbar {
@@ -1537,9 +2095,14 @@ select {
   height: 10px;
 }
 
+/* Scrollbars ride the view's hue, so a long queue reads as part of that desk. */
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: color-mix(in srgb, var(--view-accent) 32%, var(--border));
   border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--view-accent) 55%, var(--border));
 }
 
 ::-webkit-scrollbar-track {
@@ -1705,11 +2268,11 @@ select {
 }
 
 .stash-row:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--view-accent) var(--tint-row), var(--bg-hover));
 }
 
 .stash-row.selected {
-  background: var(--bg-selected);
+  background: var(--view-selected);
 }
 
 .stash-detail {
@@ -1718,11 +2281,14 @@ select {
   max-width: 640px;
 }
 
+/* Stashed work is Shelf Teal — its own hue, because a stash is neither a
+   change in the worktree nor a commit: it is parked work. */
 .stash-detail-head {
   display: flex;
   align-items: baseline;
   gap: 10px;
   font-size: 14px;
+  color: color-mix(in srgb, var(--view-accent) 45%, var(--text));
 }
 
 .stash-detail-head code {
@@ -1904,7 +2470,8 @@ select {
 
 .recent-repo:hover {
   background: var(--bg-hover);
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .recent-repo small {
@@ -2105,7 +2672,7 @@ select {
 
 .repo-table:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 /* Header and rows share one column grid so every label sits above its data. */
@@ -2469,6 +3036,15 @@ select {
     max-height: 46%;
     border-left: none;
     border-top: 1px solid var(--border);
+    /* Stacked, the tray must not push the commit verb below the fold: the
+       description yields space first, and the tray scrolls as the guarantee. */
+    overflow-y: auto;
+  }
+
+  .commit-field .description {
+    min-height: 54px;
+    flex-shrink: 1;
+    resize: vertical;
   }
 }
 

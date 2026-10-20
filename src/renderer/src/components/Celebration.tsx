@@ -15,9 +15,11 @@ import type { CelebrationKind } from '../store'
 const PARTICLE_COLORS = [
   'var(--primary)',
   'var(--primary)',
-  'var(--primary)',
   'var(--accent)',
-  'var(--caution)'
+  'var(--view-accent)',
+  'var(--caution)',
+  // A little Agent Violet in the burst: the moment is often the agent's work.
+  'var(--ai)'
 ]
 
 /** Deterministic PRNG so a re-render of the same pulse looks identical. */

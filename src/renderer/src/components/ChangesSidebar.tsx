@@ -616,9 +616,17 @@ export function CommitTray(): JSX.Element {
       />
       <div className="scope-line" title={scopeTitle}>
         <b>{checked.size} of {total}</b> files ·{' '}
-        {state.scopeLoading
-          ? '+… −…'
-          : `+${state.scopeAdds} −${state.scopeDels}`}
+        {state.scopeLoading ? (
+          <>
+            <span className="scope-adds">+…</span>{' '}
+            <span className="scope-dels">−…</span>
+          </>
+        ) : (
+          <>
+            <span className="scope-adds">+{state.scopeAdds}</span>{' '}
+            <span className="scope-dels">−{state.scopeDels}</span>
+          </>
+        )}
       </div>
       <div className="commit-actions">
         {state.aiBusy ? (

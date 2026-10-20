@@ -1,5 +1,6 @@
 import type { JSX } from 'react'
-import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Header } from './components/Header'
 import {
   ChangesQueue,
@@ -24,6 +25,7 @@ import {
 import { RepoManagerDialog } from './components/RepoManagerDialog'
 import { EmptyState } from './components/EmptyState'
 import { useStore, useStoreState } from './store'
+import { withViewTransition } from './view-transition'
 import type { DeskView } from './store'
 
 const DESK_TABS: ReadonlyArray<{ id: DeskView; label: string }> = [
@@ -47,7 +49,7 @@ export function App(): JSX.Element {
 
   if (state.selectedRepo === null) {
     return (
-      <div className="app">
+      <div className="app" data-view="empty">
         <Header />
         <EmptyState />
         <Toasts />
@@ -66,7 +68,7 @@ export function App(): JSX.Element {
   const conflictCount = state.status?.conflictCount ?? 0
 
   return (
-    <div className="app">
+    <div className="app" data-view={view}>
       <Header />
       {state.initError !== null && (
         <div className="app-banner error">
@@ -165,10 +167,44 @@ function SegmentedSwitch(): JSX.Element {
   const state = useStoreState()
   const store = useStore()
   const tabsRef = useRef<HTMLDivElement | null>(null)
+  // The active tab's box, measured from the DOM so the indicator follows the
+  // real label widths (badges change them) instead of a guessed layout.
+  const [indicator, setIndicator] = useState<{ x: number; w: number } | null>(null)
 
   const conflicts = state.status?.conflictCount ?? 0
   const files = state.status?.files.length ?? 0
   const stashes = state.stashes.length
+
+  const measure = (): void => {
+    const nav = tabsRef.current
+    const active = nav?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+    if (!nav || !active) {
+      setIndicator(null)
+      return
+    }
+    setIndicator({ x: active.offsetLeft, w: active.offsetWidth })
+  }
+
+  // Re-measure when the active tab changes and whenever a count badge appears
+  // or disappears, since that changes the label's width.
+  useLayoutEffect(() => {
+    measure()
+  }, [state.view, files, conflicts, stashes])
+
+  useEffect(() => {
+    const nav = tabsRef.current
+    if (nav === null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => measure())
+    observer.observe(nav)
+    return () => observer.disconnect()
+  }, [])
+
+  /** Move the desk, telling the transition which way the visitor travelled. */
+  const goTo = (next: DeskView): void => {
+    const order = DESK_TABS.map(t => t.id)
+    const dir = order.indexOf(next) >= order.indexOf(state.view) ? 'fwd' : 'back'
+    withViewTransition(() => store.setView(next), dir)
+  }
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
@@ -179,7 +215,7 @@ function SegmentedSwitch(): JSX.Element {
       order[
         (at + (e.key === 'ArrowRight' ? 1 : order.length - 1)) % order.length
       ]
-    store.setView(next)
+    goTo(next)
     // Keep focus on the newly active tab when the switch itself has focus.
     const active = tabsRef.current?.querySelector<HTMLButtonElement>(
       '[role="tab"][aria-selected="true"]'
@@ -189,6 +225,16 @@ function SegmentedSwitch(): JSX.Element {
 
   return (
     <nav className="desk-switch" ref={tabsRef} onKeyDown={onKeyDown} aria-label="Desk view">
+      <span
+        aria-hidden="true"
+        className={`desk-indicator${indicator === null ? '' : ' shown'}`}
+        style={
+          {
+            transform: `translateX(${indicator?.x ?? 0}px)`,
+            width: `${indicator?.w ?? 0}px`
+          } as CSSProperties
+        }
+      />
       {DESK_TABS.map(tab => {
         const active = state.view === tab.id
         const count =
@@ -210,7 +256,7 @@ function SegmentedSwitch(): JSX.Element {
             className={`desk-tab${active ? ' active' : ''}${
               tab.id === 'conflicts' && count > 0 ? ' danger' : ''
             }`}
-            onClick={() => store.setView(tab.id)}
+            onClick={() => goTo(tab.id)}
             title={
               tab.id === 'review'
                 ? 'Review and commit your changes'
@@ -299,7 +345,7 @@ function StatusBar(): JSX.Element | null {
         <span className="status-item busy">{busyLabel(state.busy)}</span>
       )}
       {state.aiBusy && (
-        <span className="status-item busy">Writing commit message…</span>
+        <span className="status-item busy ai">Writing commit message…</span>
       )}
       <span className="status-item right">
         {state.lastRefreshedAt !== null && (
