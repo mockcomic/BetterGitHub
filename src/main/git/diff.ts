@@ -83,22 +83,31 @@ export async function getCommitFileNames(
     ['diff', '--name-status', '-z', base, sha],
     { cwd: repoPath, timeoutMs: 30_000 }
   )
+  return parseNameStatusZ(result.stdout)
+}
 
-  const records = result.stdout.split('\0')
+/**
+ * Parse `git diff --name-status -z` output. In the -z format there are no
+ * tabs: the status token and each path are separate NUL-terminated records,
+ * and renames/copies put the old path in the record right after the new one
+ * (e.g. `R100\0new\0old\0M\0other\0`).
+ */
+export function parseNameStatusZ(
+  output: string
+): Array<{ path: string; oldPath?: string; code: string }> {
+  const records = output.split('\0').filter(r => r.length > 0)
   const files: Array<{ path: string; oldPath?: string; code: string }> = []
 
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i]
-    if (record.length === 0) continue
-    const space = record.indexOf('\t')
-    if (space === -1) continue
-    const code = record.slice(0, space)
-    const path = record.slice(space + 1)
+  let i = 0
+  while (i < records.length) {
+    const code = records[i]
+    const path = records[i + 1]
+    if (path === undefined) break
+    i += 2
     const kind = code[0]
-    if (kind === 'R' || kind === 'C') {
-      const oldPath = records[i + 1]
-      if (oldPath !== undefined) i++
-      files.push({ path, oldPath, code })
+    if ((kind === 'R' || kind === 'C') && records[i] !== undefined) {
+      files.push({ path, oldPath: records[i], code })
+      i++
     } else {
       files.push({ path, code })
     }
