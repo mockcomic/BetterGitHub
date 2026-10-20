@@ -1,0 +1,129 @@
+import { existsSync, readdirSync } from 'fs'
+import { basename } from 'path'
+import { execGit, GitExecError } from './exec'
+import { getStatus } from './status'
+
+export async function fetch(repoPath: string): Promise<string> {
+  const r = await execGit(['fetch', '--prune', 'origin'], {
+    cwd: repoPath,
+    timeoutMs: 120_000
+  })
+  return (r.stderr + r.stdout).trim()
+}
+
+export async function push(repoPath: string): Promise<string> {
+  const status = await getStatus(repoPath)
+  if (status.detached || status.branch.length === 0) {
+    throw new Error('Cannot push while on a detached HEAD.')
+  }
+
+  const upstream = await hasUpstream(repoPath)
+  const args = upstream
+    ? ['push']
+    : ['push', '--set-upstream', 'origin', status.branch]
+
+  const r = await execGit(args, { cwd: repoPath, timeoutMs: 120_000 })
+  return (r.stderr + r.stdout).trim()
+}
+
+export async function pull(repoPath: string): Promise<string> {
+  const status = await getStatus(repoPath)
+  const upstream = await hasUpstream(repoPath)
+  const args =
+    upstream || status.detached ? ['pull'] : ['pull', 'origin', status.branch]
+
+  const r = await execGit(args, {
+    cwd: repoPath,
+    timeoutMs: 300_000
+  })
+  return (r.stderr + r.stdout).trim()
+}
+
+async function hasUpstream(repoPath: string): Promise<boolean> {
+  try {
+    const r = await execGit(
+      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+      { cwd: repoPath, timeoutMs: 10_000 }
+    )
+    return r.stdout.trim().length > 0
+  } catch (err) {
+    if (err instanceof GitExecError) return false
+    throw err
+  }
+}
+
+export async function getRemoteUrl(
+  repoPath: string
+): Promise<string | null> {
+  try {
+    const r = await execGit(['config', '--get', 'remote.origin.url'], {
+      cwd: repoPath,
+      timeoutMs: 10_000
+    })
+    const url = r.stdout.trim()
+    return url.length > 0 ? url : null
+  } catch (err) {
+    if (err instanceof GitExecError) return null
+    throw err
+  }
+}
+
+export async function getConfigInfo(
+  repoPath: string
+): Promise<{ name: string | null; email: string | null }> {
+  const read = async (key: string): Promise<string | null> => {
+    try {
+      const r = await execGit(['config', '--get', key], {
+        cwd: repoPath,
+        timeoutMs: 10_000
+      })
+      return r.stdout.trim() || null
+    } catch (err) {
+      if (err instanceof GitExecError) return null
+      throw err
+    }
+  }
+  const [name, email] = await Promise.all([
+    read('user.name'),
+    read('user.email')
+  ])
+  return { name, email }
+}
+
+export function suggestedCloneDirectory(url: string): string {
+  const cleaned = url.replace(/\/+$/, '').replace(/\.git$/, '')
+  const last = cleaned.split(/[\/:]/).pop() ?? 'repository'
+  return basename(last) || 'repository'
+}
+
+export async function cloneRepository(
+  url: string,
+  destinationPath: string
+): Promise<string> {
+  if (url.trim().length === 0) {
+    throw new Error('Enter a repository URL to clone.')
+  }
+  if (!existsSync(destinationPath)) {
+    throw new Error(`Destination does not exist: ${destinationPath}`)
+  }
+  const existing = readdirSync(destinationPath)
+  if (existing.length > 0) {
+    throw new Error(
+      `Destination folder is not empty: ${destinationPath}\nPick an empty folder to clone into.`
+    )
+  }
+
+  const r = await execGit(
+    ['clone', '--progress', '--end-of-options', url.trim(), destinationPath],
+    { cwd: destinationPath, timeoutMs: 15 * 60_000 }
+  )
+  return (r.stderr + r.stdout).trim()
+}
+
+/** Validates that a directory is a usable git repository. */
+export async function verifyRepository(path: string): Promise<void> {
+  await execGit(['rev-parse', '--is-inside-work-tree'], {
+    cwd: path,
+    timeoutMs: 15_000
+  })
+}
