@@ -12,7 +12,7 @@ export async function getPathDiff(
   path: string,
   oldPath?: string
 ): Promise<string> {
-  const args = ['diff', 'HEAD', '-U3', '--end-of-options']
+  const args = ['diff', '--no-ext-diff', 'HEAD', '-U3', '--end-of-options']
   if (oldPath !== undefined) args.push(oldPath)
   args.push(path)
 
@@ -50,7 +50,7 @@ export async function getCommitFileDiff(
 ): Promise<string> {
   const base = await commitBase(repoPath, sha)
   const result = await execGit(
-    ['diff', base, sha, '-U3', '--end-of-options', path],
+    ['diff', '--no-ext-diff', base, sha, '-U3', '--end-of-options', path],
     { cwd: repoPath, timeoutMs: 30_000 }
   )
   return result.stdout
@@ -80,7 +80,7 @@ export async function getCommitFileNames(
 ): Promise<ReadonlyArray<{ path: string; oldPath?: string; code: string }>> {
   const base = await commitBase(repoPath, sha)
   const result = await execGit(
-    ['diff', '--name-status', '-z', base, sha],
+    ['diff', '--no-ext-diff', '--name-status', '-z', base, sha],
     { cwd: repoPath, timeoutMs: 30_000 }
   )
   return parseNameStatusZ(result.stdout)
@@ -137,7 +137,7 @@ export async function getPathsDiffText(
   const parts: string[] = []
   if (tracked.length > 0) {
     const r = await execGit(
-      ['diff', 'HEAD', '-U3', '--end-of-options', ...tracked],
+      ['diff', '--no-ext-diff', 'HEAD', '-U3', '--end-of-options', ...tracked],
       { cwd: repoPath, timeoutMs: 30_000, successExitCodes: new Set([0, 1]) }
     )
     parts.push(r.stdout)

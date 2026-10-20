@@ -58,13 +58,16 @@ export async function execGit(
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     GIT_TERMINAL_PROMPT: '0',
-    GIT_ASKPASS: '',
-    GIT_EXTERNAL_DIFF: '',
-    GIT_PAGER: 'cat',
     // Never pick up a caller-provided editor for interactive operations.
-    EDITOR: '',
     GIT_EDITOR: ':'
   }
+  // Remove rather than blank: on Windows a *set-but-empty* GIT_EXTERNAL_DIFF
+  // still activates the external-diff machinery, and git then tries to spawn
+  // a program named "" ("error: cannot spawn : No such file or directory").
+  delete env.GIT_ASKPASS
+  delete env.GIT_EXTERNAL_DIFF
+  delete env.GIT_PAGER
+  delete env.EDITOR
 
   const command = finalArgs.join(' ')
 
