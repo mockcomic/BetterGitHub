@@ -6,19 +6,19 @@ import type { CelebrationKind } from '../store'
 /**
  * The celebration moment for the desk's two completing verbs — Commit and
  * Push. When the git operation actually succeeds (not on click), the button
- * that did it pops with a Commit Green glow ring and sheds a brief burst of
- * confetti tinted only with state colors (green = commit, blue = sync,
- * amber = caution). One authored moment, bound to the verb, never idle
- * decoration: the workbench stays quiet until something is truly done.
+ * that did it pops and sheds a brief burst of confetti in GitHub's state
+ * colors (green = committed, blue = synced, amber = caution, with a touch of
+ * the agent's purple). GitHub Desktop celebrates a commit; this is the app's
+ * one long moment, bound to a verb that finished, never idle decoration.
  */
 
 const PARTICLE_COLORS = [
-  'var(--primary)',
-  'var(--primary)',
+  'var(--success)',
+  'var(--success)',
   'var(--accent)',
-  'var(--view-accent)',
+  'var(--accent)',
   'var(--caution)',
-  // A little Agent Violet in the burst: the moment is often the agent's work.
+  // A little of the agent's purple in the burst: the moment is often its work.
   'var(--ai)'
 ]
 

@@ -1,38 +1,70 @@
 ---
 name: GitDesk
-description: A workbench with a color life of its own — matte panels, hairline borders, git state as protagonist, and one named hue per duty.
+description: GitHub Desktop's own component family — neutral chrome, hairline borders, one blue for interaction, and git state as the only loud thing on screen.
 colors:
-  canvas: "#fbfcfe"
-  panel: "#f2f5fa"
-  header-surface: "#eaeef6"
-  hover-surface: "#e3e9f3"
-  selected-surface: "#daf4e4"
-  hairline: "#ccd5e3"
-  ink: "#1c2433"
-  ink-muted: "#5f6b80"
-  commit-green: "#1a7f37"
-  commit-green-hover: "#21883a"
-  beacon-blue: "#0969da"
+  canvas: "#ffffff"
+  panel: "#f6f8fa"
+  header-surface: "#f6f8fa"
+  inset: "#eaeef2"
+  hover-surface: "rgba(208, 215, 222, 0.32)"
+  selected-surface: "#0969da"
+  hairline: "#d0d7de"
+  hairline-subtle: "#eaeef2"
+  control-border: "rgba(31, 35, 40, 0.15)"
+  ink: "#1f2328"
+  ink-muted: "#656d76"
+  accent-blue: "#0969da"
+  accent-hover: "#0860ca"
+  accent-active: "#0550ae"
+  commit-blue: "#0969da"
+  commit-blue-hover: "#0860ca"
+  success-green: "#1a7f37"
   alarm-red: "#cf222e"
+  alarm-red-hover: "#a40e26"
   caution-amber: "#9a6700"
-  shelf-teal: "#0b6f7a"
-  agent-violet: "#6639ba"
+  agent-violet: "#8250df"
+  agent-violet-hover: "#6639ba"
   add-wash: "#dafbe1"
+  add-gutter: "#e6ffec"
   del-wash: "#ffebe9"
+  del-gutter: "#ffd7d5"
   hunk-wash: "#ddf4ff"
-  scrim: "rgba(31, 35, 40, 0.42)"
-  tint: "11%"
-  tint-row: "8%"
-  field-wash: "16%"
+  hunk-gutter: "#b6e3ff"
+  on-accent: "#ffffff"
+  disabled-face: "#eff2f5"
+  disabled-ink: "#8c959f"
+  scrim: "rgba(31, 35, 40, 0.5)"
+  word-add: "rgba(128, 191, 132, 0.3)"
+  word-del: "rgba(255, 129, 130, 0.3)"
+  word-del-strike: "rgba(255, 129, 130, 0.6)"
+  scroll-thumb: "rgba(110, 118, 129, 0.4)"
+  on-accent-chip: "rgba(255, 255, 255, 0.1)"
+  on-accent-chip-border: "rgba(255, 255, 255, 0.45)"
+  chip-face: "#ffffff"
+  selected-hover: "#0860ca"
+  ai-face: "#8250df"
+  ai-face-hover: "#6639ba"
+  syntax-keyword: "#cf222e"
+  syntax-string: "#0a3069"
+  syntax-comment: "#6e7781"
+  syntax-function: "#8250df"
+  syntax-constant: "#0550ae"
+  syntax-entity: "#953800"
+  syntax-keyword-dark: "#ff7b72"
+  syntax-string-dark: "#a5d6ff"
+  syntax-comment-dark: "#8b949e"
+  syntax-function-dark: "#d2a8ff"
+  syntax-constant-dark: "#79c0ff"
+  syntax-entity-dark: "#ffa657"
 typography:
   display:
     fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
-    fontSize: "30px"
-    fontWeight: 700
+    fontSize: "22px"
+    fontWeight: 600
   headline:
     fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
-    fontSize: "15px"
-    fontWeight: 700
+    fontSize: "14px"
+    fontWeight: 600
   title:
     fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
     fontSize: "13px"
@@ -46,17 +78,23 @@ typography:
     fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
     fontSize: "11.5px"
     fontWeight: 400
+  eyebrow:
+    fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+    fontSize: "10.5px"
+    fontWeight: 600
   code:
     fontFamily: "'Cascadia Code', 'Consolas', 'SFMono-Regular', Menlo, monospace"
     fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.55
+  glyph:
+    fontSize: "16px"
+    fontWeight: 400
 rounded:
   xxs: "2px"
   xs: "4px"
   sm: "6px"
-  md: "8px"
-  lg: "10px"
+  overlay: "12px"
   pill: "999px"
 spacing:
   xxs: "4px"
@@ -69,236 +107,290 @@ motion:
   instant: "90ms"
   fast: "140ms"
   layer: "200ms"
-  slide: "220ms"
   arrive: "cubic-bezier(0.16, 1, 0.3, 1)"
-  exit: "cubic-bezier(0.4, 0, 1, 1)"
   spectacle: "900ms"
 components:
-  button-primary:
-    backgroundColor: "{colors.commit-green}"
-    textColor: "#ffffff"
-    rounded: "{rounded.sm}"
-    padding: "5px 12px"
-  button-primary-hover:
-    backgroundColor: "{colors.commit-green-hover}"
-  button-primary-destructive:
-    backgroundColor: "{colors.alarm-red}"
-    textColor: "#ffffff"
-    rounded: "{rounded.sm}"
-    padding: "5px 12px"
-  button-ai:
-    backgroundColor: "color-mix(agent-violet 10%, panel)"
-    textColor: "{colors.agent-violet}"
   button-default:
     backgroundColor: "{colors.panel}"
+    border: "1px solid {colors.control-border}"
     textColor: "{colors.ink}"
     rounded: "{rounded.sm}"
     padding: "5px 12px"
+    shadow: "0 1px 0 rgba(31, 35, 40, 0.04)"
   button-default-hover:
-    backgroundColor: "{colors.hover-surface}"
+    backgroundColor: "#f3f4f6"
+  button-default-disabled:
+    backgroundColor: "{colors.disabled-face}"
+    textColor: "{colors.disabled-ink}"
+  button-primary:
+    backgroundColor: "{colors.commit-blue}"
+    border: "1px solid {colors.control-border}"
+    textColor: "{colors.on-accent}"
+    rounded: "{rounded.sm}"
+    padding: "5px 12px"
+    shadow: "0 1px 0 rgba(31, 35, 40, 0.04)"
+  button-primary-hover:
+    backgroundColor: "{colors.commit-blue-hover}"
+  button-primary-destructive:
+    backgroundColor: "{colors.alarm-red}"
+    textColor: "{colors.on-accent}"
+  button-ai:
+    backgroundColor: "{colors.agent-violet}"
+    textColor: "{colors.on-accent}"
   button-ghost:
     backgroundColor: "transparent"
-    textColor: "{colors.beacon-blue}"
+    textColor: "{colors.accent-blue}"
     padding: "2px 4px"
+  icon-button-hover:
+    backgroundColor: "{colors.hover-surface}"
+  segmented-tab:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink-muted}"
+    rounded: "{rounded.sm}"
+    padding: "5px 12px"
+  segmented-tab-active:
+    backgroundColor: "{colors.canvas}"
+    border: "1px solid color-mix(accent 40%, transparent)"
+    textColor: "{colors.accent-blue}"
   input:
     backgroundColor: "{colors.canvas}"
+    border: "1px solid {colors.hairline}"
     textColor: "{colors.ink}"
     rounded: "{rounded.sm}"
     padding: "5px 8px"
-  badge:
-    backgroundColor: "{colors.header-surface}"
+  counter-badge:
+    backgroundColor: "{colors.canvas}"
+    border: "1px solid {colors.control-border}"
     textColor: "{colors.ink-muted}"
     rounded: "{rounded.pill}"
-    padding: "1px 6px"
-  toast:
+    padding: "2px 6px"
+    fontSize: "10.5px"
+  list-row:
+    padding: "5px 10px"
+  list-row-hover:
+    backgroundColor: "{colors.hover-surface}"
+  list-row-selected:
+    backgroundColor: "{colors.selected-surface}"
+    textColor: "{colors.on-accent}"
+  popover:
     backgroundColor: "{colors.canvas}"
-    rounded: "{rounded.md}"
-    padding: "9px 12px"
+    border: "1px solid {colors.hairline}"
+    rounded: "{rounded.overlay}"
+    shadow: "0 12px 28px rgba(140, 149, 159, 0.3), 0 2px 4px rgba(140, 149, 159, 0.1)"
+    padding: "4px"
   dialog:
     backgroundColor: "{colors.canvas}"
-    rounded: "{rounded.lg}"
+    border: "1px solid {colors.hairline}"
+    rounded: "{rounded.overlay}"
+    headBackgroundColor: "{colors.panel}"
+  toast-banner:
+    rounded: "{rounded.sm}"
+    padding: "9px 12px"
+  diff-row-add:
+    backgroundColor: "{colors.add-wash}"
+    gutterBackgroundColor: "{colors.add-gutter}"
+    lineTextColor: "{colors.success-green}"
+  diff-row-del:
+    backgroundColor: "{colors.del-wash}"
+    gutterBackgroundColor: "{colors.del-gutter}"
+    lineTextColor: "{colors.alarm-red}"
+  diff-row-hunk:
+    backgroundColor: "{colors.hunk-wash}"
+    gutterBackgroundColor: "{colors.hunk-gutter}"
+    textColor: "{colors.accent-blue}"
 ---
 
 # Design System: GitDesk
 
 ## Overview
 
-**Creative North Star: "The Quiet Workbench"**
+**North Star: "GitHub Desktop, played straight."** GitDesk is a clone of a specific tool, so it borrows that tool's face rather than inventing one: the chrome is Primer's — GitHub's own design system — and every color in the interface is GitHub's color for that job. The strip, the queue, the commit tray and the status bar are all the same `#f6f8fa` chrome; the work surface is canvas-white; every boundary is a 1px `#d0d7de` hairline. One blue (`#0969da`, dark `#1f6feb`) does all interaction work — links, focus rings, the active tab, the selected row, the commit verb. Green belongs to additions and success only, red to deletions and destructive verbs, amber to warnings you can continue past, and purple to the AI agent alone. What is left to speak loudly is the repository: a status symbol, a green add-row, the ahead/behind count, the diff.
 
-GitDesk presents itself as a well-lit workbench: everything the interface is made of — panels, headers, rails, status bars — is matte and deliberately unremarkable, so that the things permitted to speak loudly are the facts of the repository. A file's status letter, a green add-row in a diff, the ahead/behind count, the commit button. The system's restraint is not absence of personality; it is personality expressed as discipline. Depth comes from hairline borders, tonal surface shifts, and a single glow family reserved for things that are active *right now*. Color is not decoration either: each desk view owns a hue that says where you are sitting, and every other chromatic value names a git or task state.
+The discipline is not imitation for its own sake. A clone earns trust by being legible in the same grammar as its reference: the same quiet ground, the same 6px controls, the same blue that means "this is the app's action." The personality of GitDesk is that it gets out of git's way — and where it departs, it departs in GitHub's own vocabulary (the agent's purple is Primer's `done` accent, not an invention).
 
-Motion is the honest machine signal, and it is now continuous rather than occasional: controls answer the cursor, the desk switch slides its indicator to the active view, panes travel in the direction you were heading, floated layers arrive instead of blink in, and state changes (new rows, changed counts, an arriving conflict, a running operation) flag themselves. Tiers run 90/140/200/220 ms; the commit/push success celebration remains the one authored spectacle. Elevation is a single soft ambient shadow reserved strictly for things floating above the app, plus one glow language for interactive-active and view-active state.
+Motion is GitHub Desktop's register: nearly silent. Controls answer with color, never position — no lift, no press-scale, no travelling indicator, no staggered rows. Floated layers fade in with a hair of scale; the desk swap fades the incoming pane in; a running operation gets a spinner; and a commit or push that lands gets confetti. Everything else is already where it belongs.
 
-The type system is a two-voice arrangement: the platform-native UI stack (Segoe UI on Windows) for human text, and a programmer's monospace (Cascadia Code) for machine truth — file paths, diffs, commit bodies, shortcut keys. Wherever monospace appears, it signals "this text is verbatim from your repository, do not paraphrase it." The system ships fully paired light and dark themes through one CSS custom-property contract; every token has a counterpart in the other theme. Dark is the primary composition — a low-chroma indigo-ink ground the hues read as signal light on — and light is composed independently on a cool porcelain ground at a higher color dosage, not an inversion.
+The type system is a two-voice arrangement: the platform-native UI stack (Segoe UI on Windows — the same family GitHub Desktop ships) for human text at 13px, and a programmer's monospace (Cascadia Code) for machine truth — paths, diffs, commit messages, `code` chips, counts. Wherever mono appears, it says "this text is verbatim from your repository." Light and dark are first-class equals through one custom-property contract; dark is Primer's `#0d1117` desk, not an inversion of the light one.
 
 **Key Characteristics:**
-- Matte tonal surfaces separated by 1px hairline borders; chromatic color always names a duty (a git state, a task state, or a desk view).
-- Git state is the protagonist: status glyphs, diff washes, badges, and the Commit button carry the meaning the interface is actually about.
-- Multi-hue wayfinding: Review wears Commit Green, History Beacon Blue, Conflicts Alarm Red, Stash Shelf Teal; the AI agent is Agent Violet everywhere.
-- One drop shadow (floating layers only) plus one glow language (focus rings, hover rings, the active-view indicator).
-- Machine truth in monospace, human text in the system stack — the split is meaningful, never stylistic.
-- Compact, instrument-panel density: 13px base, 4–16px spacing scale, a command strip over a 340px queue, dominant main pane, and a docked 300px commit tray.
-- Light and dark themes are first-class equals driven by `html[data-theme]` custom properties, with per-theme color-dosage tokens (`--tint`, `--tint-row`, `--field`).
+- Neutral chrome with tonal steps (canvas → panel → inset) separated by 1px hairlines; chromatic color always names a GitHub role.
+- One accent, not a per-view palette: the desk you are on is stated by the active tab and the panel content, never by tinting the window.
+- Git state is the protagonist: status symbols, GitHub's own diff washes and tinted gutters, counter pills, and the full-width blue commit verb.
+- Selection is GitHub's: the row turns solid accent blue and its content inverts to white — a state that survives losing its color, because the file's status symbol and the row's weight do the naming.
+- Buttons are Primer's: subtle face, 15%-ink hairline, a 1px lift shadow, 6px radius, and a color-only hover.
+- Machine truth in monospace, human text in the system stack; 13px base, 4–16px spacing, 340px queue | dominant main pane | 300px commit tray.
+- The AI agent is the one self-expressive thing on the desk: a solid `#8250df` button in both themes, purple nowhere else.
 
 ## Colors
 
-The palette is GitHub-lineage in its semantic voices and extended with two named roles — Shelf Teal and Agent Violet — so that a parked stash and the AI agent are not forced into borrowed colors. Grounds are tinted (≤4% chroma): dark sits on low-chroma indigo ink, light on cool porcelain. The frontmatter carries the light theme as normative; the dark theme's counterparts are listed per token.
+The palette is Primer's, quoted rather than paraphrased. The frontmatter carries the light theme as normative; every token's dark counterpart is listed below. Grounds are neutral, not tinted — the app has no wash, so the state colors are the only chromatic events on screen.
 
 ### Primary
-- **Commit Green** (#1a7f37; dark `#3fb950`): the color of the verb. The commit button, staged confirmations, addition text, success toasts, active popover items, and the Review desk. Its rarity is its authority.
-- **Commit Green Hover** (#21883a; dark `#4ecb5c`): the only hover shift Commit Green is allowed.
+- **Commit Blue / Accent** (#0969da; dark `#1f6feb` emphasis, `#2f81f7` on text): the commit button's face, the selected row's ground, links, focus rings, the active tab's label and chip border, the route arrow, and the busy spinner. Hover is `#0860ca` (dark `#388bfd`), active `#0550ae`.
+- **Success Green** (#1a7f37; dark `#3fb950`): additions, staged checkboxes and badges, success banners, and the ring the commit button throws when a commit lands. It is never a generic "primary" color.
 
 ### Secondary
-- **Beacon Blue** (#0969da; dark `#4493f8`): the voice of links, focus rings, busy states, renames, informational accents, and the History desk. Everything clickable that isn't committing.
-
-### Tertiary
-- **Alarm Red** (#cf222e; dark `#f85149`): deletions, conflicts, destructive affordances (discard turning red on hover, destructive confirmations), error banners, and the Conflicts desk.
-- **Caution Amber** (#9a6700; dark `#d4a72c`): pre-commit warnings — an overlong summary, risky diffs, modified-file glyphs — never brand, never decoration.
-- **Shelf Teal** (#0b6f7a; dark `#39c5cf`): stashed work only — parked, neither a working-tree change nor a commit. The Stash desk wears it.
-- **Agent Violet** (#6639ba; dark `#a371f7`): the AI commit agent — its button, its hover ring, its busy readout. The one hue kept away from everything mechanical, so the different machine in the room is recognizable at a glance.
+- **Alarm Red** (#cf222e; dark `#f85149`, destructive face `#da3633`): deletions, conflicts, error banners, and a confirmation that throws work away.
+- **Caution Amber** (#9a6700; dark `#d4a72c`): soft warnings you can continue past — an overlong summary, risky diffs, the modified-file glyph. Never brand, never highlight.
+- **Agent Violet** (#8250df; dark `#a371f7`): the AI agent alone. The button's face stays `#8250df` in both themes — a white label on `#a371f7` measures 3.35:1 and fails — while `#a371f7` is reserved for the agent's readout text and spinner. The one accent GitHub itself lets be decorative.
 
 ### Neutral
-- **Canvas** (#fbfcfe; dark `#0b1120`): main-pane background and floating-layer faces.
-- **Panel** (#f2f5fa; dark `#121a2b`): the working rail, sidebar, toolbars, gutter cells.
-- **Header Surface** (#eaeef6; dark `#172033`): window header, sticky table title bars, status bar, default badges.
-- **Hover Surface** (#e3e9f3; dark `#1c2740`): the background of any row or button under the cursor.
-- **Selected Surface** (#daf4e4; dark `#12332a`): the Review desk's green selection; other desks take a wash of their own hue (`--view-selected`).
-- **Hairline** (#ccd5e3; dark `#2a3652`): every 1px border and separator at rest; active boundaries use `--view-edge`.
-- **Ink** (#1c2433; dark `#e8edf6`) / **Ink Muted** (#5f6b80; dark `#94a3bf`): primary and secondary text throughout.
-- **Syntax palette** (GitHub's dark syntax colors, identical in both themes so a diff never re-lights): keyword/boolean #ff7b72, string #a5d6ff, comment #8b949e, function #d2a8ff, number/constant #79c0ff, entity #ffa657 — machine colors quoting the repository's contents, exempt from the state-hue roster because they name language tokens, not git state.
-- **Diff washes** — **Add Wash** (#dafbe1; dark `#12261e`), **Del Wash** (#ffebe9; dark `#25171c`), **Hunk Wash** (#ddf4ff; dark `#12233a`): full-row backgrounds in the diff table, each paired with its semantic text color.
-- **Scrim** (rgba(31, 35, 40, 0.42); dark `rgba(1, 4, 9, 0.6)`): the dialog overlay, and the only place `backdrop-filter` is allowed (4px blur).
-- **Color dosage** — `--tint` (11% light / 8% dark) for chrome washes, `--tint-row` (8% / 6%) for row hovers, `--field` (16% / 12%) for the empty-pane field of light. The whiter light ground needs the larger dose for both themes to read the same way.
-
-### View hues
-`.app[data-view='…']` names one hue per desk — `--view-accent` with derived `--view-wash`, `--view-edge`, `--view-selected`, and `--view-glow` — and that hue colors the command-strip wash, the queue/tray rails, the switch indicator, selection washes, count badges, the diff title underline, and the scrollbars. Review → Commit Green, History → Beacon Blue, Conflicts → Alarm Red, Stash → Shelf Teal, no-repository → Beacon Blue. The hue says *where you are*, never what git thinks.
+- **Canvas** (#ffffff; dark `#0d1117`): the work surface — main pane, popover and dialog faces, input fields, floating cards.
+- **Panel** (#f6f8fa; dark `#161b22`): all chrome — command strip, queue column, commit tray, sticky table titles, status bar, default button faces.
+- **Inset** (#eaeef2; dark `#010409`): wells and avatar discs.
+- **Hover Surface** (rgba(208, 215, 222, 0.32); dark `rgba(177, 186, 196, 0.12)`): any row, tab, or icon button under the cursor. It is an alpha so it works on either ground.
+- **Selected Surface** (#0969da; dark `#1f6feb`): the whole row of anything selected, with `--on-accent` white content and `rgba(255, 255, 255, 0.82)` secondary content (0.8 in dark).
+- **Hairline** (#d0d7de; dark `#30363d`) and **Hairline Subtle** (#eaeef2; dark `#21262d`): every 1px border; the subtle step is for lines inside a table or card.
+- **Control Border** (rgba(31, 35, 40, 0.15); dark `rgba(240, 246, 252, 0.1)`): the outline every bordered button wears, so button chrome stays identical across themes.
+- **Ink** (#1f2328; dark `#e6edf3`) / **Ink Muted** (#656d76; dark `#7d8590`).
+- **Disabled** (#eff2f5 face, #8c959f ink; dark `#31363e` / `#7d8590`): a disabled commit keeps a solid face rather than an opacity wash, so the label never goes translucent.
+- **Diff washes and gutters** — Add `#dafbe1` on gutter `#e6ffec` (dark `#12261f` / `#0f2d16`), Del `#ffebe9` on gutter `#ffd7d5` (dark `#2d1214` / `#3d1a1c`), Hunk `#ddf4ff` on gutter `#b6e3ff` (dark `#16263c` / `#1b3050`). Unchanged line-number cells stay on the panel ground beneath the gutter's own hairline, exactly as GitHub Desktop's gutter column is drawn.
+- **Word-level marks** — `--word-add` rgba(128, 191, 132, 0.3), `--word-del` rgba(255, 129, 130, 0.3), struck in `--word-del-strike` rgba(255, 129, 130, 0.6): Primer's own translucent pair, identical in both themes.
+- **Syntax palette** — GitHub's own, re-lit per theme exactly as the real blob view does, held in `--syntax-*` tokens: light keyword #cf222e, string #0a3069, comment #6e7781, function #8250df, constant #0550ae, entity #953800; dark #ff7b72, #a5d6ff, #8b949e, #d2a8ff, #79c0ff, #ffa657. Exempt from the role roster because they name language tokens, not git state.
+- **Scrim** (rgba(31, 35, 40, 0.5); dark `rgba(1, 4, 9, 0.68)`): the dialog overlay. No blur — GitHub Desktop dims and stays sharp.
+- **Scrollbar** (rgba(110, 118, 129, 0.4), 0.7 on hover): a neutral pill thumb on a transparent track; it never takes a hue.
 
 ### Named Rules
-**The Green-Belongs-to-Commit Rule.** Commit Green appears only on the commit action and its confirmations (staged badges, add-row text, success toasts). A generic primary button that does not commit must not wear it — and a confirmation that *destroys* work wears Alarm Red instead, so green never promises what it will not do.
+**The One Blue Rule.** One accent does all interaction: `#0969da` / `#1f6feb`. A desk, a panel, or a section never gets its own hue — the window does not change color when you change tabs, because GitHub Desktop's does not. What changes is which tab is lifted and which row is solid blue.
 
-**The Amber-Never-Shouts Rule.** Caution Amber is reserved for soft warnings that permit the user to continue. Anything that blocks or failed uses Alarm Red. Amber is never a brand or highlight color.
+**The Green-Belongs-to-Additions Rule.** Green means "this was added, staged, or completed." It paints add-row text and gutters, the staging checkbox (`accent-color` green, because checking a file *is* committing it), the staged badge, and success banners. A generic button is blue; a button that destroys is red.
 
-**The Named-Hues-Do-Jobs Rule.** Every chromatic value answers to a named role: the five semantic git/task voices, the two view-independent roles (Shelf Teal, Agent Violet), or the active desk's hue. A color with no role — no git state, no task state, no view identity — does not ship. Hue supplements state; it never replaces it (selection is wash + rail + weight, conflicts are still labelled, the active tab is still bolder).
+**The Purple-Belongs-to-the-Agent Rule.** `#8250df` appears on the Generate button and the agent's spinner and nowhere else, so the different machine in the room is recognizable at a glance.
+
+**The Amber-Never-Shouts Rule.** Amber is for warnings you can continue past. Anything blocking or failed is red.
+
+**The Named-Colors-Do-Jobs Rule.** Every chromatic value answers to one of the roles above. A color with no role — no state, no interaction, no agent — does not ship. Hue supplements state; it never replaces it (selection is solid accent *plus* the file's status symbol and the row's weight; conflicts are still labelled).
 
 ## Typography
 
-**Display Font:** System UI stack (`-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif`) — the platform's own face; on Windows this is Segoe UI.
-**Body Font:** Same system stack at 13px.
-**Label/Mono Font:** Programmer's mono (`'Cascadia Code', 'Consolas', 'SFMono-Regular', Menlo, monospace`) at 12px.
+**Display Font:** System UI stack (`-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif`) — the platform's own face, the same family GitHub Desktop ships.
+**Body Font:** The same stack at 13px, weight 400; buttons and active tabs 500–600; file basenames and section titles 600.
+**Label/Mono Font:** Programmer's mono (`'Cascadia Code', 'Consolas', 'SFMono-Regular', Menlo, monospace`) at 12px/1.55.
 
-**Icon glyphs** (the system's only pictograms, drawn from the platform's own characters, not an icon set): 14px for row-level quiet glyphs (discard ×, status marks), 16px for header icon buttons.
+**Icon glyphs** (the system's only pictograms, drawn from platform characters, not an icon set): 16px for header icon buttons, 14px for row-level marks, 11px for the status symbols.
 
-**Character:** Workbench utilitarian — small, dense, and confident. The human voice (system UI) is quiet and never displays more than once per screen; the machine voice (mono) carries the repository's verbatim truth. The pairing is functional, not decorative: switch fonts only when switching between "explaining" and "quoting the repo."
+**Character:** GitHub's own — small, dense, matter-of-fact. Type never performs: the largest thing on screen is a 22px empty-state heading, and the loudest control is a button, not a headline.
 
 ### Hierarchy
-- **Display** (700, 30px): the empty-state/onboarding headline (`h1`), once per app lifetime screen at most. Solid ink — the wordmark never wears a gradient.
-- **Headline** (700, 15px): dialog titles (`h2`).
-- **Title** (600, 13px): file names in the changes list, section labels inside commit summaries, picker values, popover active items.
-- **Body** (400, 13px): the app-wide default; diff content inherits mono at 12px/1.55 instead.
-- **Label** (400, 11–12.5px, often Ink Muted): hints, timestamps, badges (10.5px), status bar (11.5px), uppercase section eyebrows at 10.5px with 0.04em letter-spacing, tinted 55% toward the view hue so an eyebrow names its desk.
+- **Display** (600, 22px): the empty-state/onboarding heading, once per screen at most.
+- **Headline** (600, 14px): dialog titles and the commit-detail subject line.
+- **Title** (600, 13px): file basenames, picker values, active popover items.
+- **Body** (400, 13px): the app-wide default; diff content takes mono 12px/1.55 instead.
+- **Small** (400, 12.5px): banner and toast copy.
+- **Label** (400, 11.5px): hints, timestamps, status bar, field hints.
+- **Eyebrow** (600, 10.5px): uppercase section labels at 0.04em letter-spacing, mono counters, `code` chips, badge text.
+- **Code** (400, 12px mono): everything quoted from the repository.
 
 ### Named Rules
-**The Two-Voice Rule.** System UI for prose the app wrote; monospace for text your repository wrote (paths, diffs, commit messages, `code` chips). Never blend them in one element.
+**The Two-Voice Rule.** System UI for prose the app wrote; monospace for text your repository wrote (paths, diffs, commit messages, `code` chips, ahead/behind counts). Never blend them in one element.
 
-**The 10.5px Floor.** No UI text renders below 10.5px; the density lives in spacing and truncation, not in shrinking type.
+**The 10.5px Floor.** No UI text renders below 10.5px; density comes from spacing and truncation, not from shrinking type.
 
 ## Layout
 
-The window is a fixed vertical sandwich: a ~44 px command strip on top, a ~38 px desk-switch rail beneath it, a flexible `.body` work area in the middle, and an 18-ish px status bar at the bottom. The command strip carries, left to right: repository picker, branch picker, the mono route readout (`branch ⇄ origin · ↑n ↓m` — silent when there is nothing to say), the contextual filter centered with its `Ctrl K` chip riding inside its right edge, and the sync controls (refresh, Fetch, Pull, Push, GitHub). The strip, the queue rail, the tray rail, and the status bar are all washed and edged with the active view's hue; the rest of the chrome stays neutral so the tint reads as location, not decoration. The body splits into three zones — a 340px **queue column** (the queue for the active view), a flexible **main pane** (diff, history, or stash detail) that owns `min-width: 0` so long paths ellipsize instead of breaking the rail, and a docked 300px **commit tray** (compose fields, scope line, full-width commit verb) that replaces itself with conflict guidance in the Conflicts view. History mirrors the pattern with a 280px commit-files column.
+The window is a fixed vertical sandwich: a ~44px command strip on top, a ~38px desk-switch rail beneath it, a flexible `.body` work area in the middle, and an ~18px status bar at the bottom. The strip carries, left to right: repository picker, branch picker, the mono route readout (`branch ⇄ origin · ↑n ↓m`, silent when it has nothing to say), the contextual filter centered with its `Ctrl K` chip riding inside its right edge, and the sync controls (refresh, Fetch, Pull, Push, GitHub). The body splits into three zones — a 340px **queue column**, a flexible **main pane** (diff, history, or stash detail) with `min-width: 0` so long paths ellipsize instead of breaking the rail, and a docked 300px **commit tray** (compose fields, scope line, Generate, full-width commit verb) that swaps itself for conflict guidance in the Conflicts view. History mirrors the pattern with a 280px commit-files column.
 
-The spatial model is rails and rows, not cards: panes separate with 1px borders (hairline at rest, `--view-edge` where the view owns the boundary) and tonal steps (canvas → panel → header-surface); internal padding runs on the 4/6/8/10/12/16px scale, rows are 5px vertical, toolbars 6px, commit box 10px. Sticky-in-scroll elements (changes toolbar, diff title, commit-files head, truncation notice) pin within their pane and keep the header/panel background so content scrolls beneath them.
+Panels are separated, not decorated: strip, queue, tray and status bar share one chrome tone and are held apart by 1px `--border` hairlines; the main pane is canvas-white. Sticky-in-scroll elements (changes toolbar, diff title, commit-files head) keep their panel background so content scrolls beneath them.
 
-There is one deliberate responsive concession: below 1160px the queue and tray narrow to 290/260px, and below 980px (or the 1040-class windows it targets) the three zones stack vertically — queue on top (max-height 38%), work area, tray (max-height 46%) — because the desk must survive a daily-driver window that is not always wide. Everything else adapts by truncation (ellipsis, `min-width: 0`, `word-break`) and `max-width: min(92vw, 640px)` / `max-height: 88vh` caps on dialogs, plus `max-height: 480px` scroll caps on popovers.
+One deliberate responsive concession: below 1160px the queue and tray narrow to 290/260px, and below 980px the three zones stack vertically — queue on top (max-height 38%), work area, tray (max-height 46%) — because the desk must survive a daily-driver window that is not always wide. Everything else adapts by truncation and by `max-width: min(92vw, 640px)` / `max-height: 88vh` caps on dialogs and `max-height: 480px` scroll caps on popovers.
 
 ## Elevation & Depth
 
-Flat by default. Every structural boundary is a 1px border or a tonal surface shift; nothing is lifted to imply grouping. Two depth vocabularies exist and neither is decorative: one ambient shadow for things floating above the app, and one glow language for things that are active right now.
+Flat by default, in fill and in height. Every structural boundary is a 1px border or a tonal step between canvas and panel; no in-flow surface is lifted, and no surface is painted with a gradient.
 
 ### Shadow Vocabulary
-- **Float** (`0 8px 24px rgba(31, 35, 40, 0.16)` light; `rgba(1, 4, 9, 0.6)` dark): the only drop shadow in the system. Used by popovers, dialogs, toasts, and context menus. Its dark-theme deepening keeps the same geometry.
-- **Glow** (`--focus-ring`, `--glow-hover`, `--view-glow`): the ring/halo family — a 3px color-mixed focus ring on inputs and buttons, a 1px hover shadow on lifted controls, and the active-view halo on the switch indicator and its badges. Glow marks state that is true at this instant; it never sits on a resting surface.
-- **Scrim** (`--scrim`, plus 4px `backdrop-filter` blur): the full-viewport dialog overlay. The blur is the only blur in the app — the desk behind a dialog is present but silent.
+- **Float** (`0 12px 28px rgba(140, 149, 159, 0.3), 0 2px 4px rgba(140, 149, 159, 0.1)`; dark `0 12px 28px rgba(1, 4, 9, 0.6), 0 2px 4px rgba(1, 4, 9, 0.4)`): Primer's overlay shadow, carried by popovers, context menus, and dialogs. Two layers, always together.
+- **Rest lift** (`0 1px 0 rgba(31, 35, 40, 0.04)`; `0 0 transparent` in dark): the 1px shadow every bordered button and the active tab chip carries at rest. It is GitHub's, it never grows on hover, and it is the only shadow on an in-flow control.
+- **Focus ring** (`0 0 0 3px rgba(9, 105, 218, 0.3)`; dark `rgba(31, 111, 235, 0.4)`): the only halo in the system, and it appears only on `:focus-visible`, always with the border taken to the accent.
+- **Scrim** (`rgba(31, 35, 40, 0.5)`; dark `rgba(1, 4, 9, 0.68)`): the dialog overlay, unblurred.
 
 ### Named Rules
-**The One Shadow And One Glow Rule.** One drop-shadow token, four consumers (popover, dialog, toast, context menu). Glow — rings and halos — is a separate language reserved for interactive-active and view-active state: focus, hover, the active tab and its badge, an avatar under the cursor. If it's in the document flow at rest, it gets a hairline border, not a shadow and not a glow.
+**The Two-Shadows-Only Rule.** One float shadow for things above the document, one 1px rest lift for bordered controls, one focus ring for keyboard state. Nothing else casts. Blur appears nowhere.
 
-**The Flat-By-Default Rule.** Surfaces are flat at rest; depth is reserved for state (floating layers, active things) and never for decoration. Hover-lift is the implemented expression: a 1 px raise with a faint shadow on `.btn`/`.icon-btn` hover, and a press that returns the control while scaling it to 0.97 — an interaction response, not rest-state elevation.
+**The Flat-By-Default Rule.** Every fill is one solid color. No gradients, no lit top faces, no falling light, no washes that fade to the base — including the busy state, which is a spinner, not a travelling sheen. Depth is state (floating layers, focus), never decoration.
 
 ## Shapes
 
-Gently softened rectangles throughout: 4px for `code` chips and inner menu items, 6px for all controls (buttons, inputs, selects, textarea, tabs, the sliding switch indicator), 8px for floating layers and inline banners, 10px reserved for the dialog shell (the most "app-modal" object gets the largest radius). Badges are true pills (`border-radius: 999px` with 1px × 6px padding); avatars are perfect circles. Scrollbar thumbs are 10px-wide rounded pills tinted 32% with the view hue (55% on hover) on a transparent track. Borders are 1px and near-always visible; separators inside menus are 1px Hairline rules with 4px margins. There are no notches, cutouts, or custom clip-paths — the silhouette language is "rounded rectangle, softly."
+Gently softened rectangles on GitHub's scale: 2px for word-level diff marks, 4px for `code` chips and inline menu-item niceties, 6px for every control and card (buttons, inputs, tabs, the active tab chip, toasts, banners, table containers), 12px reserved for things that float above the app (popovers, context menus, dialogs). Counter badges are true pills (`999px`), avatars are circles. Borders are 1px and nearly always visible; menu separators are 1px hairlines with 4px margins. No notches, cutouts, or clip-paths — the silhouette language is "rounded rectangle, GitHub's radius."
 
 ## Motion
 
-Four tiers, all on transform/opacity/box-shadow/background-position only: `--motion-instant` 90 ms (cursor answers: color, lift, focus ring), `--motion-fast` 140 ms (rows, rails, small reveals), `--motion-layer` 200 ms (floated layers, hue crossfades), `--motion-slide` 220 ms (the switch indicator travelling, a desk view moving). Arrival curve `cubic-bezier(0.16, 1, 0.3, 1)`, exits on `cubic-bezier(0.4, 0, 1, 1)`. The 900 ms commit/push celebration stays the only spectacle; count pops run 240 ms and the conflict-badge arrival 420 ms, both once.
+Three tiers, on color and opacity plus a hair of scale on entrances — `--motion-instant` 90ms (cursor answers: background, border, text color), `--motion-fast` 140ms (floated-layer fades, the desk-swap fade, the diff fade-in), `--motion-layer` 200ms (dialog and toast entrances). Arrival curve `cubic-bezier(0.16, 1, 0.3, 1)`; everything else is `ease-out`. The commit/push celebration (a 500ms button pop, a 680ms confetti flight, dismissed after 900ms) is the single long moment.
 
-What moves: the switch indicator slides and re-tints between desks (measured from the DOM in `App.tsx`); desk swaps run through the View Transitions API (`withViewTransition` in `src/renderer/src/view-transition.ts`), travelling forward or backward per `html[data-nav-dir]`, with the keyed `.pane-enter` entrance as the no-API fallback; rows grow a status-hued left rail on hover/select; the commit verb lights a sheen across its face on hover; dialogs scrim-blur in; a conflicted badge announces itself once; the busy item carries a travelling hairline under its text. `prefers-reduced-motion: reduce` drops all travel and scale (and skips view transitions entirely), keeping fades, color state, and the spinners.
+What moves: buttons change face color on hover and press without moving a pixel; icon buttons gain a hover ground; rows change ground; the active tab's chip appears at its new position (opacity only — it jumps, it does not travel); popovers, menus, dialogs, and toasts fade in at `scale(0.98)`; the desk swap is one keyed `.pane-enter` fade on the queue and the main pane — the strip, tab rail, tray, and status bar are the same faces in every desk, so they are never snapshotted or faded; the busy item grows a spinner; a landed commit or push throws confetti. Nothing staggers in, nothing lifts, nothing rotates, and no number pops. `prefers-reduced-motion: reduce` drops the scale from the entrances and keeps the fades; the spinner and the confetti's fade-in-place remain.
 
 ### Named Rules
-**The Motion-Tiers Rule.** Four tiers, 90/140/200/220 ms, and the 900 ms celebration as the single long moment. Every motion must acknowledge an event — hover, press, arrival, state change, a view swap, a running operation. Looping motion stays reserved for spinners and the busy sheen. Each animation ships its `prefers-reduced-motion` path.
+**The Motion-Tiers Rule.** 90/140/200ms plus the one 900ms celebration. Every motion acknowledges an event — hover, press, arrival of a layer, a swap, a running operation, a success. Looping motion is reserved for spinners. Each animation ships its `prefers-reduced-motion` path.
+
+**The Nothing-Travel Rule.** No element translates as feedback. A hover changes color; a selection changes ground; a tab change changes which chip is lit. If a proposed animation moves something along an axis, it is the old world talking.
 
 ## Components
 
 ### Buttons
-- **Shape:** Gently curved rectangles (6px), quiet 1px bordered defaults; label + optional glyph with 6px gap.
-- **Primary (`.btn.primary`):** Commit Green with a lit top face (`linear-gradient` over the token), white text, border darkened via `color-mix(primary 70%, black)`; hover lifts 1 px, brightens, rings at 24% primary, and sweeps a sheen across the face (`background-position`, 220 ms) — no `overflow: clip`, so the celebration's confetti can still fly free. Pressed: returns to rest and scales to 0.97. Padding 5px × 12px; the commit button stretches full-width, centered.
-- **Primary, destructive (`.btn.primary.destructive`):** same face in Alarm Red — the verb of a confirmation that throws work away (Discard, Delete, Drop, Abort).
-- **Primary, disabled:** keeps a solid face dimmed by hue (40% green over panel), not by opacity, so the label holds its contrast.
-- **Default (`.btn`):** Panel background, Hairline border, Ink text; hover shifts background to Hover Surface; disabled at 0.55 opacity.
-- **AI (`.btn.ai`):** Agent Violet label on a 10% violet wash with a 42%-mixed border; hover deepens the wash and rings at 18% violet. The agent's button is the only violet thing in the tray.
-- **Hover / Focus:** Hover raises the button 1 px with a faint ambient shadow alongside the color shift, all on 90 ms ease-out; keyboard focus gets the Beacon Blue 3px ring (`--focus-ring`) on buttons and inputs; pointer clicks never draw the ring.
-- **Quiet variants:** `.mini` (accent-blue text, underline on hover, 12px), `.link` (button-styled accent link), `.icon-btn` (16px muted glyph button, lifts on hover).
+- **Shape:** 6px radius, 1px `--btn-border` outline, `0 1px 0 rgba(31,35,40,0.04)` at rest, label + optional glyph at a 6px gap, padding 5px × 12px.
+- **Default (`.btn`):** Panel face, Ink label; hover `#f3f4f6`, active `#ebecf0` (dark `#292e33` / `#21262d`); disabled takes the Primer disabled face and ink, never an opacity fade.
+- **Primary (`.btn.primary`):** Commit Blue face with a white label — the app's one loud action, and the commit button stretches full-width and centered. Hover `#0860ca`, active `#0550ae`. No `overflow: clip`, so the celebration's confetti flies free.
+- **Primary, destructive (`.btn.primary.destructive`):** the same face in Alarm Red (`#da3633` dark) for confirmations that throw work away — Discard, Delete, Drop, Abort.
+- **AI (`.btn.ai`):** solid `#8250df` with a white label and a text-presented sparkle (a gold emoji would be a color with no role); hover deepens to `#6639ba`. The only purple object on the desk.
+- **Hover / focus:** hover and press change color alone — no lift, no scale. Keyboard focus removes the outline and draws the accent border plus the 3px ring; pointer clicks never draw it.
+- **Quiet variants:** `.mini` and `.link` (accent-blue text, underline on hover), `.icon-btn` (transparent, 16px glyph, hover takes `--bg-hover`).
 
 ### Badges & Status Glyphs
-- **Style:** Pill badges (999px) at 10.5px; desk-switch badges take the view hue (`--view-wash` face, `--view-edge` border, `--view-accent` text), default badges stay Header Surface with muted text.
-- **Status:** A 14px-wide monospace-ish letter column at the row head codes file state — new/deleted/conflicted/renamed/modified in the semantic palette (modified uses Amber as its only glyph color). Staged badges carry Commit Green text with a 45%-mixed border over a 12% wash and are clickable; unstaged are static.
+- **Style:** counter pills at 10.5px mono — `--chip-face` (canvas in light, `#21262d` in dark), `--btn-border` ring, muted ink — turning accent-tinted inside the active tab and del-washed for the Conflicts count. Badges invert to `--on-accent-chip` on a selected row.
+- **Status:** a 14px symbol column at the row head codes file state (new, deleted, conflicted, renamed, modified) in the semantic palette, modified in amber. Staged badges carry green text and are clickable; unstaged are static. On a selected row the symbols invert to white and stay legible, because the mark is a distinct shape and the file's own git status is one keystroke away.
 
-### List Rows (files, commits, stashes, popovers, recent repos)
-- **Style:** 5px × 10px padding, transparent bottom hairline, hover to a view-tinted Hover Surface, selected to the view's own wash (`--view-selected`; green on the Review desk). A selected or hovered file row grows a 2px left rail in its **status** hue (add/delete/conflict/rename/caution), not the view's — the row tells you what changed in it while the desk tells you where you are. Commit rows lead with a 24px circular avatar in 25%-tinted Beacon Blue, inset-ringed 35% and haloing on hover; file rows foreground the bold basename with the directory muted ahead of it. Hover-revealed actions (discard ×, branch actions) fade in from `opacity: 0`, and the discard × turns 90° as it goes red — a decision, not a decoration. Rows arrive with a capped 16ms stagger (six steps).
-
-### Popovers & Menus
-- **Style:** Canvas face, Hairline border, 8px radius, Float shadow, 4px padding; items are 7px × 10px with 6px radius, hover to a view-tinted Hover Surface, active item turns Commit Green 600-weight, danger items Alarm Red. Headers are uppercase 10.5px eyebrows; separators and inline filters allowed. Max height 480px with scroll; positioned 4px below their trigger.
+### List Rows (files, commits, stashes, hub rows)
+- **Style:** 5px × 10px padding over a transparent bottom hairline (commit rows take 8px over a solid hairline, hub rows 7px over a 55%-alpha one); hover to `--bg-hover`; selected to solid `--bg-selected` with `--on-accent` content, muted secondaries at 0.82 white (0.8 in dark), chips at `--on-accent-chip` with a `--on-accent-chip-border` ring, and on hover a deeper accent — `#0860ca` in light, and `#1f6feb` held in dark, where Primer's lighter dark-hover blue would drop white text under AA. No left rails, no tinted washes, no arrival stagger. File rows lead with the checkbox, then the status symbol, then the bold basename with its directory muted ahead of it; commit rows lead with a 24px neutral avatar (inset disc, muted initials) and put the subject first. Hover-revealed actions fade in from `opacity: 0`; the discard × goes red, without turning its head.
 
 ### Desk Switch
-- **Style:** Four ghost tabs (Review / History / Conflicts / Stash) riding on the switch rail — no borders at rest, Ink Muted labels — with one sliding indicator underneath the active tab: `--tab-x`/`--tab-w` measured from the DOM, tinted with the active view's hue (`--view-wash` face, `--view-edge` border, `--view-glow` halo) and travelling on `--motion-slide`. The active label is Ink at 600 weight, so hue is never the only signal. Non-active tabs take a faint view wash on hover. Count badges are 10.5px mono pills in the view hue; the Conflicts badge (and the tab's own label) turns Alarm Red only while conflicts exist, announcing itself once with a 420 ms arrival. Arrow keys cycle the switch; full ARIA tablist semantics with the work area as its tabpanel.
+- **Style:** four tabs (Review / History / Conflicts / Stash) on a `--bg-panel` rail edged by a bottom hairline. Inactive tabs are ghost — transparent, muted label, hover ground; the active one is named by a lifted chip drawn under it (`--tab-x`/`--tab-w` measured in `App.tsx`): canvas face, accent-mixed border, the rest-lift shadow, and an accent 600-weight label, so state never depends on one channel. The chip's position changes with an opacity fade only. Full ARIA tablist semantics with the work area as its tabpanel; arrow keys cycle.
 
 ### Commit Tray (signature)
-- **Style:** Docked 300px panel with a view-edged left hairline, a 45% view-hue inner rail, and a panel background washed 1× `--tint` at its top; 10px padding, 8px gaps: summary input, description textarea, then the **scope line** — mono, muted, `N of M files · +A −D` with the add count in add-green and the delete count in delete-red (git truth colored as git truth); then Generate (Agent Violet) and the full-width Commit Green commit verb. With nothing selected the tray says `0 of N · +0 −0` and the commit button is disabled: the verb that owns Green never promises what it will not do.
+- **Style:** docked 300px panel on `--bg-panel`, held off the main pane by a 1px hairline; 10px padding, 8px gaps: summary input, description textarea, then the **scope line** — mono, muted, `N of M files · +A −D`, add count in green and delete count in red (git truth colored as git truth) — then Generate (violet) and the full-width Commit Blue verb. With nothing selected the tray reads `0 of N · +0 −0` and the commit button takes its disabled face: the verb never promises what it will not do.
+
+### Celebration (signature)
+- **Style:** when a commit or push actually lands, the button that did it pops on a 500ms arrival curve and sheds 14 confetti bits over 680ms, tinted only with state colors — success green twice, accent blue twice, amber, and a single touch of agent violet. It is the app's one long moment, bound to a verb that finished; nothing loops for decoration.
 
 ### Route Readout & Ctrl K Chip
-- **Style:** The strip's signature mono readout `branch ⇄ origin`, the arrow tinted Beacon Blue, trailing `↑n ↓m` counts as git reports them; it renders nothing when it has nothing to say. The filter input carries a `Ctrl K` chip — mono 10.5px muted text in a Panel-background hairline pill — visible only while the field is empty and unfocused.
+- **Style:** the strip's mono readout `branch ⇄ origin` with the arrow in accent blue and trailing `↑n ↓m` counts as git reports them; it renders nothing when it has nothing to say. The filter carries a `Ctrl K` chip — 10.5px mono muted in a panel-background hairline pill — visible only while the field is empty and unfocused.
 
 ### Inputs & Fields
-- **Style:** Canvas background, 1px Hairline border, 6px radius, 5px × 8px padding, full-width. Focus removes the outline and replaces it with a Beacon Blue border plus the 3px `--focus-ring`. Labels are 600-weight 13px with 11.5px muted hints beneath; fields stack at 12px gaps. Staging checkboxes take `accent-color: Commit Green` — checking a file is committing it.
+- **Style:** canvas background, 1px `--border`, 6px radius, 5px × 8px padding, full-width. Focus removes the outline and draws the accent border plus the ring. Labels are 600-weight 13px with 11.5px muted hints beneath, stacked at 12px gaps. Staging checkboxes take `accent-color: Success Green`; the hub's table checkboxes take the accent.
+
+### Popovers & Menus
+- **Style:** canvas face, hairline border, 12px radius, the two-layer Float shadow, 4px padding; items are 7px × 10px at 6px radius, hover to `--bg-hover`, active item accent-colored 600-weight, danger items red. Headers are 10.5px uppercase eyebrows; separators and inline filters allowed. Max height 480px with scroll, positioned 4px below the trigger, entering as a fade at `scale(0.98)`.
 
 ### Dialogs
-- **Style:** Canvas face, Hairline border, 10px radius, Float shadow, scrim behind (4px blur, the only blur in the app); capped at `min(92vw, 640px)` × 88vh. One documented wide variant exists for data-dense lists — the repository manager hub caps at `min(92vw, 720px)`; new dialogs must ask before going wide. Anatomy: head (12×16px, 15px bold title, ghost close, washed with the view hue and edged `--view-edge`), scrollable body (14×16px), foot of right-aligned buttons at 8px gaps — destructive confirmations paint their verb with `.btn.primary.destructive`.
+- **Style:** canvas face, hairline border, 12px radius, Float shadow, unblurred scrim; capped at `min(92vw, 640px)` × 88vh, with one documented wide variant — the repository hub at `min(92vw, 720px)`. Anatomy: head on `--bg-panel` with a 14px/600 title, 12×16px padding and a ghost close; scrollable body at 14×16px; foot of right-aligned buttons at 8px gaps, destructive confirmations painting their verb `.btn.primary.destructive`.
 
 ### Toasts
-- **Style:** Floating cards (8px radius, Float shadow, Hairline border) with a 4px severity stripe on the left edge — Alarm Red (error), Commit Green (success), Beacon Blue (info) — and a faint horizontal wash of the same hue fading by 42% across the card, so severity reads in peripheral vision. Stacked bottom-right above the status bar, max 420px, body text selectable, optional action row and quiet ×-close.
+- **Style:** floating banners, not striped cards: the whole card takes the state's subtle ground (`--del-bg`, `--add-bg`, `--hunk-bg`) with a 35%-mixed border of the same hue, and the label takes that hue's strong tone — never gray text on a colored field. 6px radius, Float shadow, 9px × 12px padding, hairline border in the neutral case. Stacked bottom-right above the status bar, max 420px, body selectable, optional action row and a quiet 14px ×-close.
 
 ### Diff Table (signature)
-- **Style:** Full-width collapsed monospace table at 12px/1.55; sticky Header-Surface title bar with the file path in mono, washed with the view hue and underlined `--view-edge`. The table fades in as one layer when a file changes (`--motion-fast`). Line-number gutters are 44px Panel cells with right-aligned muted digits; sign column 16px. Add/Del/Hunk rows take their semantic washes full-width; word-level highlights use 30%-mixed add/del tints at 2px radius, deletions struck through at 60% del-color. Split mode halves the pane at `calc(50% - 48px)` with an empty-side ghost at 0.55 opacity. Prism syntax colors ride GitHub's dark syntax palette in both themes. An empty work pane carries a quiet field of its view's light (`--field`) — readiness, not breakage.
+- **Style:** full-width collapsed monospace table at 12px/1.55; sticky `--bg-header` title bar carrying the path in mono over a 1px hairline, with Split / No wrap / Open as accent links. Unchanged line-number cells sit on the panel ground with muted digits; add, del and hunk rows tint **both** the row and its gutter (`--add-bg`/`--add-gutter`, `--del-bg`/`--del-gutter`, `--hunk-bg`/`--hunk-gutter`) with the line number in the matching state color; the hunk row's content sets in `--hunk-text` — GitHub's blob view, not a generic table. Word-level highlights use `--word-add`/`--word-del` at 2px radius, deletions struck in `--word-del-strike`. Split mode halves the pane at `calc(50% - 48px)` with an empty-side ghost at 0.55 opacity. Prism syntax colors read the `--syntax-*` tokens, so code re-lights with the theme. An empty pane is plain canvas with centered guidance and an ink heading — no wash, no illustration.
 
 ### Status Bar & Busy Indicator
-- **Style:** 3px × 10px Header-Surface strip washed with the view hue and edged `--view-edge` on top, 11.5px muted text items at 14px gaps. A busy item turns Beacon Blue, grows an 8px spinning ring (0.8s linear) and carries a 1px sheen travelling its width (1.2s) — the app's looping motion, reserved for "the machine is thinking"; the AI's own busy readout answers in Agent Violet so the two kinds of waiting look different.
+- **Style:** ~18px `--bg-panel` strip under a 1px hairline, 11.5px muted items at 14px gaps. A busy item turns accent blue and grows an 8px spinning ring (0.8s linear) — the app's only looping motion, reserved for "the machine is thinking." The agent's own busy readout answers in violet, so the two kinds of waiting look different.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** route every new surface through the `html[data-theme]` custom-property contract and the `.app[data-view]` hue contract; both themes must receive the same roles, and a new view must name a hue with a role.
-- **Do** express structure with 1px borders and tonal steps (canvas → panel → header-surface) before reaching for any shadow, and reserve glow for focus, hover, and active-view state.
-- **Do** reserve Commit Green for commit-and-confirmation semantics, Beacon Blue for interaction/focus/busy semantics, Alarm Red for destructive confirmations, Shelf Teal for stashed work, and Agent Violet for the agent.
-- **Do** set repository-verbatim text (paths, diffs, commit messages, shortcut keys) in the mono stack, and UI prose in the system stack.
-- **Do** use the Float shadow only for dismissible floating layers, and give new overlays 8–10px radius + 4px inner item radius like its siblings.
-- **Do** express selection with a wash plus a status rail (and weight on the switch tab), never hue alone; state must survive someone seeing no color.
+- **Do** route every new surface through the `html[data-theme]` contract; both themes receive the same roles, and dark is composed on Primer's `#0d1117` ground, not inverted from light.
+- **Do** express structure with 1px hairlines and the canvas → panel → inset tonal steps before reaching for any shadow.
+- **Do** use the accent for interaction and selection, green for additions/staging/success, red for deletion and destruction, amber for warnings, violet for the agent — and nothing else.
+- **Do** set repository-verbatim text (paths, diffs, commit messages, shortcut keys, counts) in the mono stack, and UI prose in the system stack.
+- **Do** invert a selected row's content to `--on-accent` — including its status symbols and chips — and keep the non-color cues (symbol shape, weight) that make the state readable without color.
+- **Do** keep hover, focus, and selection answers in color and ground alone, and keep the focus ring for `:focus-visible`.
 - **Do** truncate with ellipsis at `min-width: 0` rather than wrapping paths or breaking the 340px queue column.
+- **Do** celebrate a landed commit or push with confetti, and nothing else.
 
 ### Don't:
-- **Don't** introduce chromatic color that answers to no role: not a git state, not a task state, not the active desk. The palette is exhausted at Green/Blue/Red/Amber/Teal/Violet plus the three diff washes and the per-view hue.
-- **Don't** add a second drop-shadow token, shadow an in-flow panel, or glow a resting surface; borders do that work, and blur belongs only to the dialog scrim.
-- **Don't** display type larger than 30px or text smaller than 10.5px; density comes from the 4–16px spacing scale.
-- **Don't** use Caution Amber for blockers/errors and Alarm Red for soft warnings — the severity ladder is fixed.
-- **Don't** put package-UI webfonts or icon libraries on the product; the incumbent system uses the platform's own faces and glyph characters.
-- **Don't** animate for decoration: every motion must acknowledge an event (hover, press, arrival of a layer/row/number, tab swap, running operation, success) and stay in the 90/140/200/220 ms tiers except the one authored commit/push celebration; looping motion is reserved for spinners and the busy sheen. Every animation needs a `prefers-reduced-motion` path that keeps fades and color state while dropping travel and scale.
-- **Don't** use gradient text on headings, metrics, or the wordmark — the color story is told by washes, rails, and rings, not by painting type with gradients.
+- **Don't** tint the chrome per desk again: no view hues, no colored rails, no hue-tinted scrollbars or eyebrows. The window does not change color when the tab does.
+- **Don't** introduce chromatic color that answers to no role; the roster is accent, success, danger, caution, agent, plus the diff washes and the syntax palette.
+- **Don't** use green as a generic primary color — the commit verb is blue, and green is what it produces.
+- **Don't** lift, scale, rotate, or slide a control for feedback; don't stagger rows, pop a number, or animate a sheen across a busy item.
+- **Don't** add a third shadow, shadow an in-flow panel, or blur anything: the Float pair and the 1px rest lift are the whole vocabulary.
+- **Don't** paint any surface or any heading with a gradient, and never bring back the busy hairline: a spinner is the machine-thinking signal.
+- **Don't** display type larger than 22px or text smaller than 10.5px.
+- **Don't** use caution amber for blockers or alarm red for soft warnings — the severity ladder is fixed.
+- **Don't** add package UI webfonts or icon libraries; the CSP allows neither, and GitHub Desktop ships system faces.

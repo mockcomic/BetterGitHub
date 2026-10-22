@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    GitDesk app mark — one commit graph, one hue.
+
+    The tile is the dark desk ground (#0b1120, styles.css); the glyph is Beacon
+    Blue (#4493f8), the interaction hue, and it is the only chromatic value in
+    the mark (see DESIGN.md, "Named Hues Do Jobs"). Flat at rest: no gradient,
+    no shadow, no decoration — a trunk with three commits and one branch that
+    leaves the middle commit and stays ahead of it.
+
+    Sizes are 512-unit space: keep the stroke at 38 and the nodes at r=50 so
+    the graph still separates at 16 px.
+  -->
+  <rect width="512" height="512" rx="112" fill="#0b1120" />
+  <g stroke="#4493f8" fill="#4493f8" stroke-width="38">
+    <path d="M187 128 V384" stroke-linecap="round" />
+    <path
+      d="M187 256 C187 190 235 152 322 152"
+      fill="none"
+      stroke-linecap="round"
+    />
+    <circle cx="187" cy="128" r="50" stroke="none" />
+    <circle cx="187" cy="256" r="50" stroke="none" />
+    <circle cx="187" cy="384" r="50" stroke="none" />
+    <circle cx="322" cy="152" r="50" stroke="none" />
+  </g>
+</svg>

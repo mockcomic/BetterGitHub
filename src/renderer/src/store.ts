@@ -19,7 +19,6 @@ import type {
 } from '../../shared/models'
 import type { MenuAction } from '../../shared/ipc'
 import { call, onMenuAction, onRepoChanged } from './api'
-import { withViewTransition } from './view-transition'
 
 export interface ToastAction {
   readonly label: string
@@ -730,11 +729,9 @@ export class AppStore {
             prevConflicts === 0 &&
             this.state.view === 'review'
           ) {
-            // The move is narrated by a view transition: the desk slid, it
-            // did not blink.
-            withViewTransition(() => {
-              this.update({ view: 'conflicts' })
-            }, 'fwd')
+            // The desk moves on its own: the incoming queue and pane fade in,
+            // and nothing that did not change is asked to move.
+            this.update({ view: 'conflicts' })
           }
           if (checked.size !== draft.checked.size) {
             this.setDraft(repo.path, { checked })
@@ -1731,9 +1728,7 @@ export class AppStore {
             await call('stashAll', repo.path)
           }, 'stash')
           await this.refreshStashes()
-          withViewTransition(() => {
-            this.update({ view: 'stash', selectedStashIndex: 0 })
-          }, 'fwd')
+          this.update({ view: 'stash', selectedStashIndex: 0 })
         }
       }
     })

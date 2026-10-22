@@ -9,6 +9,7 @@
     "dev": "node scripts/launch.mjs dev",
     "start": "node scripts/launch.mjs preview",
     "build": "electron-vite build",
+    "icons": "node scripts/make-icons.mjs",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
@@ -44,15 +45,18 @@
     },
     "files": [
       "out/**/*",
+      "resources/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "resources/icons/gitdesk.ico",
       "target": [
         "nsis",
         "portable"
       ]
     },
     "mac": {
+      "icon": "resources/icons/gitdesk.png",
       "category": "public.app-category.developer-tools",
       "target": [
         "dmg",
@@ -60,6 +64,7 @@
       ]
     },
     "linux": {
+      "icon": "resources/icons/png",
       "category": "Development",
       "target": [
         "AppImage",

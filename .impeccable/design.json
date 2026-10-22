@@ -1,158 +1,217 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-20T05:15:00Z",
+  "generatedAt": "2026-10-22T06:55:30Z",
   "title": "Design System: GitDesk",
   "extensions": {
     "colorMeta": {
-      "commit-green": { "role": "primary", "displayName": "Commit Green", "canonical": "#1a7f37", "darkCounterpart": "#2ea043", "tonalRamp": ["#082010", "#0f3a1d", "#165729", "#1a7f37", "#2ea043", "#4ac261", "#7fd893", "#c8f0d3"] },
-      "beacon-blue": { "role": "secondary", "displayName": "Beacon Blue", "canonical": "#0969da", "darkCounterpart": "#4493f8", "tonalRamp": ["#071c3d", "#0b3a75", "#0d52a3", "#0969da", "#4493f8", "#79b8ff", "#b6d9ff", "#ddefff"] },
-      "alarm-red": { "role": "tertiary", "displayName": "Alarm Red", "canonical": "#cf222e", "darkCounterpart": "#f85149", "tonalRamp": ["#3d0710", "#75101a", "#a31321", "#cf222e", "#f85149", "#ff8a80", "#ffb3ab", "#ffe0dd"] },
-      "caution-amber": { "role": "tertiary", "displayName": "Caution Amber", "canonical": "#d4a72c", "darkCounterpart": "#d4a72c", "tonalRamp": ["#3a2c07", "#6f5410", "#9c7816", "#d4a72c", "#e5c353", "#f0d789", "#f7e9bd", "#fcf6df"] },
-      "canvas": { "role": "neutral", "displayName": "Canvas", "canonical": "#ffffff", "darkCounterpart": "#0d1117", "tonalRamp": ["#0d1117", "#161b22", "#1c2128", "#eef1f4", "#f3f5f7", "#f6f8fa", "#ffffff", "#ffffff"] },
-      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#d0d7de", "darkCounterpart": "#30363d", "tonalRamp": ["#30363d", "#484f58", "#656d76", "#8b949e", "#afb8c1", "#d0d7de", "#e7ebef", "#f6f8fa"] },
-      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1f2328", "darkCounterpart": "#e6edf3", "tonalRamp": ["#1f2328", "#32383f", "#4b545d", "#656d76", "#8b949e", "#afb8c1", "#d0d7de", "#e6edf3"] }
+      "accent-blue": { "role": "primary", "displayName": "Commit Blue / Accent", "canonical": "#0969da", "darkCounterpart": "#2f81f7 (text) / #1f6feb (emphasis)", "tonalRamp": ["#032c62", "#04428d", "#0550ae", "#0969da", "#218bff", "#54aeff", "#80ccff", "#ddf4ff"] },
+      "commit-blue": { "role": "primary", "displayName": "Commit Blue", "canonical": "#0969da", "darkCounterpart": "#1f6feb", "tonalRamp": ["#032c62", "#04428d", "#0550ae", "#0969da", "#218bff", "#54aeff", "#80ccff", "#ddf4ff"] },
+      "accent-hover": { "role": "state", "displayName": "Commit Blue, hovered", "canonical": "#0860ca", "darkCounterpart": "#388bfd", "tonalRamp": ["#032c62", "#04428d", "#0550ae", "#0860ca", "#0969da", "#218bff", "#54aeff", "#b6e3ff"] },
+      "commit-blue-hover": { "role": "state", "displayName": "Commit Blue, hovered", "canonical": "#0860ca", "darkCounterpart": "#388bfd", "tonalRamp": ["#032c62", "#04428d", "#0550ae", "#0860ca", "#0969da", "#218bff", "#54aeff", "#b6e3ff"] },
+      "accent-active": { "role": "state", "displayName": "Commit Blue, pressed / selected-hover", "canonical": "#0550ae", "darkCounterpart": "#1f6feb", "tonalRamp": ["#010f33", "#032c62", "#04428d", "#0550ae", "#0969da", "#218bff", "#54aeff", "#80ccff"] },
+      "success-green": { "role": "semantic", "displayName": "Success Green (additions, staging, success — and the commit-landing ring)", "canonical": "#1a7f37", "darkCounterpart": "#3fb950", "tonalRamp": ["#04260f", "#0a3625", "#0c4a26", "#116329", "#1a7f37", "#2da44e", "#4ac26b", "#dafbe1"] },
+      "alarm-red": { "role": "semantic", "displayName": "Alarm Red", "canonical": "#cf222e", "darkCounterpart": "#f85149 (text) / #da3633 (destructive face)", "tonalRamp": ["#5e0701", "#81160d", "#a40e26", "#cf222e", "#fa4549", "#ff8182", "#ffcecb", "#ffebe9"] },
+      "alarm-red-hover": { "role": "state", "displayName": "Alarm Red, hovered", "canonical": "#a40e26", "darkCounterpart": "#b62324", "tonalRamp": ["#3d0300", "#5e0701", "#81160d", "#a40e26", "#cf222e", "#fa4549", "#ff8182", "#ffcecb"] },
+      "caution-amber": { "role": "semantic", "displayName": "Caution Amber", "canonical": "#9a6700", "darkCounterpart": "#d4a72c", "tonalRamp": ["#341a00", "#5e3a05", "#7d4e00", "#9a6700", "#bf8700", "#d4a72c", "#eac54f", "#fff8c5"] },
+      "agent-violet": { "role": "semantic", "displayName": "Agent Violet", "canonical": "#8250df", "darkCounterpart": "#a371f7", "tonalRamp": ["#1f0f52", "#3d1e8f", "#6639ba", "#8250df", "#a371f7", "#c297ff", "#d8b9ff", "#fbeffd"] },
+      "agent-violet-hover": { "role": "state", "displayName": "Agent Violet, hovered", "canonical": "#6639ba", "darkCounterpart": "#8250df", "tonalRamp": ["#150a38", "#1f0f52", "#3d1e8f", "#6639ba", "#8250df", "#a371f7", "#c297ff", "#d8b9ff"] },
+      "ai-face": { "role": "semantic", "displayName": "Agent Violet Face (identical in both themes)", "canonical": "#8250df", "darkCounterpart": "#8250df", "tonalRamp": ["#150a38", "#1f0f52", "#3d1e8f", "#6639ba", "#8250df", "#9a6ce8", "#b38ef2", "#fbeffd"] },
+      "ai-face-hover": { "role": "state", "displayName": "Agent Violet Face, pressed deeper", "canonical": "#6639ba", "darkCounterpart": "#6e40c9", "tonalRamp": ["#150a38", "#1f0f52", "#3d1e8f", "#6639ba", "#6e40c9", "#8250df", "#a371f7", "#d8b9ff"] },
+      "canvas": { "role": "neutral", "displayName": "Canvas", "canonical": "#ffffff", "darkCounterpart": "#0d1117", "tonalRamp": ["#010409", "#0d1117", "#161b22", "#21262d", "#d0d7de", "#eaeef2", "#f6f8fa", "#ffffff"] },
+      "panel": { "role": "neutral", "displayName": "Panel Chrome", "canonical": "#f6f8fa", "darkCounterpart": "#161b22", "tonalRamp": ["#010409", "#0d1117", "#161b22", "#21262d", "#d0d7de", "#eaeef2", "#f6f8fa", "#ffffff"] },
+      "header-surface": { "role": "neutral", "displayName": "Sticky Header Ground", "canonical": "#f6f8fa", "darkCounterpart": "#161b22", "tonalRamp": ["#010409", "#0d1117", "#161b22", "#21262d", "#d0d7de", "#eaeef2", "#f6f8fa", "#ffffff"] },
+      "chip-face": { "role": "neutral", "displayName": "Raised Chip Face (active desk tab and its counter)", "canonical": "#ffffff", "darkCounterpart": "#21262d", "tonalRamp": ["#0d1117", "#161b22", "#21262d", "#30363d", "#d0d7de", "#eaeef2", "#f6f8fa", "#ffffff"] },
+      "inset": { "role": "neutral", "displayName": "Inset Well", "canonical": "#eaeef2", "darkCounterpart": "#010409", "tonalRamp": ["#010409", "#0d1117", "#161b22", "#21262d", "#cfd6dd", "#eaeef2", "#f6f8fa", "#ffffff"] },
+      "hover-surface": { "role": "state", "displayName": "Hover Ground (alpha)", "canonical": "rgba(208, 215, 222, 0.32)", "darkCounterpart": "rgba(177, 186, 196, 0.12)", "tonalRamp": ["#30363d", "#484f58", "#656d76", "#8b949e", "#afb8c1", "#d0d7de", "#e0e5ea", "#eff2f5"] },
+      "selected-surface": { "role": "state", "displayName": "Selected Row (solid accent)", "canonical": "#0969da", "darkCounterpart": "#1f6feb", "tonalRamp": ["#032c62", "#04428d", "#0550ae", "#0860ca", "#0969da", "#1f6feb", "#388bfd", "#79b8ff"] },
+      "selected-hover": { "role": "state", "displayName": "Selected Row, hovered (dark holds the accent for AA)", "canonical": "#0860ca", "darkCounterpart": "#1f6feb", "tonalRamp": ["#032c62", "#04428d", "#0550ae", "#0860ca", "#0969da", "#1f6feb", "#388bfd", "#79b8ff"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#d0d7de", "darkCounterpart": "#30363d", "tonalRamp": ["#21262d", "#30363d", "#3d444d", "#484f58", "#656d76", "#8b949e", "#d0d7de", "#eaeef2"] },
+      "hairline-subtle": { "role": "neutral", "displayName": "Hairline Subtle", "canonical": "#eaeef2", "darkCounterpart": "#21262d", "tonalRamp": ["#0d1117", "#161b22", "#21262d", "#30363d", "#656d76", "#8b949e", "#d0d7de", "#eaeef2"] },
+      "control-border": { "role": "neutral", "displayName": "Control Border (15% ink)", "canonical": "rgba(31, 35, 40, 0.15)", "darkCounterpart": "rgba(240, 246, 252, 0.1)", "tonalRamp": ["#0d1117", "#161b22", "#30363d", "#484f58", "#656d76", "#8b949e", "#d0d7de", "#f6f8fa"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1f2328", "darkCounterpart": "#e6edf3", "tonalRamp": ["#1f2328", "#32383f", "#4b545d", "#656d76", "#8b949e", "#afb8c1", "#d0d7de", "#e6edf3"] },
+      "ink-muted": { "role": "neutral", "displayName": "Ink Muted", "canonical": "#656d76", "darkCounterpart": "#7d8590", "tonalRamp": ["#1f2328", "#32383f", "#4b545d", "#656d76", "#7d8590", "#8b949e", "#afb8c1", "#d0d7de"] },
+      "on-accent": { "role": "neutral", "displayName": "On Accent", "canonical": "#ffffff", "darkCounterpart": "#ffffff", "tonalRamp": ["#8b949e", "#afb8c1", "#c6ccd2", "#d0d7de", "#e0e5ea", "#eff2f5", "#f8fafb", "#ffffff"] },
+      "on-accent-chip": { "role": "state", "displayName": "Chip on Selected Row (10% white)", "canonical": "rgba(255, 255, 255, 0.1)", "darkCounterpart": "rgba(255, 255, 255, 0.1)", "tonalRamp": ["#8b949e", "#afb8c1", "#c6ccd2", "#d0d7de", "#e0e5ea", "#eff2f5", "#f8fafb", "#ffffff"] },
+      "on-accent-chip-border": { "role": "state", "displayName": "Chip Ring on Selected Row (45% white)", "canonical": "rgba(255, 255, 255, 0.45)", "darkCounterpart": "rgba(255, 255, 255, 0.45)", "tonalRamp": ["#8b949e", "#afb8c1", "#c6ccd2", "#d0d7de", "#e0e5ea", "#eff2f5", "#f8fafb", "#ffffff"] },
+      "disabled-face": { "role": "neutral", "displayName": "Disabled Face", "canonical": "#eff2f5", "darkCounterpart": "#31363e", "tonalRamp": ["#21262d", "#31363e", "#484f58", "#656d76", "#8b949e", "#afb8c1", "#d0d7de", "#eff2f5"] },
+      "disabled-ink": { "role": "neutral", "displayName": "Disabled Ink", "canonical": "#8c959f", "darkCounterpart": "#7d8590", "tonalRamp": ["#3d444d", "#484f58", "#586069", "#656d76", "#7d8590", "#8b949e", "#afb8c1", "#d0d7de"] },
+      "add-wash": { "role": "diff", "displayName": "Add Wash", "canonical": "#dafbe1", "darkCounterpart": "#12261f", "tonalRamp": ["#0f2d16", "#12261f", "#116329", "#1a7f37", "#2da44e", "#6fd890", "#affbcb", "#dafbe1"] },
+      "add-gutter": { "role": "diff", "displayName": "Add Gutter", "canonical": "#e6ffec", "darkCounterpart": "#0f2d16", "tonalRamp": ["#12261f", "#0f2d16", "#1a7f37", "#2da44e", "#4ac26b", "#9be6b0", "#c8f5d6", "#e6ffec"] },
+      "del-wash": { "role": "diff", "displayName": "Del Wash", "canonical": "#ffebe9", "darkCounterpart": "#2d1214", "tonalRamp": ["#2d1214", "#3d1a1c", "#81160d", "#cf222e", "#fa4549", "#ffaba8", "#ffc1be", "#ffebe9"] },
+      "del-gutter": { "role": "diff", "displayName": "Del Gutter", "canonical": "#ffd7d5", "darkCounterpart": "#3d1a1c", "tonalRamp": ["#2d1214", "#3d1a1c", "#a40e26", "#fa4549", "#ff8182", "#ffaba8", "#ffd0cc", "#ffd7d5"] },
+      "hunk-wash": { "role": "diff", "displayName": "Hunk Wash", "canonical": "#ddf4ff", "darkCounterpart": "#16263c", "tonalRamp": ["#16263c", "#1b3050", "#0550ae", "#0969da", "#218bff", "#54aeff", "#b6e3ff", "#ddf4ff"] },
+      "hunk-gutter": { "role": "diff", "displayName": "Hunk Gutter", "canonical": "#b6e3ff", "darkCounterpart": "#1b3050", "tonalRamp": ["#16263c", "#1b3050", "#0969da", "#218bff", "#54aeff", "#80ccff", "#b6e3ff", "#ddf4ff"] },
+      "word-add": { "role": "diff", "displayName": "Word Insert Mark (translucent)", "canonical": "rgba(128, 191, 132, 0.3)", "darkCounterpart": "rgba(128, 191, 132, 0.3)", "tonalRamp": ["#1a7f37", "#2da44e", "#4ac26b", "#6fd890", "#80bf84", "#9fcfa1", "#c2e6c4", "#e0f3e1"] },
+      "word-del": { "role": "diff", "displayName": "Word Delete Mark (translucent)", "canonical": "rgba(255, 129, 130, 0.3)", "darkCounterpart": "rgba(255, 129, 130, 0.3)", "tonalRamp": ["#cf222e", "#fa4549", "#ff8182", "#ff8a8b", "#ffa1a2", "#ffb9ba", "#ffd0d1", "#ffe6e6"] },
+      "word-del-strike": { "role": "diff", "displayName": "Word Delete Strike (translucent, doubled alpha)", "canonical": "rgba(255, 129, 130, 0.6)", "darkCounterpart": "rgba(255, 129, 130, 0.6)", "tonalRamp": ["#cf222e", "#fa4549", "#ff8182", "#ff8a8b", "#ffa1a2", "#ffb9ba", "#ffd0d1", "#ffe6e6"] },
+      "scrim": { "role": "overlay", "displayName": "Dialog Scrim (unblurred)", "canonical": "rgba(31, 35, 40, 0.5)", "darkCounterpart": "rgba(1, 4, 9, 0.68)", "tonalRamp": ["#010409", "#0d1117", "#161b22", "#1f2328", "#32383f", "#4b545d", "#656d76", "#8b949e"] },
+      "scroll-thumb": { "role": "utility", "displayName": "Scrollbar Thumb (0.7 on hover)", "canonical": "rgba(110, 118, 129, 0.4)", "darkCounterpart": "rgba(110, 118, 129, 0.4)", "tonalRamp": ["#3d444d", "#484f58", "#586069", "#656d76", "#6e7681", "#8b949e", "#afb8c1", "#d0d7de"] },
+      "syntax-keyword": { "role": "syntax", "displayName": "Syntax Keyword / Boolean", "canonical": "#cf222e", "darkCounterpart": "#ff7b72", "tonalRamp": ["#5e0701", "#81160d", "#a40e26", "#cf222e", "#fa4549", "#ff7b72", "#ff9d95", "#ffe3e0"] },
+      "syntax-string": { "role": "syntax", "displayName": "Syntax String / Char / Regex", "canonical": "#0a3069", "darkCounterpart": "#a5d6ff", "tonalRamp": ["#032c62", "#0a3069", "#0550ae", "#0969da", "#218bff", "#54aeff", "#79c0ff", "#a5d6ff"] },
+      "syntax-comment": { "role": "syntax", "displayName": "Syntax Comment (italic)", "canonical": "#6e7781", "darkCounterpart": "#8b949e", "tonalRamp": ["#30363d", "#3d444d", "#484f58", "#656d76", "#6e7781", "#8b949e", "#afb8c1", "#d0d7de"] },
+      "syntax-function": { "role": "syntax", "displayName": "Syntax Function", "canonical": "#8250df", "darkCounterpart": "#d2a8ff", "tonalRamp": ["#1f0f52", "#3d1e8f", "#6639ba", "#8250df", "#a371f7", "#c297ff", "#d2a8ff", "#fbeffd"] },
+      "syntax-constant": { "role": "syntax", "displayName": "Syntax Number / Constant / Property", "canonical": "#0550ae", "darkCounterpart": "#79c0ff", "tonalRamp": ["#032c62", "#04428d", "#0550ae", "#0969da", "#218bff", "#54aeff", "#79c0ff", "#ddf4ff"] },
+      "syntax-entity": { "role": "syntax", "displayName": "Syntax Entity / Class Name", "canonical": "#953800", "darkCounterpart": "#ffa657", "tonalRamp": ["#341a00", "#5e3a05", "#7d4e00", "#953800", "#c26200", "#e68a3c", "#ffa657", "#ffd7b3"] }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Empty-state/onboarding h1 only (30px). Once per screen at most." },
-      "headline": { "displayName": "Headline", "purpose": "Dialog titles (h2, 15px)." },
-      "title": { "displayName": "Title", "purpose": "File basenames, picker values, active popover items (600 weight)." },
-      "body": { "displayName": "Body", "purpose": "App-wide default UI text (13px)." },
-      "label": { "displayName": "Label", "purpose": "Hints, meta, status bar, uppercase eyebrows (10.5-12.5px, usually Ink Muted)." },
-      "code": { "displayName": "Code", "purpose": "Repository-verbatim text: paths, diffs, commit bodies, code chips. Cascadia Code/Consolas." }
+      "display": { "displayName": "Display", "purpose": "The empty-state/onboarding h1 only (600, 22px). Once per screen at most — the largest thing on screen." },
+      "headline": { "displayName": "Headline", "purpose": "Dialog titles (h2, 14px) and the commit-detail subject line (14px)." },
+      "title": { "displayName": "Title", "purpose": "File basenames, picker values, active popover items (600, 13px)." },
+      "body": { "displayName": "Body", "purpose": "App-wide default UI text (400, 13px / 1.5)." },
+      "label": { "displayName": "Label", "purpose": "Hints, timestamps, status bar, field hints (400, 11.5px, usually Ink Muted)." },
+      "eyebrow": { "displayName": "Eyebrow", "purpose": "Uppercase section labels at 0.04em letter-spacing, mono counters, code chips, badge text (600, 10.5px)." },
+      "code": { "displayName": "Code", "purpose": "Repository-verbatim text: paths, diffs, commit messages, counts — Cascadia Code/Consolas at 12px/1.55." },
+      "glyph": { "displayName": "Glyph", "purpose": "Platform-character pictograms: 16px header icon buttons, 14px row-level marks, 11px status symbols (● ＋ － ! ⇄) — symbols, never letters." }
     },
     "shadows": [
-      { "name": "float-light", "value": "0 8px 24px rgba(31, 35, 40, 0.16)", "purpose": "The single ambient shadow. Popovers, dialogs, toasts, context menus (light theme)." },
-      { "name": "float-dark", "value": "0 8px 24px rgba(1, 4, 9, 0.6)", "purpose": "Same geometry, deepened for the dark theme's floating layers." },
-      { "name": "scrim", "value": "rgba(1, 4, 9, 0.55)", "purpose": "Full-viewport dialog overlay beneath a floated dialog." }
+      { "name": "float-light", "value": "0 12px 28px rgba(140, 149, 159, 0.3), 0 2px 4px rgba(140, 149, 159, 0.1)", "purpose": "Primer's two-layer overlay shadow (--shadow): popovers, context menus, dialogs, toasts (light theme)." },
+      { "name": "float-dark", "value": "0 12px 28px rgba(1, 4, 9, 0.6), 0 2px 4px rgba(1, 4, 9, 0.4)", "purpose": "The same float, deepened for the dark desk's floating layers." },
+      { "name": "rest-lift", "value": "0 1px 0 rgba(31, 35, 40, 0.04)", "purpose": "The 1px lift (--btn-shadow) every bordered button and the active-tab chip carries at rest; '0 0 transparent' in dark. Never grows on hover." },
+      { "name": "focus-ring", "value": "0 0 0 3px rgba(9, 105, 218, 0.3)", "purpose": "The only halo (--focus-ring; dark rgba(31, 111, 235, 0.4)). :focus-visible only, always with the border taken to the accent." },
+      { "name": "scrim", "value": "rgba(31, 35, 40, 0.5)", "purpose": "Full-viewport dialog overlay (--scrim; dark rgba(1, 4, 9, 0.68)). Dims and stays sharp — no blur." }
     ],
     "motion": [
-      { "name": "spinner", "value": "0.8s linear infinite", "purpose": "The app's only animation: the busy ring on AI/git operations." },
-      { "name": "hover-lift-directional", "value": "150ms ease-out", "purpose": "Accepted-but-unimplemented direction: subtle lift/shadow response on button and row hover." }
+      { "name": "instant", "value": "90ms", "purpose": "--motion-instant: cursor answers — button/input/row background, border, text color, on ease-out." },
+      { "name": "fast", "value": "140ms", "purpose": "--motion-fast: floated-layer fades, the desk swap's single keyed .pane-enter fade (no View Transitions API in the renderer), the diff fade-in, the tab chip's opacity arrival." },
+      { "name": "layer", "value": "200ms", "purpose": "--motion-layer: dialog and toast entrances." },
+      { "name": "ease-arrive", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "--ease-arrive: the arrival curve for layers, dialogs, toasts, the celebration pop and confetti; everything else is ease-out." },
+      { "name": "spinner", "value": "0.8s linear infinite", "purpose": "The busy ring (11px .spinner and the 8px status-bar ring) — the app's only looping motion, reserved for 'the machine is thinking'. Accent blue; violet for the agent." },
+      { "name": "celebration-pop", "value": "500ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The landed commit/push verb pops to scale(1.045) with a ring in Success Green (btn-celebrate: --success mixed at 60%, fading to 0%) — the verb itself is blue, so the ring is not." },
+      { "name": "confetti-flight", "value": "680ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "14 confetti bits fly from the celebrating verb, tinted only with state colors." },
+      { "name": "celebration-dismiss", "value": "900ms", "purpose": "The whole celebration is dismissed after 900ms — the system's single long moment, bound to a verb that finished." }
     ],
     "breakpoints": [
       { "name": "compact", "value": "max-width: 1160px", "purpose": "Queue and tray shrink to 290/260px." },
-      { "name": "stacked", "value": "max-width: 980px", "purpose": "The three body zones stack vertically — queue (38%), work area, tray (46%)." }
+      { "name": "stacked", "value": "max-width: 980px", "purpose": "The three body zones stack vertically — queue (max-height 38%), work area, tray (max-height 46%, scrollable so the commit verb stays reachable)." }
     ]
   },
   "components": [
     {
-      "name": "Primary Button",
+      "name": "Commit Verb (Primary Button)",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The commit action. Commit Green is reserved for it and its confirmations.",
-      "html": "<button class=\"ds-btn-primary\">Commit to main</button>",
-      "css": ".ds-btn-primary { background: var(--primary, #1a7f37); border: 1px solid #12612a; color: #fff; font: 600 13px -apple-system, 'Segoe UI', sans-serif; padding: 5px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; } .ds-btn-primary:hover { background: var(--primary-hover, #21883a); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #1a7f37) 25%, transparent); }"
+      "description": "The app's one loud action in Commit Blue with a white label; the commit button stretches full-width. Color-only hover; green is left to what the commit produces.",
+      "html": "<button class=\"ds-btn-commit\">Commit to main</button>",
+      "css": ".ds-btn-commit { background: var(--primary, #0969da); border: 1px solid var(--btn-border, rgba(31, 35, 40, 0.15)); color: var(--on-accent, #ffffff); border-radius: 6px; padding: 5px 12px; box-shadow: var(--btn-shadow, 0 1px 0 rgba(31, 35, 40, 0.04)); font: 500 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: background-color 90ms ease-out, border-color 90ms ease-out, color 90ms ease-out, box-shadow 90ms ease-out; } .ds-btn-commit:hover { background: var(--primary-hover, #0860ca); } .ds-btn-commit:active { background: var(--accent-active, #0550ae); } .ds-btn-commit:focus-visible { outline: none; border-color: var(--accent, #0969da); box-shadow: var(--focus-ring, 0 0 0 3px rgba(9, 105, 218, 0.3)); } .ds-btn-commit:disabled { background: var(--btn-disabled-bg, #eff2f5); color: var(--btn-disabled-ink, #8c959f); box-shadow: none; cursor: default; }"
     },
     {
       "name": "Default Button",
       "kind": "button",
       "refersTo": "button-default",
-      "description": "The workhorse control: panel-filled, hairline-bordered, quiet.",
+      "description": "Primer's workhorse control: subtle panel face, 15%-ink hairline, 1px rest lift, color-only hover. Disabled takes the Primer disabled face, never an opacity fade.",
       "html": "<button class=\"ds-btn-default\">Fetch origin</button>",
-      "css": ".ds-btn-default { background: var(--bg-panel, #f6f8fa); border: 1px solid var(--border, #d0d7de); color: var(--text, #1f2328); font: 400 13px -apple-system, 'Segoe UI', sans-serif; padding: 5px 12px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; } .ds-btn-default:hover { background: var(--bg-hover, #eef1f4); } .ds-btn-default:disabled { opacity: 0.55; cursor: default; }"
+      "css": ".ds-btn-default { background: var(--btn-bg, #f6f8fa); border: 1px solid var(--btn-border, rgba(31, 35, 40, 0.15)); color: var(--text, #1f2328); border-radius: 6px; padding: 5px 12px; box-shadow: var(--btn-shadow, 0 1px 0 rgba(31, 35, 40, 0.04)); font: 500 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background-color 90ms ease-out, border-color 90ms ease-out, box-shadow 90ms ease-out; } .ds-btn-default:hover { background: var(--btn-bg-hover, #f3f4f6); } .ds-btn-default:active { background: var(--btn-bg-active, #ebecf0); } .ds-btn-default:focus-visible { outline: none; border-color: var(--accent, #0969da); box-shadow: var(--focus-ring, 0 0 0 3px rgba(9, 105, 218, 0.3)); } .ds-btn-default:disabled { background: var(--btn-disabled-bg, #eff2f5); color: var(--btn-disabled-ink, #8c959f); box-shadow: none; cursor: default; }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-primary-destructive",
+      "description": "A confirmation that throws work away (Discard, Delete, Drop, Abort) answers in Alarm Red; the blue verb always means something was kept. Hover and press both take --danger-face-hover — GitHub Desktop's buttons darken one step and stay put.",
+      "html": "<button class=\"ds-btn-destructive\">Discard changes</button>",
+      "css": ".ds-btn-destructive { background: var(--danger-face, #cf222e); border: 1px solid var(--btn-border, rgba(31, 35, 40, 0.15)); color: var(--on-accent, #ffffff); border-radius: 6px; padding: 5px 12px; box-shadow: var(--btn-shadow, 0 1px 0 rgba(31, 35, 40, 0.04)); font: 500 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background-color 90ms ease-out; } .ds-btn-destructive:hover { background: var(--danger-face-hover, #a40e26); } .ds-btn-destructive:active { background: var(--danger-face-hover, #a40e26); } .ds-btn-destructive:focus-visible { outline: none; border-color: var(--accent, #0969da); box-shadow: var(--focus-ring, 0 0 0 3px rgba(9, 105, 218, 0.3)); }"
+    },
+    {
+      "name": "AI Button",
+      "kind": "button",
+      "refersTo": "button-ai",
+      "description": "The agent's Generate verb in solid --ai-face #8250df — identical in both themes, because a white label on #a371f7 measures 3.35:1 and fails AA; --ai (#a371f7 in dark) is reserved for the agent's readout text and spinner. The one accent allowed to be decorative.",
+      "html": "<button class=\"ds-btn-ai\">Generate message</button>",
+      "css": ".ds-btn-ai { background: var(--ai-face, #8250df); border: 1px solid var(--btn-border, rgba(31, 35, 40, 0.15)); color: var(--on-accent, #ffffff); border-radius: 6px; padding: 5px 12px; box-shadow: var(--btn-shadow, 0 1px 0 rgba(31, 35, 40, 0.04)); font: 500 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-variant-emoji: text; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background-color 90ms ease-out; } .ds-btn-ai:hover { background: var(--ai-face-hover, #6639ba); } .ds-btn-ai:focus-visible { outline: none; border-color: var(--accent, #0969da); box-shadow: var(--focus-ring, 0 0 0 3px rgba(9, 105, 218, 0.3)); }"
     },
     {
       "name": "Text Input",
       "kind": "input",
       "refersTo": "input",
-      "description": "Full-width field; focus replaces the outline with a Beacon Blue border and 25% ring.",
+      "description": "Full-width canvas field on a hairline; focus removes the outline and draws the accent border plus the 3px ring.",
       "html": "<input class=\"ds-input\" placeholder=\"Summary (required)\" />",
-      "css": ".ds-input { background: var(--bg, #fff); border: 1px solid var(--border, #d0d7de); color: var(--text, #1f2328); font: 400 13px -apple-system, 'Segoe UI', sans-serif; padding: 5px 8px; border-radius: 6px; width: 100%; } .ds-input:focus { outline: none; border-color: var(--accent, #0969da); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0969da) 25%, transparent); }"
+      "css": ".ds-input { background: var(--bg, #ffffff); border: 1px solid var(--border, #d0d7de); color: var(--text, #1f2328); font: 400 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; padding: 5px 8px; border-radius: 6px; width: 100%; transition: border-color 90ms ease-out, box-shadow 90ms ease-out; } .ds-input:focus { outline: none; border-color: var(--accent, #0969da); box-shadow: var(--focus-ring, 0 0 0 3px rgba(9, 105, 218, 0.3)); }"
     },
     {
-      "name": "Staged Badge",
-      "kind": "chip",
-      "refersTo": "badge",
-      "description": "Pill chip coding file staging; staged variant is green, clickable, transparent.",
-      "html": "<button class=\"ds-badge-staged\">staged</button>",
-      "css": ".ds-badge-staged { font: 400 10.5px -apple-system, 'Segoe UI', sans-serif; color: var(--add-text, #1a7f37); background: transparent; border: 1px solid color-mix(in srgb, var(--add-text, #1a7f37) 45%, var(--border, #d0d7de)); padding: 1px 6px; border-radius: 999px; cursor: pointer; }"
-    },
-    {
-      "name": "File Row",
+      "name": "File Row (queue)",
       "kind": "card",
-      "refersTo": null,
-      "description": "Changes-list row: status letter, muted directory + bold basename, hover-revealed discard.",
-      "html": "<div class=\"ds-file-row\"><span class=\"ds-glyph new\">N</span><span class=\"ds-path\"><span class=\"ds-dir\">src/renderer/</span><span class=\"ds-name\">styles.css</span></span><button class=\"ds-discard\">×</button></div>",
-      "css": ".ds-file-row { display: flex; align-items: center; gap: 7px; padding: 5px 10px; cursor: pointer; border-bottom: 1px solid transparent; background: transparent; font: 400 13px -apple-system, 'Segoe UI', sans-serif; color: var(--text, #1f2328); } .ds-file-row:hover { background: var(--bg-hover, #eef1f4); } .ds-glyph { flex: 0 0 14px; text-align: center; font-size: 11px; color: var(--add-text, #1a7f37); } .ds-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-dir { color: var(--text-muted, #656d76); } .ds-name { font-weight: 600; } .ds-discard { opacity: 0; border: none; background: transparent; color: var(--text-muted, #656d76); font-size: 14px; cursor: pointer; } .ds-file-row:hover .ds-discard { opacity: 1; } .ds-discard:hover { color: var(--danger, #cf222e); }"
-    },
-    {
-      "name": "Popover Menu",
-      "kind": "custom",
-      "refersTo": null,
-      "description": "Floating layer for branch/repo pickers: canvas face, float shadow, eyebrow headings, active item in Commit Green.",
-      "html": "<div class=\"ds-popover\"><div class=\"ds-pop-heading\">Recent branches</div><button class=\"ds-pop-item\">main</button><button class=\"ds-pop-item active\">feat/design</button><div class=\"ds-pop-sep\"></div><button class=\"ds-pop-item danger\">Remove</button></div>",
-      "css": ".ds-popover { position: relative; background: var(--bg, #fff); border: 1px solid var(--border, #d0d7de); border-radius: 8px; box-shadow: var(--shadow, 0 8px 24px rgba(31,35,40,0.16)); padding: 4px; min-width: 280px; font: 400 13px -apple-system, 'Segoe UI', sans-serif; } .ds-pop-heading { padding: 6px 10px 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #656d76); } .ds-pop-item { display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--text, #1f2328); padding: 7px 10px; border-radius: 6px; cursor: pointer; font: inherit; } .ds-pop-item:hover { background: var(--bg-hover, #eef1f4); } .ds-pop-item.active { color: var(--primary, #1a7f37); font-weight: 600; } .ds-pop-item.danger { color: var(--danger, #cf222e); } .ds-pop-sep { height: 1px; background: var(--border, #d0d7de); margin: 4px 0; }"
-    },
-    {
-      "name": "Toast",
-      "kind": "custom",
-      "refersTo": "toast",
-      "description": "Bottom-right floating notice with a 4px severity stripe: green success, red error, blue info.",
-      "html": "<div class=\"ds-toast ds-toast-success\">Committed to branch main.</div>",
-      "css": ".ds-toast { background: var(--bg, #fff); border: 1px solid var(--border, #d0d7de); border-left-width: 4px; border-radius: 8px; box-shadow: var(--shadow, 0 8px 24px rgba(31,35,40,0.16)); padding: 9px 12px; font: 400 12.5px -apple-system, 'Segoe UI', sans-serif; color: var(--text, #1f2328); max-width: 420px; } .ds-toast-success { border-left-color: var(--primary, #1a7f37); } .ds-toast-error { border-left-color: var(--danger, #cf222e); } .ds-toast-info { border-left-color: var(--accent, #0969da); }"
+      "refersTo": "list-row",
+      "description": "Changes-list row: checkbox, 14px status symbol column (● ＋ － ! ⇄ — symbols, not letters), muted directory + bold basename, staged pill, hover-revealed discard. Selected, the whole row turns solid accent and its content inverts to white.",
+      "html": "<div class=\"ds-file-row ds-file-row-selected\"><span class=\"ds-glyph\">●</span><span class=\"ds-path\"><span class=\"ds-dir\">src/renderer/</span><span class=\"ds-name\">styles.css</span></span><span class=\"ds-badge\">staged</span><button class=\"ds-discard\">×</button></div>",
+      "css": ".ds-file-row { display: flex; align-items: center; gap: 7px; padding: 5px 10px; cursor: pointer; border-bottom: 1px solid transparent; background: transparent; color: var(--text, #1f2328); font: 400 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; transition: background-color 90ms ease-out, color 90ms ease-out; } .ds-file-row:hover { background: var(--bg-hover, rgba(208, 215, 222, 0.32)); } .ds-file-row-selected { background: var(--bg-selected, #0969da); color: var(--row-on-accent, #ffffff); } .ds-file-row-selected:hover { background: var(--bg-selected-hover, #0860ca); } .ds-glyph { flex: 0 0 14px; text-align: center; font-size: 11px; color: var(--caution, #9a6700); } .ds-file-row-selected .ds-glyph { color: var(--row-on-accent, #ffffff); } .ds-path { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } .ds-dir { color: var(--text-muted, #656d76); } .ds-file-row-selected .ds-dir { color: var(--row-on-accent-muted, rgba(255, 255, 255, 0.82)); } .ds-name { font-weight: 600; } .ds-badge { font-size: 10.5px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--on-accent-chip-border, rgba(255, 255, 255, 0.45)); background: var(--on-accent-chip, rgba(255, 255, 255, 0.1)); color: var(--row-on-accent, #ffffff); } .ds-discard { opacity: 0; border: none; background: transparent; color: var(--text-muted, #656d76); font-size: 14px; cursor: pointer; } .ds-file-row:hover .ds-discard { opacity: 1; } .ds-discard:hover { color: var(--danger, #cf222e); }"
     },
     {
       "name": "Desk Switch",
       "kind": "nav",
-      "refersTo": null,
-      "description": "Four-tab Review/History/Conflicts/Stash switch; the active tab's Beacon Blue border is the sole active signal, count badges are mono pills, conflicts badge turns Alarm Red.",
-      "html": "<div class=\"ds-desk\"><button class=\"ds-desk-tab\">Review <span class=\"ds-desk-badge\">8</span></button><button class=\"ds-desk-tab ds-desk-active\">History</button><button class=\"ds-desk-tab\">Conflicts</button><button class=\"ds-desk-tab\">Stash <span class=\"ds-desk-badge\">1</span></button></div>",
-      "css": ".ds-desk { display: flex; gap: 4px; } .ds-desk-tab { padding: 6px 12px; border: 1px solid var(--border, #d0d7de); background: var(--bg, #fff); color: var(--text-muted, #656d76); border-radius: 4px; cursor: pointer; font: 400 13px -apple-system, 'Segoe UI', sans-serif; display: inline-flex; align-items: center; gap: 6px; } .ds-desk-active { background: var(--bg-header, #f3f5f7); color: var(--text, #1f2328); font-weight: 600; border-color: var(--accent, #0969da); } .ds-desk-tab:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0969da) 25%, transparent); } .ds-desk-badge { font: 400 10.5px 'Cascadia Code', Consolas, monospace; border: 1px solid var(--border, #d0d7de); border-radius: 999px; padding: 0 5px; color: var(--text-muted, #656d76); }"
+      "refersTo": "segmented-tab",
+      "description": "Review/History/Conflicts/Stash rail. The active tab is a lifted chip drawn under an accent 600-weight label — a raised surface (--chip-face: canvas white in light, #21262d in dark, never a hole in the rail) with an accent-mixed border and the rest-lift shadow; the active tab's counter rides the same face. The chip jumps, it does not travel.",
+      "html": "<div class=\"ds-desk\"><div class=\"ds-desk-chip\"></div><button class=\"ds-desk-tab\">Review <span class=\"ds-desk-badge\">8</span></button><button class=\"ds-desk-tab ds-desk-active\">History <span class=\"ds-desk-badge\">12</span></button><button class=\"ds-desk-tab\">Conflicts</button><button class=\"ds-desk-tab\">Stash <span class=\"ds-desk-badge\">1</span></button></div>",
+      "css": ".ds-desk { position: relative; display: flex; align-items: center; gap: 4px; padding: 6px 10px; background: var(--bg-panel, #f6f8fa); border-bottom: 1px solid var(--border, #d0d7de); font: 400 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; } .ds-desk-chip { position: absolute; top: 6px; left: 0; width: 66px; height: calc(100% - 12px); background: var(--chip-face, #ffffff); border: 1px solid rgba(9, 105, 218, 0.4); border-radius: 6px; box-shadow: var(--btn-shadow, 0 1px 0 rgba(31, 35, 40, 0.04)); pointer-events: none; transition: opacity 140ms ease-out; } .ds-desk-tab { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-muted, #656d76); font: inherit; cursor: pointer; white-space: nowrap; transition: background-color 140ms ease-out, color 140ms ease-out; } .ds-desk-tab:hover { background: var(--bg-hover, rgba(208, 215, 222, 0.32)); color: var(--text, #1f2328); } .ds-desk-active { color: var(--accent, #0969da); font-weight: 600; } .ds-desk-tab:focus-visible { outline: none; border-color: var(--accent, #0969da); box-shadow: var(--focus-ring, 0 0 0 3px rgba(9, 105, 218, 0.3)); } .ds-desk-badge { font: 400 10.5px 'Cascadia Code', Consolas, monospace; line-height: 1; padding: 2px 6px; border-radius: 999px; background: var(--bg, #ffffff); border: 1px solid var(--btn-border, rgba(31, 35, 40, 0.15)); color: var(--text-muted, #656d76); } .ds-desk-active .ds-desk-badge { background: var(--chip-face, #ffffff); border-color: rgba(9, 105, 218, 0.4); color: var(--accent, #0969da); }"
     },
     {
-      "name": "Commit Tray Scope Line",
+      "name": "Popover Menu",
       "kind": "custom",
-      "refersTo": null,
-      "description": "The tray's mono `N of M files · +A −D` declaration of exactly what will ship; the commit verb sits disabled whenever N is 0.",
-      "html": "<div class=\"ds-scope\"><b>3 of 11</b> files · +42 −7</div>",
-      "css": ".ds-scope { font: 400 11px 'Cascadia Code', Consolas, monospace; color: var(--text-muted, #656d76); cursor: help; } .ds-scope b { color: var(--text, #1f2328); font-weight: 600; }"
+      "refersTo": "popover",
+      "description": "Floating layer for branch/repo pickers: canvas face, 12px radius, the two-layer float, eyebrow headings; active item accent 600, danger items red. Enters as a fade at scale(0.98).",
+      "html": "<div class=\"ds-popover\"><div class=\"ds-pop-heading\">Recent branches</div><button class=\"ds-pop-item\">main</button><button class=\"ds-pop-item ds-pop-active\">feat/primer</button><div class=\"ds-pop-sep\"></div><button class=\"ds-pop-item ds-pop-danger\">Remove</button></div>",
+      "css": ".ds-popover { position: relative; background: var(--bg, #ffffff); border: 1px solid var(--border, #d0d7de); border-radius: 12px; box-shadow: var(--shadow, 0 12px 28px rgba(140, 149, 159, 0.3), 0 2px 4px rgba(140, 149, 159, 0.1)); padding: 4px; min-width: 320px; font: 400 13px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; } .ds-pop-heading { padding: 6px 10px 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #656d76); } .ds-pop-item { display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--text, #1f2328); padding: 7px 10px; border-radius: 6px; cursor: pointer; font: inherit; transition: background-color 90ms ease-out; } .ds-pop-item:hover { background: var(--bg-hover, rgba(208, 215, 222, 0.32)); } .ds-pop-active { color: var(--accent, #0969da); font-weight: 600; } .ds-pop-danger { color: var(--danger, #cf222e); } .ds-pop-sep { height: 1px; background: var(--border, #d0d7de); margin: 4px 0; }"
     },
     {
-      "name": "Route Readout & Ctrl K Chip",
+      "name": "State Toast",
       "kind": "custom",
-      "refersTo": null,
-      "description": "The strip's signature mono `branch ⇄ origin` readout with Beacon Blue arrow and ↑↓ counts, plus the Ctrl K chip riding inside the filter field's right edge while it is empty.",
-      "html": "<span class=\"ds-route\">main <span class=\"ds-route-arrow\">⇄</span> origin · ↑1</span><span class=\"ds-kbd\">Ctrl K</span>",
-      "css": ".ds-route { font: 400 11.5px 'Cascadia Code', Consolas, monospace; color: var(--text-muted, #656d76); } .ds-route-arrow { color: var(--accent, #0969da); } .ds-kbd { font: 400 10.5px 'Cascadia Code', Consolas, monospace; color: var(--text-muted, #656d76); background: var(--bg-panel, #f6f8fa); border: 1px solid var(--border, #d0d7de); border-radius: 4px; padding: 0 5px; line-height: 16px; }"
+      "refersTo": "toast-banner",
+      "description": "GitHub's banner: the whole card takes the state's subtle ground (--add-bg here) with a 35%-mixed border of the same hue and the label in the strong tone — never gray text on a colored field.",
+      "html": "<div class=\"ds-toast-success\"><span class=\"ds-toast-body\">Committed to branch main.</span><button class=\"ds-toast-close\">×</button></div>",
+      "css": ".ds-toast-success { display: flex; align-items: flex-start; gap: 8px; background: var(--add-bg, #dafbe1); border: 1px solid rgba(26, 127, 55, 0.35); color: var(--add-text, #1a7f37); border-radius: 6px; padding: 9px 12px; box-shadow: var(--shadow, 0 12px 28px rgba(140, 149, 159, 0.3), 0 2px 4px rgba(140, 149, 159, 0.1)); font: 400 12.5px -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; max-width: 420px; user-select: text; } .ds-toast-body { flex: 1 1 auto; min-width: 0; } .ds-toast-close { flex: 0 0 auto; border: none; background: none; color: var(--text-muted, #656d76); font-size: 14px; line-height: 1; cursor: pointer; padding: 0 2px; } .ds-toast-close:hover { color: var(--text, #1f2328); }"
+    },
+    {
+      "name": "Diff Add Row",
+      "kind": "custom",
+      "refersTo": "diff-row-add",
+      "description": "The signature git fact: the row and its gutter both take GitHub's add washes with the line number in the state's own color; word-level marks are Primer's translucent pair at 2px radius.",
+      "html": "<table class=\"ds-diff\"><tbody><tr class=\"ds-diff-add\"><td class=\"ds-lineno\">42</td><td class=\"ds-sign\">+</td><td class=\"ds-content\"><code class=\"ds-word-ins\">const x = 1;</code></td></tr></tbody></table>",
+      "css": ".ds-diff { border-collapse: collapse; width: 100%; font: 400 12px/1.55 'Cascadia Code', Consolas, 'SFMono-Regular', Menlo, monospace; } .ds-diff-add { background: var(--add-bg, #dafbe1); } .ds-lineno { width: 44px; min-width: 44px; text-align: right; padding: 0 8px; font-size: 11px; user-select: none; background: var(--add-gutter, #e6ffec); color: var(--add-text, #1a7f37); border-right: 1px solid var(--border, #d0d7de); } .ds-sign { width: 16px; min-width: 16px; text-align: center; user-select: none; color: var(--add-text, #1a7f37); } .ds-content { padding: 0 10px; white-space: pre-wrap; user-select: text; color: var(--text, #1f2328); } .ds-word-ins { background: rgba(128, 191, 132, 0.3); border-radius: 2px; }"
     }
   ],
   "narrative": {
-    "northStar": "The Quiet Workbench",
-    "overview": "GitDesk presents itself as a well-lit workbench: everything the interface is made of — panels, headers, rails, status bars — is matte, neutral, and deliberately unremarkable, so that the only things permitted to speak are the facts of the repository. A file's status letter, a green add-row in a diff, the ahead/behind count, the commit button. The system's restraint is personality expressed as discipline. Depth comes from hairline borders and tonal surface shifts, never decoration. Motion is reduced to the honest machine signals that exist (a spinner while git or the AI is working), and elevation is a single soft ambient shadow reserved strictly for things floating above the app.\n\nThe type system is a two-voice arrangement: the platform-native UI stack (Segoe UI on Windows) for human text, and a programmer's monospace (Cascadia Code) for machine truth — file paths, diffs, commit bodies, shortcut keys. Wherever monospace appears, it signals \"this text is verbatim from your repository, do not paraphrase it.\" The system ships fully paired light and dark themes through one CSS custom-property contract; the dark theme is not an afterthought but the same philosophy rendered in cast iron.",
+    "northStar": "GitHub Desktop, played straight.",
+    "overview": "North Star: \"GitHub Desktop, played straight.\" GitDesk is a clone of a specific tool, so it borrows that tool's face rather than inventing one: the chrome is Primer's — GitHub's own design system — and every color in the interface is GitHub's color for that job. The strip, the queue, the commit tray and the status bar are all the same #f6f8fa chrome; the work surface is canvas-white; every boundary is a 1px #d0d7de hairline. One blue (#0969da, dark #1f6feb) does all interaction work — links, focus rings, the active tab, the selected row, the commit verb. Green belongs to additions and success only, red to deletions and destructive verbs, amber to warnings you can continue past, and purple to the AI agent alone. What is left to speak loudly is the repository: a status symbol, a green add-row, the ahead/behind count, the diff.\n\nThe discipline is not imitation for its own sake. A clone earns trust by being legible in the same grammar as its reference: the same quiet ground, the same 6px controls, the same blue that means \"this is the app's action.\" The personality of GitDesk is that it gets out of git's way — and where it departs, it departs in GitHub's own vocabulary (the agent's purple is Primer's done accent, not an invention).\n\nMotion is GitHub Desktop's register: nearly silent. Controls answer with color, never position — no lift, no press-scale, no travelling indicator, no staggered rows. Floated layers fade in with a hair of scale; the desk swap fades the incoming pane in (one keyed .pane-enter fade — there is no View Transitions API call in the renderer); a running operation gets a spinner; and a commit or push that lands gets confetti. Everything else is already where it belongs.\n\nThe type system is a two-voice arrangement: the platform-native UI stack (Segoe UI on Windows — the same family GitHub Desktop ships) for human text at 13px, and a programmer's monospace (Cascadia Code) for machine truth — paths, diffs, commit messages, code chips, counts. Wherever mono appears, it says \"this text is verbatim from your repository.\" Light and dark are first-class equals through one custom-property contract; dark is Primer's #0d1117 desk, not an inversion of the light one.",
     "keyCharacteristics": [
-      "Matte tonal surfaces separated by 1px hairline borders; no decorative color anywhere.",
-      "Git state is the only protagonist: status glyphs, diff washes, badges, and the Commit button carry all meaning.",
-      "One shadow token, one use: floating layers only (popovers, dialogs, toasts, context menus).",
-      "Machine truth in monospace, human text in the system stack — the split is meaningful, never stylistic.",
-      "Compact, instrument-panel density: 13px base, 4-16px spacing scale, command strip over a 340px queue, dominant main pane, and a docked 300px commit tray.",
-      "Light and dark themes are first-class equals driven by html[data-theme] custom properties."
+      "Neutral chrome with tonal steps (canvas → panel → inset) separated by 1px hairlines; chromatic color always names a GitHub role.",
+      "One accent, not a per-view palette: the desk you are on is stated by the active tab and the panel content, never by tinting the window.",
+      "Git state is the protagonist: status symbols (● ＋ － ! ⇄), GitHub's own diff washes and tinted gutters — hunk rows tint both ground and gutter (--hunk-bg/--hunk-gutter) — counter pills, and the full-width blue commit verb.",
+      "Selection is GitHub's: the row turns solid accent blue and its content inverts to white — a state that survives losing its color, because the row's status symbol and the row's weight do the naming.",
+      "Buttons are Primer's: subtle face, 15%-ink hairline, a 1px lift shadow, 6px radius, and a color-only hover.",
+      "Machine truth in monospace, human text in the system stack; 13px base, 4–16px spacing, 340px queue | dominant main pane | 300px commit tray.",
+      "The AI agent is the one self-expressive thing on the desk: a solid #8250df button in both themes, purple nowhere else."
     ],
     "rules": [
-      { "name": "The Green-Belongs-to-Commit Rule", "body": "Commit Green appears only on the commit action and its confirmations (staged badges, add-row text, success toasts). A generic primary button that does not commit must not wear it.", "section": "colors" },
-      { "name": "The Amber-Never-Shouts Rule", "body": "Caution Amber is reserved for soft warnings that permit the user to continue. Anything that blocks or failed uses Alarm Red. Amber is never a brand or highlight color.", "section": "colors" },
-      { "name": "The No-Decoration Rule", "body": "Every pixel of chromatic color in the interface encodes git or task state. A color with no state meaning does not ship.", "section": "colors" },
-      { "name": "The Two-Voice Rule", "body": "System UI for prose the app wrote; monospace for text your repository wrote (paths, diffs, commit messages, code chips). Never blend them in one element.", "section": "typography" },
-      { "name": "The 10.5px Floor", "body": "No UI text renders below 10.5px; the density lives in spacing and truncation, not in shrinking type.", "section": "typography" },
-      { "name": "The One Shadow Rule", "body": "One shadow token, four consumers (popover, dialog, toast, context menu). If it's in the document flow, it gets a hairline border, not a shadow.", "section": "elevation" },
-      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest; depth is reserved for state (floating layers) and never for decoration. Hover-lift on buttons/rows is an accepted evolution, not yet implemented.", "section": "elevation" }
+      { "name": "The One Blue Rule", "body": "One accent does all interaction: #0969da / #1f6feb. A desk, a panel, or a section never gets its own hue — the window does not change color when you change tabs, because GitHub Desktop's does not. What changes is which tab is lifted and which row is solid blue.", "section": "colors" },
+      { "name": "The Green-Belongs-to-Additions Rule", "body": "Green means \"this was added, staged, or completed.\" It paints add-row text and gutters, the staging checkbox (accent-color green, because checking a file is committing it), the staged badge, and success banners. A generic button is blue; a button that destroys is red.", "section": "colors" },
+      { "name": "The Purple-Belongs-to-the-Agent Rule", "body": "#8250df appears on the Generate button and the agent's spinner and nowhere else, so the different machine in the room is recognizable at a glance.", "section": "colors" },
+      { "name": "The Amber-Never-Shouts Rule", "body": "Amber is for warnings you can continue past. Anything blocking or failed is red.", "section": "colors" },
+      { "name": "The Named-Colors-Do-Jobs Rule", "body": "Every chromatic value answers to one of the roles above. A color with no role — no state, no interaction, no agent — does not ship. Hue supplements state; it never replaces it (selection is solid accent plus the row's status symbol and weight; conflicts are still labelled). The --syntax-* palette is exempt: it names language tokens, not git state, and it re-lights per theme exactly as GitHub's own blob view does.", "section": "colors" },
+      { "name": "The Two-Voice Rule", "body": "System UI for prose the app wrote; monospace for text your repository wrote (paths, diffs, commit messages, code chips, ahead/behind counts). Never blend them in one element.", "section": "typography" },
+      { "name": "The 10.5px Floor", "body": "No UI text renders below 10.5px; density comes from spacing and truncation, not from shrinking type.", "section": "typography" },
+      { "name": "The Two-Shadows-Only Rule", "body": "One float shadow for things above the document, one 1px rest lift for bordered controls, one focus ring for keyboard state. Nothing else casts. Blur appears nowhere.", "section": "elevation" },
+      { "name": "The Flat-By-Default Rule", "body": "Every fill is one solid color. No gradients, no lit top faces, no falling light, no washes that fade to the base — including the busy state, which is a spinner, not a travelling sheen. Depth is state (floating layers, focus), never decoration.", "section": "elevation" },
+      { "name": "The Motion-Tiers Rule", "body": "90/140/200ms plus the one 900ms celebration. Every motion acknowledges an event — hover, press, arrival of a layer, a swap, a running operation, a success. Looping motion is reserved for spinners. Each animation ships its prefers-reduced-motion path.", "section": "motion" },
+      { "name": "The Nothing-Travel Rule", "body": "No element translates as feedback. A hover changes color; a selection changes ground; a tab change changes which chip is lit. If a proposed animation moves something along an axis, it is the old world talking.", "section": "motion" }
     ],
     "dos": [
-      "Do route every new surface through the html[data-theme] custom-property contract; both themes must receive the exact same roles.",
-      "Do express structure with 1px Hairline borders and tonal steps (canvas → panel → header-surface) before reaching for any shadow.",
-      "Do reserve Commit Green for commit-and-confirmation semantics and Beacon Blue for interaction/focus/busy semantics.",
-      "Do set repository-verbatim text (paths, diffs, commit messages, shortcut keys) in the mono stack, and UI prose in the system stack.",
-      "Do use the Float shadow only for dismissible floating layers, and give new overlays 8-10px radius + 4px inner item radius like its existing consumers.",
-      "Do express selection with the green Selected Surface and never with a checkbox-only or border-only treatment in the file/commit lists.",
+      "Do route every new surface through the html[data-theme] contract; both themes receive the same roles, and dark is composed on Primer's #0d1117 ground, not inverted from light.",
+      "Do express structure with 1px hairlines and the canvas → panel → inset tonal steps before reaching for any shadow.",
+      "Do use the accent for interaction and selection, green for additions/staging/success, red for deletion and destruction, amber for warnings, violet for the agent — and nothing else.",
+      "Do set repository-verbatim text (paths, diffs, commit messages, shortcut keys, counts) in the mono stack, and UI prose in the system stack.",
+      "Do invert a selected row's content to --on-accent — including its status symbols and chips — and keep the non-color cues (symbol shape, weight) that make the state readable without color.",
+      "Do keep hover, focus, and selection answers in color and ground alone, and keep the focus ring for :focus-visible.",
       "Do truncate with ellipsis at min-width: 0 rather than wrapping paths or breaking the 340px queue column.",
-      "Do keep the commit verb disabled while its scope line reads 0 of N — the button that owns Green never promises what it will not do."
+      "Do celebrate a landed commit or push with confetti, and nothing else."
     ],
     "donts": [
-      "Don't introduce chromatic color that encodes no git or task state; the palette is exhausted at Green/Blue/Red/Amber plus the three diff washes.",
-      "Don't add a second shadow token or shadow an in-flow panel; borders do that work.",
-      "Don't display type larger than 30px or text smaller than 10.5px; density comes from the 4-16px spacing scale.",
-      "Don't use Caution Amber for blockers/errors and Alarm Red for soft warnings — the severity ladder is fixed.",
-      "Don't put package-UI webfonts or icon libraries on the product; the incumbent system uses the platform's own faces and glyph characters.",
-      "Don't animate anything except the busy spinner until the hover-lift direction is actually implemented; instant state changes are the current grammar."
+      "Don't tint the chrome per desk again: no view hues, no colored rails, no hue-tinted scrollbars or eyebrows. The window does not change color when the tab does.",
+      "Don't introduce chromatic color that answers to no role; the roster is accent, success, danger, caution, agent, plus the diff washes and the syntax palette.",
+      "Don't use green as a generic primary color — the commit verb is blue, and green is what it produces.",
+      "Don't lift, scale, rotate, or slide a control for feedback; don't stagger rows, pop a number, or animate a sheen across a busy item.",
+      "Don't add a third shadow, shadow an in-flow panel, or blur anything: the Float pair and the 1px rest lift are the whole vocabulary.",
+      "Don't paint any surface or any heading with a gradient, and never bring back the busy hairline: a spinner is the machine-thinking signal.",
+      "Don't display type larger than 22px or text smaller than 10.5px.",
+      "Don't use caution amber for blockers or alarm red for soft warnings — the severity ladder is fixed.",
+      "Don't add package UI webfonts or icon libraries; the CSP allows neither, and GitHub Desktop ships system faces."
     ]
   }
 }

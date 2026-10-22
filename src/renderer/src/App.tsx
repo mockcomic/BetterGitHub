@@ -25,7 +25,6 @@ import {
 import { RepoManagerDialog } from './components/RepoManagerDialog'
 import { EmptyState } from './components/EmptyState'
 import { useStore, useStoreState } from './store'
-import { withViewTransition } from './view-transition'
 import type { DeskView } from './store'
 
 const DESK_TABS: ReadonlyArray<{ id: DeskView; label: string }> = [
@@ -199,11 +198,9 @@ function SegmentedSwitch(): JSX.Element {
     return () => observer.disconnect()
   }, [])
 
-  /** Move the desk, telling the transition which way the visitor travelled. */
+  /** Move the desk. The swap has one animation: the keyed pane fade. */
   const goTo = (next: DeskView): void => {
-    const order = DESK_TABS.map(t => t.id)
-    const dir = order.indexOf(next) >= order.indexOf(state.view) ? 'fwd' : 'back'
-    withViewTransition(() => store.setView(next), dir)
+    store.setView(next)
   }
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
@@ -230,8 +227,8 @@ function SegmentedSwitch(): JSX.Element {
         className={`desk-indicator${indicator === null ? '' : ' shown'}`}
         style={
           {
-            transform: `translateX(${indicator?.x ?? 0}px)`,
-            width: `${indicator?.w ?? 0}px`
+            '--tab-x': `${indicator?.x ?? 0}px`,
+            '--tab-w': `${indicator?.w ?? 0}px`
           } as CSSProperties
         }
       />
