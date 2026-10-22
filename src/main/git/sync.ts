@@ -28,6 +28,9 @@ export async function push(repoPath: string): Promise<string> {
 
 export async function pull(repoPath: string): Promise<string> {
   const status = await getStatus(repoPath)
+  if (status.detached) {
+    throw new Error('Cannot pull while on a detached HEAD — check out a branch first.')
+  }
   const upstream = await hasUpstream(repoPath)
   const args =
     upstream || status.detached ? ['pull'] : ['pull', 'origin', status.branch]

@@ -14,6 +14,9 @@ export interface PorcelainEntry {
   /** Y: worktree vs index ('.' when unchanged). */
   readonly worktreeCode: string
   readonly untracked: boolean
+  /** True for porcelain-v2 `u` records: the path is unmerged regardless of
+   * whether the XY letters read UU, AA, DD, AU, UA, DU or UD. */
+  readonly unmerged?: boolean
 }
 
 export interface PorcelainHeader {
@@ -95,11 +98,16 @@ export function parsePorcelainStatus(output: string): PorcelainStatus {
       // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
       // (verified against `git status --porcelain=2 -z` output: unmerged
       // records carry no <Xscore>, unlike rename records)
+      // The `u` record marker itself is the unmerged signal — XY can be
+      // AA/DD/AU/UA/DU/UD, not just U-something, so consumers that classify
+      // on the letters alone (status.ts) must not mistake these for new/deleted.
+      const xy = parts[1] ?? 'UU'
       entries.push({
         path: parts.slice(10).join(' '),
-        indexCode: parts[1]?.[0] ?? 'U',
-        worktreeCode: parts[1]?.[1] ?? 'U',
-        untracked: false
+        indexCode: xy[0] ?? 'U',
+        worktreeCode: xy[1] ?? 'U',
+        untracked: false,
+        unmerged: true
       })
       continue
     }

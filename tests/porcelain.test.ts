@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   parsePorcelainStatus
 } from '../src/main/git/porcelain'
+import { toFileStatus } from '../src/main/git/status'
 
 const NUL = '\u0000'
 
@@ -35,6 +36,19 @@ describe('parsePorcelainStatus', () => {
     )
     expect(out.header.detached).toBe(true)
     expect(out.header.branch).toBe('(detached)')
+  })
+
+  it('classifies every unmerged XY code as conflicted', () => {
+    for (const xy of ['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']) {
+      const out = parsePorcelainStatus(
+        statusOutput(
+          `u ${xy} N... 100644 100644 100644 100644 a1 a2 a3 c.txt`
+        )
+      )
+      expect(out.entries[0].indexCode).toBe(xy[0])
+      expect(out.entries[0].worktreeCode).toBe(xy[1])
+      expect(toFileStatus(out.entries[0]).kind).toBe('conflicted')
+    }
   })
 
   it('parses a modified-in-worktree entry', () => {

@@ -29,6 +29,12 @@ export async function getStatus(repoPath: string): Promise<RepositoryStatus> {
     { cwd: repoPath, successExitCodes: new Set([0, 128]), timeoutMs: 20_000 }
   )
 
+  // Exit 128 is tolerated only for the benign "empty/unborn" cases; a real
+  // fatal (corrupt index, unreadable HEAD) with no stdout must surface.
+  if (result.exitCode === 128 && result.stdout.trim().length === 0 && result.stderr.trim().length > 0) {
+    throw new Error(result.stderr.trim().split(/\r?\n/)[0])
+  }
+
   const { header, entries } = parsePorcelainStatus(result.stdout)
   const files = entries.map(toFileStatus)
   const conflictCount = files.filter(f => f.kind === 'conflicted').length
@@ -64,7 +70,9 @@ function classify(entry: PorcelainEntry): FileStatusKind {
   const y = entry.worktreeCode
 
   if (entry.untracked) return 'new'
-  if (x === 'U' || y === 'U') return 'conflicted'
+  // The unmerged marker (porcelain `u` record) outranks the letters: AA/DD
+  // would otherwise classify as new/deleted and hide the conflict.
+  if (entry.unmerged === true || x === 'U' || y === 'U') return 'conflicted'
   if (x === 'R') return 'renamed'
   if (x === 'C') return 'copied'
   if (x === 'D' || y === 'D') return 'deleted'

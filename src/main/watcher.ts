@@ -75,9 +75,13 @@ function schedule(repoPath: string): void {
 async function emit(repoPath: string): Promise<void> {
   if (watchedPath === null) return
   if (!(await isAutoRefreshEnabled())) return
-  // Collapse bursts that straddle the debounce window.
+  // Collapse bursts that straddle the debounce window — but re-arm instead
+  // of dropping, so the last save in a burst still gets a refresh.
   const now = Date.now()
-  if (now - lastEmitted < DEBOUNCE_MS) return
+  if (now - lastEmitted < DEBOUNCE_MS) {
+    if (watchedPath !== null) schedule(repoPath)
+    return
+  }
   lastEmitted = now
   getMainWindow()?.webContents.send(REPO_CHANGED_CHANNEL, repoPath)
 }

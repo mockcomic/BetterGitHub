@@ -86,7 +86,9 @@ function languageFor(path: string | null): string | null {
 function highlightText(text: string, language: string | null): string {
   if (language !== null && Prism.languages[language] !== undefined) {
     try {
-      return Prism.highlight(escapeHtml(text), Prism.languages[language], language)
+      // Prism escapes internally; pre-escaping here double-escapes and the
+      // user sees literal `&lt;`/`&amp;` garbage in every highlighted line.
+      return Prism.highlight(text, Prism.languages[language], language)
     } catch {
       /* fall through */
     }

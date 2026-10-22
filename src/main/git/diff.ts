@@ -12,7 +12,10 @@ export async function getPathDiff(
   path: string,
   oldPath?: string
 ): Promise<string> {
-  const args = ['diff', '--no-ext-diff', 'HEAD', '-U3', '--end-of-options']
+  // `--` (not `--end-of-options`) is the portable rev/pathspec separator for
+  // git <= 2.43; with it, paths absent from the working tree still diff
+  // correctly instead of erroring out into the synthesized-added fallback.
+  const args = ['diff', '--no-ext-diff', 'HEAD', '-U3', '--']
   if (oldPath !== undefined) args.push(oldPath)
   args.push(path)
 
@@ -61,7 +64,7 @@ export async function getCommitFileDiff(
 ): Promise<string> {
   const base = await commitBase(repoPath, sha)
   const result = await execGit(
-    ['diff', '--no-ext-diff', base, sha, '-U3', '--end-of-options', path],
+    ['diff', '--no-ext-diff', base, sha, '-U3', '--', path],
     { cwd: repoPath, timeoutMs: 30_000 }
   )
   return result.stdout

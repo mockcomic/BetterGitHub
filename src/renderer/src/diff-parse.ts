@@ -38,33 +38,53 @@ export function parseDiff(text: string): DiffLine[] {
   let newNo = 0
   let binary = false
 
+  // Track whether we are inside a hunk: only OUTSIDE a hunk may a `--- `/
+  // `+++ ` line be a file header. Inside a hunk those prefixes are content
+  // (a deleted `--- foo` line arrives raw as `---- foo`? no — as `--- foo`
+  // when the removed line itself begins with `-- `), and misreading them as
+  // meta skips the line-number counters and shifts every later line.
+  let inHunk = false
   for (const raw of text.split('\n')) {
     if (raw.length === 0) {
-      // A trailing empty line from the split; keep as context if inside a hunk.
+      // git never emits a truly empty body line (empty context is " "), so
+      // this is only the trailing piece from the split; keep dropping it.
       continue
     }
 
     if (raw.startsWith('@@')) {
-      const m = raw.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+      const m =
+        raw.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/) ??
+        // Combined diff (merge commits) headers: @@@ -1,2 -1,2 +1,3 @@@
+        raw.match(/^@@@+ -\d+(?:,\d+)? -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@@+/)
       if (m !== null) {
-        oldNo = parseInt(m[1], 10) - 1
-        newNo = parseInt(m[2], 10) - 1
+        oldNo = 0
+        newNo = parseInt(m[1] ?? m[2], 10) - 1
+        if (m[1] === undefined) {
+          const mm = raw.match(/^-\d+/)
+          oldNo = mm ? parseInt(mm[0].slice(1), 10) - 1 : 0
+        }
+      } else {
+        // Unparseable header: reset counters rather than continue stale ones.
+        oldNo = 0
+        newNo = 0
       }
+      inHunk = true
       lines.push({ kind: 'hunk', text: raw, oldNo: null, newNo: null })
       continue
     }
 
     if (
-      raw.startsWith('diff --git') ||
-      raw.startsWith('index ') ||
-      raw.startsWith('--- ') ||
-      raw.startsWith('+++ ') ||
-      raw.startsWith('new file') ||
-      raw.startsWith('deleted file') ||
-      raw.startsWith('similarity ') ||
-      raw.startsWith('rename ') ||
-      raw.startsWith('copy ') ||
-      raw.startsWith('mode ')
+      !inHunk &&
+      (raw.startsWith('diff --git') ||
+        raw.startsWith('index ') ||
+        raw.startsWith('--- ') ||
+        raw.startsWith('+++ ') ||
+        raw.startsWith('new file') ||
+        raw.startsWith('deleted file') ||
+        raw.startsWith('similarity ') ||
+        raw.startsWith('rename ') ||
+        raw.startsWith('copy ') ||
+        raw.startsWith('mode '))
     ) {
       lines.push({ kind: 'meta', text: raw, oldNo: null, newNo: null })
       continue

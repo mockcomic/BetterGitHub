@@ -50,13 +50,24 @@ export async function amendCommit(
   repoPath: string,
   summary: string,
   description: string,
-  paths: ReadonlyArray<string>
+  paths: ReadonlyArray<string>,
+  expectedSha?: string
 ): Promise<string> {
   const trimmed = summary.trim()
   if (trimmed.length === 0) {
     throw new Error('A commit summary is required.')
   }
-  await requireExistingCommit(repoPath)
+  const head = await revParseHead(repoPath)
+  if (head.length === 0) {
+    throw new Error('This repository has no commits yet.')
+  }
+  // Same tip-moved guard as undo: never amend somebody else's commit when a
+  // pull/watcher moved the tip while the amend box was open.
+  if (expectedSha !== undefined && expectedSha.length > 0 && !sameSha(head, expectedSha)) {
+    throw new Error(
+      'The latest commit has changed since the amend started, so the amendment was cancelled.'
+    )
+  }
 
   if (paths.length > 0) {
     await addPaths(repoPath, paths)
@@ -156,12 +167,6 @@ async function revParseHead(repoPath: string): Promise<string> {
   }
 }
 
-async function requireExistingCommit(repoPath: string): Promise<void> {
-  const head = await revParseHead(repoPath)
-  if (head.length === 0) {
-    throw new Error('This repository has no commits yet.')
-  }
-}
 
 /** Compares two SHAs tolerating an abbreviated expected value. */
 function sameSha(head: string, expected: string): boolean {

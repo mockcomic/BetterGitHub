@@ -266,8 +266,19 @@ const handlers: Handlers = {
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
   },
-  async testAiConnection() {
-    const cfg = await getAiConfig()
+  async testAiConnection(config?: { baseUrl: string; model: string; apiKey?: string }) {
+    // When the settings dialog passes its pending edits, test those instead
+    // of the persisted config — testing must not require saving first.
+    const cfg =
+      config !== undefined
+        ? {
+            ...(await getAiConfig()),
+            baseUrl: config.baseUrl,
+            model: config.model,
+            // An empty box means "keep the stored key", matching save semantics.
+            apiKey: config.apiKey?.length ? config.apiKey : (await getAiConfig()).apiKey
+          }
+        : await getAiConfig()
     return testConnection(cfg.baseUrl, cfg.apiKey ?? '', cfg.model)
   },
   async suggestCloneFolder(url: string) {
@@ -309,16 +320,17 @@ const handlers: Handlers = {
       isDirectory = false
     }
     const rule = gitignoreRuleFor(path, isDirectory)
-    const changed = await appendGitignoreRule(repoPath, rule)
-    if (!changed) return
-    // Ignoring a file that git already tracks needs an untrack too, otherwise
-    // the list looks unchanged; keep it explicit for the user.
+    // Check tracked state BEFORE writing the rule: if the promise in the
+    // error ("…then ignore it again") is honored, the retry used to no-op on
+    // the already-present rule and the file stayed tracked-but-hidden.
     const status = await getStatus(repoPath)
-    if (status.files.some(f => f.path === path)) {
+    const tracked = status.files.some(f => f.path === path && !f.untracked)
+    if (tracked) {
       throw new Error(
         `${path} is already tracked. Discard or unstage it first, then ignore it again.`
       )
     }
+    await appendGitignoreRule(repoPath, rule)
   },
 
   async getPathDiff(repoPath: string, path: string, oldPath?: string) {
@@ -364,9 +376,10 @@ const handlers: Handlers = {
     repoPath: string,
     summary: string,
     description: string,
-    paths: ReadonlyArray<string>
+    paths: ReadonlyArray<string>,
+    expectedSha?: string
   ) {
-    return amendCommit(repoPath, summary, description, paths)
+    return amendCommit(repoPath, summary, description, paths, expectedSha)
   },
   async undoLastCommit(repoPath: string, expectedSha: string) {
     await undoLastCommit(repoPath, expectedSha)

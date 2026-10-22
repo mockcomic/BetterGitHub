@@ -314,6 +314,8 @@ export class AppStore {
     }, 500)
   }
 
+  private listenersBound = false
+
   async init(): Promise<void> {
     if (this.inited) return
     this.inited = true
@@ -334,12 +336,15 @@ export class AppStore {
         await this.selectRepo(selected)
       }
     } catch (err) {
+      this.inited = false // let the error banner's Retry button actually retry
       this.update({
         initError: err instanceof Error ? err.message : String(err)
       })
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
 
+    if (this.listenersBound) return
+    this.listenersBound = true
     onMenuAction(action => {
       void this.handleMenuAction(action)
     })
@@ -389,6 +394,13 @@ export class AppStore {
   }
 
   private async handleMenuAction(action: MenuAction): Promise<void> {
+    // Menu accelerators bypass the disabled buttons; without this gate a
+    // second Ctrl+Enter double-commits and Ctrl+Shift+{P,U} run git
+    // concurrently and hit index-lock errors. Read-only refresh is exempt.
+    if (action !== 'refresh' && this.state.busy !== null) {
+      this.toast('info', 'Wait for the current operation to finish.')
+      return
+    }
     switch (action) {
       case 'commit':
         await this.commit()
@@ -466,7 +478,12 @@ export class AppStore {
 
   async selectRepo(repo: Repository): Promise<void> {
     localStorage.setItem('gitdesk.lastRepo', repo.path)
+    // Hydrate the persisted draft into visible state so the commit box shows
+    // exactly what Enter/Ctrl+Enter would actually commit.
+    const drafts = new Map(this.state.drafts)
+    drafts.set(repo.path, this.draftFor(repo.path))
     this.update({
+      drafts,
       selectedRepo: repo,
       status: null,
       statusError: null,
@@ -713,9 +730,16 @@ export class AppStore {
         try {
           const prevConflicts = this.state.status?.conflictCount ?? 0
           const status = await call('getStatus', repo.path)
+          // Repo may have changed under an in-flight fetch; drop the result
+          // instead of painting repo A's status over repo B.
+          if (this.state.selectedRepo?.path !== repo.path) return
           const draft = this.draftFor(repo.path)
           const valid = new Set(status.files.map(f => f.path))
-          const checked = new Set([...draft.checked].filter(p => valid.has(p)))
+          // While amending, `checked` holds the tip commit's paths, which are
+          // identical to HEAD and therefore absent from status.files — pruning
+          // them here silently guts the amend scope. Skip pruning then.
+          const validCheck = this.state.amend !== null ? draft.checked : valid
+          const checked = new Set([...draft.checked].filter(p => validCheck.has(p)))
           this.update({
             status,
             statusError: null,
@@ -761,6 +785,7 @@ export class AppStore {
     if (repo === null) return
     try {
       const list = await call('getBranches', repo.path)
+      if (this.state.selectedRepo?.path !== repo.path) return
       this.update({
         branches: list.local,
         remoteBranches: list.remote,
@@ -780,6 +805,7 @@ export class AppStore {
     if (repo === null) return
     try {
       const stashes = await call('listStashes', repo.path)
+      if (this.state.selectedRepo?.path !== repo.path) return
       const sel = this.state.selectedStashIndex
       this.update({
         stashes,
@@ -797,7 +823,9 @@ export class AppStore {
     const repo = this.state.selectedRepo
     if (repo === null) return
     try {
-      this.update({ identity: await call('getConfigInfo', repo.path) })
+      const identity = await call('getConfigInfo', repo.path)
+      if (this.state.selectedRepo?.path !== repo.path) return
+      this.update({ identity })
     } catch {
       this.update({ identity: null })
     }
@@ -1232,7 +1260,8 @@ export class AppStore {
               repo.path,
               summary,
               draft.description,
-              [...draft.checked]
+              [...draft.checked],
+              this.state.amend?.sha ?? ''
             )
 
       this.setDraft(repo.path, {
@@ -1763,7 +1792,7 @@ export class AppStore {
           this.update({ confirm: null })
           void this.runGit(async () => {
             await call('dropStash', repo.path, entry.index)
-          }, 'stash-drop')
+          }, 'stash-drop').then(() => void this.refreshStashes())
         }
       }
     })
@@ -1804,9 +1833,13 @@ export class AppStore {
     }
   }
 
-  async testAiConnection(): Promise<{ ok: boolean; message: string }> {
+  async testAiConnection(config?: {
+    baseUrl: string
+    model: string
+    apiKey?: string
+  }): Promise<{ ok: boolean; message: string }> {
     try {
-      return await call('testAiConnection')
+      return await call('testAiConnection', config)
     } catch (err) {
       return {
         ok: false,

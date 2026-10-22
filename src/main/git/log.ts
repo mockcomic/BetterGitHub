@@ -21,7 +21,10 @@ export async function getLog(
     .filter(r => r.trim().length > 0)
     .map(record => {
       const fields = record.split(FIELD_SEP)
-      const [sha, parents, authorName, authorEmail, date, summary, body] = fields
+      const [sha, parents, authorName, authorEmail, date, summary] = fields
+      // %B is the final field: rejoin anything past it so a commit message
+      // containing the raw separator byte cannot truncate the body.
+      const body = fields.slice(6).join(FIELD_SEP)
       const parentList = (parents ?? '').split(' ').filter(p => p.length > 0)
       // %B includes the subject line; strip it, keeping only the body.
       const rawBody = (body ?? '').replace(/^\r?\n+/, '')

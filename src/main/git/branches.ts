@@ -87,10 +87,21 @@ export async function checkoutBranch(
     } catch (err) {
       // Older git or a missing ref: fall back to the DWIM checkout, which
       // creates the tracking branch itself when exactly one remote has it.
+      // Only substitute the fallback's error when it also fails, so real
+      // failures (dirty tree would be overwritten, …) keep their own message.
       if (!(err instanceof GitExecError)) throw err
+      try {
+        await execGit(['checkout', name], { cwd: repoPath, timeoutMs: 30_000 })
+        return
+      } catch {
+        throw err
+      }
     }
   }
-  await execGit(['checkout', '--end-of-options', name], {
+  // Branch names can never start with '-' (git's check-ref-format), and
+  // `git checkout` does not recognize `--end-of-options` on git <= 2.43
+  // (it treats it as a pathspec and fails), so use the plain form.
+  await execGit(['checkout', name], {
     cwd: repoPath,
     timeoutMs: 30_000
   })
@@ -107,7 +118,11 @@ export async function createBranch(
   }
   const args = ['checkout', '-b', trimmed]
   const base = startPoint?.trim()
-  if (base !== undefined && base.length > 0) args.push('--end-of-options', base)
+  // No `--end-of-options` before the start point: `git checkout -b` does not
+  // recognize it on git <= 2.43 (it becomes a pathspec and aborts with
+  // "Cannot update paths and switch to branch"); `--` has the same failure.
+  // The plain form is what git's own docs prescribe for `branch startPoint`.
+  if (base !== undefined && base.length > 0) args.push(base)
   await execGit(args, { cwd: repoPath, timeoutMs: 20_000 })
 }
 
@@ -124,7 +139,7 @@ export async function deleteBranch(
   if (status.branch === name) {
     throw new Error(`Switch to another branch before deleting "${name}".`)
   }
-  await execGit(['branch', force ? '-D' : '-d', '--end-of-options', name], {
+  await execGit(['branch', force ? '-D' : '-d', '--', name], {
     cwd: repoPath,
     timeoutMs: 20_000
   })
@@ -140,7 +155,7 @@ export async function renameBranch(
     throw new Error('Branch name cannot be empty.')
   }
   if (trimmed === oldName) return
-  await execGit(['branch', '-m', '--end-of-options', oldName, trimmed], {
+  await execGit(['branch', '-m', '--', oldName, trimmed], {
     cwd: repoPath,
     timeoutMs: 20_000
   })
@@ -152,7 +167,7 @@ export async function deleteRemoteBranch(
   name: string
 ): Promise<void> {
   await execGit(
-    ['push', remote, '--delete', `--end-of-options`, name],
+    ['push', remote, '--delete', name],
     { cwd: repoPath, timeoutMs: 120_000 }
   )
 }

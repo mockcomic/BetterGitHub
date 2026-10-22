@@ -101,7 +101,9 @@ export async function unstagePaths(
   paths: ReadonlyArray<string>
 ): Promise<void> {
   if (paths.length === 0) return
-  await execGit(['reset', '-q', '--end-of-options', ...paths], {
+  // `git reset` rejects `--end-of-options` after it sees positional args on
+  // git <= 2.43 (exit 128); `--` is the portable separator.
+  await execGit(['reset', '-q', '--', ...paths], {
     cwd: repoPath,
     timeoutMs: 20_000
   })
@@ -149,7 +151,7 @@ export async function discardPaths(
       // Files not present in HEAD (newly staged) can't be restored; fall
       // back to unstage + delete for those.
       if (err instanceof GitExecError) {
-        await execGit(['reset', '-q', '--end-of-options', ...tracked], {
+        await execGit(['reset', '-q', '--', ...tracked], {
           cwd: repoPath,
           timeoutMs: 20_000
         })
@@ -161,7 +163,7 @@ export async function discardPaths(
   }
 
   for (const p of removed) {
-    await execGit(['reset', '-q', '--end-of-options', p], {
+    await execGit(['reset', '-q', '--', p], {
       cwd: repoPath,
       timeoutMs: 20_000
     }).catch(() => undefined)
@@ -181,7 +183,7 @@ export async function resolveConflict(
 ): Promise<void> {
   if (side === 'ours' || side === 'theirs') {
     await execGit(
-      ['checkout', `--${side}`, '--end-of-options', path],
+      ['checkout', `--${side}`, '--', path],
       { cwd: repoPath, timeoutMs: 20_000 }
     )
   }

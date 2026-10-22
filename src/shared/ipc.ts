@@ -52,7 +52,11 @@ export interface RequestResponseChannels {
   getSettings: () => PublicSettings
   saveSettings: (patch: SettingsPatch) => PublicSettings
   selectDirectory: () => string | null
-  testAiConnection: () => { ok: boolean; message: string }
+  testAiConnection: (config?: {
+    baseUrl: string
+    model: string
+    apiKey?: string
+  }) => { ok: boolean; message: string }
   suggestCloneFolder: (url: string) => string
 
   // filesystem watching (main pushes REPO_CHANGED_CHANNEL)
@@ -95,7 +99,8 @@ export interface RequestResponseChannels {
     repoPath: string,
     summary: string,
     description: string,
-    paths: ReadonlyArray<string>
+    paths: ReadonlyArray<string>,
+    expectedSha?: string
   ) => string
   /** Soft-reset the tip, but only while HEAD is still `expectedSha`. */
   undoLastCommit: (repoPath: string, expectedSha: string) => void

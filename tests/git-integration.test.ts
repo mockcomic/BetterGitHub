@@ -7,6 +7,7 @@ import { getStatus } from '../src/main/git/status'
 import { getLog } from '../src/main/git/log'
 import {
   checkoutBranch,
+  createBranch,
   deleteBranch,
   getBranches,
   renameBranch
@@ -25,7 +26,7 @@ import {
   popStash,
   stashAll
 } from '../src/main/git/stash'
-import { resolveConflict, stagePaths } from '../src/main/git/staging'
+import { resolveConflict, stagePaths, unstagePaths } from '../src/main/git/staging'
 import { getPathsDiffText } from '../src/main/git/diff'
 import { abortOperation, continueOperation } from '../src/main/git/workflow'
 import { appendGitignoreRule, gitignoreRuleFor } from '../src/main/git/ignore'
@@ -502,4 +503,40 @@ describe('git integration', () => {
     expect(text).not.toContain('doomed probe') // vanished path contributes nothing
     await resetClean()
   })
+
+  it('unstages a staged file while keeping its content', async () => {
+    write('unstage-me.txt', 'staged content')
+    await stagePaths(repo, ['unstage-me.txt'])
+    let status = await getStatus(repo)
+    expect(status.files.find(f => f.path === 'unstage-me.txt')?.staged).toBe(true)
+    await unstagePaths(repo, ['unstage-me.txt'])
+    status = await getStatus(repo)
+    const entry = status.files.find(f => f.path === 'unstage-me.txt')
+    expect(entry?.staged ?? false).toBe(false)
+    expect(entry?.untracked).toBe(true)
+    expect(readFileSync(join(repo, 'unstage-me.txt'), 'utf8')).toBe('staged content')
+    await execGit(['clean', '-fd', '--', 'unstage-me.txt'], { cwd: repo })
+  })
+
+  it('creates a branch from a named start point', async () => {
+    const head = await execGit(['rev-parse', 'HEAD'], { cwd: repo })
+    await createBranch(repo, 'from-start', 'main')
+    const nowAt = await execGit(['rev-parse', 'HEAD'], { cwd: repo })
+    expect(nowAt.stdout.trim()).toBe(head.stdout.trim())
+    await checkoutBranch(repo, 'main')
+    await deleteBranch(repo, 'from-start', true)
+  })
+
+  it('refuses to amend after the tip moved', async () => {
+    write('amend-race.txt', 'v1')
+    await stagePaths(repo, ['amend-race.txt'])
+    const sha = await commitPaths(repo, 'amend race base', '', ['amend-race.txt'])
+    write('other.txt', 'someone else commits')
+    await stagePaths(repo, ['other.txt'])
+    await commitPaths(repo, 'moved the tip', '', ['other.txt'])
+    await expect(
+      amendCommit(repo, 'nope', '', [], sha)
+    ).rejects.toThrow(/changed since the amend started/)
+  })
+
 })

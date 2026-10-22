@@ -32,6 +32,9 @@ export function toWebRepository(remoteUrl: string | null): WebRepository | null 
     if (scp === null) return null
     host = scp[1]
     path = scp[2]
+    // A single-letter host is a Windows drive path (`C:/repos/x`), not an
+    // scp-like remote — mapping it would produce a nonsense https://C/... URL.
+    if (host.length === 1) return null
   }
 
   const cleanPath = path
@@ -53,8 +56,18 @@ export function commitUrl(repo: WebRepository, sha: string): string {
   return `${repo.webUrl}/commit/${encodeURIComponent(sha)}`
 }
 
+/**
+ * Encode a git ref for a URL path segment: encodeURIComponent covers `#`,
+ * `?` and `&` (all legal in refnames and fatal to a URL when left raw), then
+ * `%2F` is restored so slash-separated refs like `feature/my-thing` stay
+ * readable paths.
+ */
+function encodeRef(ref: string): string {
+  return encodeURIComponent(ref).replace(/%2F/g, '/')
+}
+
 export function branchUrl(repo: WebRepository, branch: string): string {
-  return `${repo.webUrl}/tree/${encodeURI(branch)}`
+  return `${repo.webUrl}/tree/${encodeRef(branch)}`
 }
 
 export function compareUrl(
@@ -62,5 +75,5 @@ export function compareUrl(
   base: string,
   head: string
 ): string {
-  return `${repo.webUrl}/compare/${encodeURI(base)}...${encodeURI(head)}`
+  return `${repo.webUrl}/compare/${encodeRef(base)}...${encodeRef(head)}`
 }

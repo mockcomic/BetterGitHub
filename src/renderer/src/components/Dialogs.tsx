@@ -113,17 +113,12 @@ export function SettingsDialog(): JSX.Element | null {
               setTesting(true)
               setTestResult(null)
               void store
-                .saveSettings({
-                  ai: {
-                    baseUrl,
-                    model,
-                    customInstructions,
-                    ...(apiKey.length > 0 ? { apiKey } : {})
-                  }
+                .testAiConnection({
+                  baseUrl,
+                  model,
+                  ...(apiKey.length > 0 ? { apiKey } : {})
                 })
-                .then(async s => {
-                  if (s === null) return
-                  const r = await store.testAiConnection()
+                .then(r => {
                   setTestResult(`${r.ok ? '✓ ' : '✗ '}${r.message}`)
                 })
                 .finally(() => setTesting(false))
