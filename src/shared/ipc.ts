@@ -147,11 +147,14 @@ export interface RequestResponseChannels {
   openExternal: (url: string) => void
   writeClipboard: (text: string) => void
 
-  // window-frame menu (win32 WCO title band, src/renderer/components/
-  // TitleBar.tsx): the labels shown in the band, and asking main to popup
-  // the native menu for one of them at renderer pixel coordinates.
-  getMenuLabels: () => string[]
-  popupMenu: (label: string, x: number, y: number) => void
+  // Window-frame menu (win32 WCO title band, components/TitleBar.tsx):
+  // main owns the menu data (src/main/menu.ts); the band asks for the
+  // declarative menu bar, forwards plain actions exactly like the native
+  // menu bar's click handlers do, and delegates role items (undo, zoom,
+  // fullscreen…) back to main's WebContents implementations.
+  getMenuBar: () => MenuBarSpec[]
+  triggerMenuAction: (action: MenuAction) => void
+  runMenuRole: (role: MenuRole) => void
 
   // AI commit messages
   generateCommitMessage: (
@@ -193,8 +196,48 @@ export type MenuAction =
   | 'rename-branch'
   | 'view-on-github'
   | 'show-about'
+  | 'donate'
 
 export const MENU_ACTION_CHANNEL = 'menu-action'
+
+/**
+ * The menu roles the title band's dropdowns delegate back to main — a
+ * deliberate subset of Electron's MenuItemRoles (WebContents/BrowserWindow
+ * primitives; src/main/menu.ts runMenuRole).
+ */
+export type MenuRole =
+  | 'undo'
+  | 'redo'
+  | 'cut'
+  | 'copy'
+  | 'paste'
+  | 'selectAll'
+  | 'reload'
+  | 'toggleDevTools'
+  | 'resetZoom'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'togglefullscreen'
+  | 'close'
+  | 'quit'
+
+/** One entry of a title-band dropdown: item, separator, or both-void gap. */
+export interface MenuEntrySpec {
+  readonly label?: string
+  /** Display-only shortcut hint (already platform-spelled, e.g. 'Ctrl+Z'). */
+  readonly accelerator?: string
+  /** Forwarded to the renderer's menu-action dispatcher via main. */
+  readonly action?: MenuAction
+  /** Handled by main against the window's WebContents. */
+  readonly role?: MenuRole
+  readonly separator?: boolean
+}
+
+/** One top-level menu: the band label plus its dropdown entries. */
+export interface MenuBarSpec {
+  readonly label: string
+  readonly items: ReadonlyArray<MenuEntrySpec>
+}
 
 /** Main -> renderer push: the working tree of a watched repository changed. */
 export const REPO_CHANGED_CHANNEL = 'repo-changed'

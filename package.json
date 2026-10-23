@@ -45,7 +45,7 @@
     "appId": "com.kh.gitdesk",
     "productName": "GitDesk",
     "directories": {
-      "output": "dist"
+      "output": "../gitdesk-dist"
     },
     "files": [
       "out/**/*",

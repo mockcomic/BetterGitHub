@@ -164,6 +164,18 @@ tests/           Vitest suites: porcelain / diff parsers, stash & log parsing,
                  suite that drives the real `git` binary in a temp repo
 ```
 
+## Support
+
+GitDesk is free and open source. If it saves you time, consider supporting
+Kurtis Hight and continued work on the project:
+
+[![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&style=for-the-badge)](https://www.paypal.com/paypalme/kurtishight)
+
+👉 **https://www.paypal.com/paypalme/kurtishight**
+
+The same link is available in the app under **Help → Donate via PayPal**, or
+in the **Help → About GitDesk → Support the development** section.
+
 ## License
 
 MIT

@@ -20,6 +20,7 @@ import type {
 import type { MenuAction } from '../../shared/ipc'
 import type { ThemeId } from '../../shared/themes'
 import { themeBase } from '../../shared/themes'
+import { DONATE_URL } from '../../shared/links'
 import { call, onMenuAction, onRepoChanged } from './api'
 
 export interface ToastAction {
@@ -420,7 +421,11 @@ export class AppStore {
     // Menu accelerators bypass the disabled buttons; without this gate a
     // second Ctrl+Enter double-commits and Ctrl+Shift+{P,U} run git
     // concurrently and hit index-lock errors. Read-only refresh is exempt.
-    if (action !== 'refresh' && this.state.busy !== null) {
+    if (
+      action !== 'refresh' &&
+      action !== 'donate' &&
+      this.state.busy !== null
+    ) {
       this.toast('info', 'Wait for the current operation to finish.')
       return
     }
@@ -463,6 +468,9 @@ export class AppStore {
         break
       case 'show-about':
         this.update({ showAbout: true })
+        break
+      case 'donate':
+        void call('openExternal', DONATE_URL)
         break
       case 'stash-all':
         this.stashAllChanges()

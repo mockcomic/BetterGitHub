@@ -8,6 +8,8 @@ export interface ContextMenuItem {
   readonly separatorBefore?: boolean
   readonly disabled?: boolean
   readonly title?: string
+  /** Right-aligned shortcut hint (title-band menus; see styles.css). */
+  readonly accelerator?: string
 }
 
 export interface ContextMenuState {
@@ -87,7 +89,10 @@ export function ContextMenu({
               item.onSelect()
             }}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.accelerator !== undefined && (
+              <span className="menu-accel">{item.accelerator}</span>
+            )}
           </button>
         </div>
       ))}

@@ -7,9 +7,16 @@
  * The geometry is redrawn here (see MARK below — keep the two in step) and
  * rasterized with signed-distance fields at supersampled coverage, so the
  * build needs no image library, no Chromium and no network: `node` alone
- * produces PNG, ICO and the macOS source. The shapes are exact primitives
- * (one rounded box, one trunk segment, one cubic branch, four commit circles),
- * which an SDF covers better than any bitmap scaler would.
+ * produces PNG, ICO and the macOS source. The card is a union-free CSG
+ * composition of exact primitives — a rounded box, a straight 45° corner
+ * cut, one edge notch and three circle holes — which an SDF covers better
+ * than any bitmap scaler would.
+ *
+ * The color model, like the SVG: card-stock paper everywhere the card is;
+ * a printed keyline in deep ink along every rim (outer edge, cut, notch,
+ * hole rims), erased inside the two empty holes; and commit blue in exactly
+ * one place, the head-commit hole. The empty holes are true alpha knockouts
+ * — the desktop shows through the record.
  *
  * Outputs (all under resources/icons/):
  *   png/{size}x{size}.png   — 16…1024, also the linux.icon directory
@@ -31,83 +38,70 @@ const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 /** Mirror of resources/gitdesk-icon.svg, in that file's 512-unit space. */
 const MARK = {
   canvas: 512,
-  cornerRadius: 112,
-  tile: '#0b1120',
-  accent: '#4493f8',
-  stroke: 38,
-  nodeRadius: 50,
-  trunk: { x: 187, top: 128, bottom: 384 },
-  // [p0, c1, c2, p3] of the branch that leaves the middle commit.
-  branch: [
-    [187, 256],
-    [187, 190],
-    [235, 152],
-    [322, 152]
-  ],
-  nodes: [
-    [187, 128],
-    [187, 256],
-    [187, 384],
-    [322, 152]
-  ]
+  cornerRadius: 64,
+  paper: '#e9e2cf',
+  ink: '#0b1120',
+  accent: '#0969da',
+  keyline: 8,
+  /** The 45° corner cut keeps the side x − y ≤ CUT_LEG (chord from
+   *  (344, 0) to (512, 168) — legs of 168). */
+  cutLeg: 344,
+  /** Semicircular timing notch: circle at (256, 0), cut from the top edge. */
+  notch: { cx: 256, cy: 0, radius: 36 },
+  /** The hole row on a strict 128-unit module grid. r = 52 leaves a 24-unit
+   *  paper gap between hole rims; with the keyline's 4-unit outer reach each
+   *  ring reads 56 in radius, leaving a 16-unit bridge between visible rings
+   *  (~1 px at 32 px) that AA softens rather than fuses outright. The holes
+   *  stay readable discs at the 16 px cut. */
+  holeRadius: 52,
+  holes: { x: [128, 256, 384], y: 280 },
+  /** The right-most hole is not knocked out — it is punched and inked. */
+  headIndex: 2
 }
 
 const CRC_TABLE = buildCrcTable()
 
 /* ------------------------------------------------------------------ geometry */
 
-/**
- * Signed distance to the mark's ink, in 512-space: negative inside.
- * The glyph is a union of the two strokes (capsules) and the four commit
- * circles; the tile is a rounded box, kept separate so it can clip the glyph
- * and carry its own edge softness.
- */
-function distanceToGlyph(x, y, branch) {
-  const half = MARK.stroke / 2
-  let d = distanceToSegment(x, y, MARK.trunk.x, MARK.trunk.top, MARK.trunk.x, MARK.trunk.bottom)
-  for (let i = 0; i < branch.length - 1; i++) {
-    const [ax, ay] = branch[i]
-    const [bx, by] = branch[i + 1]
-    const next = distanceToSegment(x, y, ax, ay, bx, by)
-    if (next < d) d = next
-  }
-  d -= half
-  for (const [cx, cy] of MARK.nodes) {
-    const circle = Math.hypot(x - cx, y - cy) - MARK.nodeRadius
-    if (circle < d) d = circle
-  }
-  return d
-}
-
-function distanceToTile(x, y) {
+/** Signed distance to the card body (tile minus cut minus notch), negative
+ *  inside. The empty holes are subtracted separately so the keyline can read
+ *  their rims. */
+function distanceToCardBody(x, y) {
   const half = MARK.canvas / 2
   const r = MARK.cornerRadius
   const qx = Math.abs(x - half) - (half - r)
   const qy = Math.abs(y - half) - (half - r)
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r
+  let d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r
+  // Corner cut: keep the side x − y ≤ cutLeg.
+  const cut = (x - y - MARK.cutLeg) / Math.SQRT2
+  if (cut > d) d = cut
+  // Timing notch: a punched half-circle on the top edge.
+  const notch = Math.hypot(x - MARK.notch.cx, y - MARK.notch.cy) - MARK.notch.radius
+  const knocked = -notch
+  if (knocked > d) d = knocked
+  return d
 }
 
-function distanceToSegment(px, py, ax, ay, bx, by) {
-  const vx = bx - ax
-  const vy = by - ay
-  const lengthSq = vx * vx + vy * vy
-  let t = lengthSq === 0 ? 0 : ((px - ax) * vx + (py - ay) * vy) / lengthSq
-  t = t < 0 ? 0 : t > 1 ? 1 : t
-  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy))
+function distanceToHole(x, y, index) {
+  return Math.hypot(x - MARK.holes.x[index], y - MARK.holes.y) - MARK.holeRadius
 }
 
-/** Cubic → polyline, so branch distance is a min over a few segments. */
-function flattenCubic([p0, c1, c2, p3], steps) {
-  const points = []
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    const u = 1 - t
-    points.push([
-      u * u * u * p0[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * p3[0],
-      u * u * u * p0[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * p3[1]
-    ])
+/** Distance fields the rasterizer needs at one sample point. */
+function sampleDistances(x, y) {
+  const body = distanceToCardBody(x, y)
+  const holes = MARK.holes.x.map((_, i) => distanceToHole(x, y, i))
+  // The card as printed: the body with the empty holes knocked out; the head
+  // hole stays card material and only carries ink.
+  let card = body
+  let rim = body
+  for (let i = 0; i < holes.length; i++) {
+    if (i === MARK.headIndex) continue
+    const knocked = -holes[i]
+    if (knocked > card) card = knocked
+    if (Math.abs(holes[i]) < Math.abs(rim)) rim = holes[i]
   }
-  return points
+  if (Math.abs(holes[MARK.headIndex]) < Math.abs(rim)) rim = holes[MARK.headIndex]
+  return { card, rim, head: holes[MARK.headIndex] }
 }
 
 /* ----------------------------------------------------------------- rasterize */
@@ -117,38 +111,53 @@ function flattenCubic([p0, c1, c2, p3], steps) {
  * samples × samples analytic coverages, which keeps the 16 px cut as crisp as
  * the 1024 px sheet without a resampler anywhere in the loop.
  */
-function rasterize(size, samples, branch) {
+function rasterize(size, samples) {
   const buffer = new Uint8Array(size * size * 4)
-  const tile = parseHex(MARK.tile)
+  const paper = parseHex(MARK.paper)
+  const ink = parseHex(MARK.ink)
   const accent = parseHex(MARK.accent)
   const scale = MARK.canvas / size
   // One target pixel of edge falloff, expressed in 512-space.
   const softness = scale
+  const halfKey = MARK.keyline / 2
 
   for (let py = 0; py < size; py++) {
     for (let px = 0; px < size; px++) {
-      let tileCoverage = 0
-      let inkCoverage = 0
+      let cardCoverage = 0
+      let keyCoverage = 0
+      let accentCoverage = 0
       for (let sy = 0; sy < samples; sy++) {
         for (let sx = 0; sx < samples; sx++) {
           const x = (px + (sx + 0.5) / samples) * scale
           const y = (py + (sy + 0.5) / samples) * scale
-          const onTile = coverage(distanceToTile(x, y), softness)
-          if (onTile === 0) continue
-          tileCoverage += onTile
-          inkCoverage += onTile * coverage(distanceToGlyph(x, y, branch), softness)
+          const { card, rim, head } = sampleDistances(x, y)
+          const onCard = coverage(card, softness)
+          if (onCard === 0) continue
+          cardCoverage += onCard
+          // The printed keyline hugs every rim of the finished card; it is
+          // punched away wherever the card itself is gone.
+          keyCoverage += coverage(Math.abs(rim) - halfKey, softness) * onCard
+          accentCoverage += coverage(head, softness) * onCard
         }
       }
       const samplesTotal = samples * samples
-      const aTile = tileCoverage / samplesTotal
-      // The ink sits on the tile: un-premultiply by the tile's coverage so the
-      // shared edge stays one alpha value.
-      const aInk = aTile === 0 ? 0 : inkCoverage / samplesTotal / aTile
+      const aCard = cardCoverage / samplesTotal
+      // Every layer sits on the card: un-premultiply by the card's coverage
+      // so the shared edges stay one alpha value.
+      const aKey = aCard === 0 ? 0 : keyCoverage / samplesTotal / aCard
+      const aInk = aCard === 0 ? 0 : accentCoverage / samplesTotal / aCard
+      let [r, g, b] = paper
+      r = blend(r, ink[0], aKey)
+      g = blend(g, ink[1], aKey)
+      b = blend(b, ink[2], aKey)
+      r = blend(r, accent[0], aInk)
+      g = blend(g, accent[1], aInk)
+      b = blend(b, accent[2], aInk)
       const at = (py * size + px) * 4
-      buffer[at] = blend(tile[0], accent[0], aInk)
-      buffer[at + 1] = blend(tile[1], accent[1], aInk)
-      buffer[at + 2] = blend(tile[2], accent[2], aInk)
-      buffer[at + 3] = Math.round(aTile * 255)
+      buffer[at] = r
+      buffer[at + 1] = g
+      buffer[at + 2] = b
+      buffer[at + 3] = Math.round(aCard * 255)
     }
   }
   return buffer
@@ -260,13 +269,11 @@ function buildIco(entries) {
 
 mkdirSync(pngDir, { recursive: true })
 
-// The branch polyline is derived once; the hot loop only walks it.
-const branch = flattenCubic(MARK.branch, 24)
 const samplesFor = size => (size <= 128 ? 4 : size <= 256 ? 3 : 2)
 
 const pngs = new Map()
 for (const size of PNG_SIZES) {
-  const png = encodePng(size, rasterize(size, samplesFor(size), branch))
+  const png = encodePng(size, rasterize(size, samplesFor(size)))
   pngs.set(size, png)
   writeFileSync(join(pngDir, `${size}x${size}.png`), png)
   console.log(`resources/icons/png/${size}x${size}.png (${png.byteLength} bytes)`)

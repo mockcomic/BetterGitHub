@@ -6,6 +6,8 @@ import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field } from './Dialog'
 
+import { DONATE_URL } from '../../../shared/links'
+
 const autoEntries = THEME_ENTRIES.filter(e => e.group === 'auto')
 const lightEntries = THEME_ENTRIES.filter(e => e.group === 'light')
 const darkEntries = THEME_ENTRIES.filter(e => e.group === 'dark')
@@ -463,6 +465,23 @@ export function AboutDialog(): JSX.Element | null {
             <code>Ctrl+,</code> preferences
           </li>
         </ul>
+      </div>
+      <div className="settings-section">
+        <h3>Support the development</h3>
+        <p className="confirm-message">
+          GitDesk is free and open source. If it saves you time, consider a
+          small donation to support Kurtis Hight and continued work on the
+          project.
+        </p>
+        <div className="donate-row">
+          <button
+            className="btn primary"
+            onClick={() => void call('openExternal', DONATE_URL)}
+          >
+            ♥ Donate via PayPal
+          </button>
+          <small className="muted">paypal.com/paypalme/kurtishight</small>
+        </div>
       </div>
     </Dialog>
   )

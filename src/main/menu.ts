@@ -1,5 +1,5 @@
 import { Menu, app } from 'electron'
-import type { MenuAction } from '../shared/ipc'
+import type { MenuAction, MenuBarSpec, MenuEntrySpec, MenuRole } from '../shared/ipc'
 import { MENU_ACTION_CHANNEL } from '../shared/ipc'
 import { getMainWindow } from './windows'
 
@@ -7,18 +7,257 @@ function sendAction(action: MenuAction): void {
   getMainWindow()?.webContents.send(MENU_ACTION_CHANNEL, action)
 }
 
-/**
- * App menu mirroring the categories GitHub Desktop exposes (File/Edit/View/
- * Repository/History/Help); repository operations are forwarded to the
- * renderer as menu actions, the same pattern the original uses with menu item
- * indices.
- *
- * The built menu is also reused as the popup source for the win32 title
- * band (see popupMenuAt): the standard menu bar hides there (autoHideMenuBar),
- * so the band shows these top-level labels and pops the same native menus.
- */
-let builtMenu: Menu | null = null
+/** Forward one action to the renderer's menu dispatcher (the title band's
+ *  dropdowns reuse the exact route the native menu's clicks used). */
+export function dispatchMenuAction(action: MenuAction): void {
+  sendAction(action)
+}
 
+interface MenuEntry {
+  readonly label?: string
+  /** Electron accelerator for the native menu ('CmdOrCtrl+…'). The band's
+   *  display hint is derived from it (win32 spelling — the band only shows
+   *  there). */
+  readonly accelerator?: string
+  readonly action?: MenuAction
+  readonly role?: MenuRole
+  readonly separator?: boolean
+  /** Hide from the win32 title band (e.g. the quit item mac shows inside
+   *  the app menu instead). */
+  readonly noBand?: boolean
+}
+
+interface TopMenu {
+  readonly label: string
+  readonly items: ReadonlyArray<MenuEntry>
+}
+
+/**
+ * The one menu definition: categories mirror GitHub Desktop (File/Edit/View/
+ * Repository/History/Help). It feeds the native application menu (accelerators
+ * on win32, the real bar on macOS/Linux) *and* the themed win32 title-band
+ * dropdowns, so the two can never drift apart.
+ */
+const MENUS: ReadonlyArray<TopMenu> = [
+  {
+    label: 'File',
+    items: [
+      {
+        label: 'Manage repositories…',
+        accelerator: 'CmdOrCtrl+T',
+        action: 'manage-repositories'
+      },
+      { label: 'Add local repository…', action: 'add-repository' },
+      { label: 'Clone repository…', action: 'clone-repository' },
+      { separator: true },
+      {
+        label: 'Preferences',
+        accelerator: 'CmdOrCtrl+,',
+        action: 'show-preferences'
+      },
+      { label: 'Quit GitDesk', role: 'quit', accelerator: 'Alt+F4', noBand: false }
+    ]
+  },
+  {
+    label: 'Edit',
+    items: [
+      { label: 'Undo', role: 'undo', accelerator: 'Ctrl+Z' },
+      { label: 'Redo', role: 'redo', accelerator: 'Ctrl+Y' },
+      { separator: true },
+      { label: 'Cut', role: 'cut', accelerator: 'Ctrl+X' },
+      { label: 'Copy', role: 'copy', accelerator: 'Ctrl+C' },
+      { label: 'Paste', role: 'paste', accelerator: 'Ctrl+V' },
+      { label: 'Select All', role: 'selectAll', accelerator: 'Ctrl+A' }
+    ]
+  },
+  {
+    label: 'View',
+    items: [
+      { label: 'Reload', role: 'reload', accelerator: 'Ctrl+R' },
+      { label: 'Toggle Developer Tools', role: 'toggleDevTools', accelerator: 'F12' },
+      { separator: true },
+      { label: 'Actual Size', role: 'resetZoom', accelerator: 'Ctrl+0' },
+      { label: 'Zoom In', role: 'zoomIn', accelerator: 'Ctrl+Plus' },
+      { label: 'Zoom Out', role: 'zoomOut', accelerator: 'Ctrl+-' },
+      { separator: true },
+      { label: 'Toggle Full Screen', role: 'togglefullscreen', accelerator: 'F11' }
+    ]
+  },
+  {
+    label: 'Repository',
+    items: [
+      { label: 'Commit', accelerator: 'CmdOrCtrl+Enter', action: 'commit' },
+      {
+        label: 'Stage all',
+        accelerator: 'CmdOrCtrl+Shift+X',
+        action: 'stage-all'
+      },
+      {
+        label: 'Unstage all',
+        accelerator: 'CmdOrCtrl+Shift+Z',
+        action: 'unstage-all'
+      },
+      { separator: true },
+      {
+        label: 'Stash all my changes',
+        accelerator: 'CmdOrCtrl+Shift+S',
+        action: 'stash-all'
+      },
+      {
+        label: 'Edit latest commit…',
+        accelerator: 'CmdOrCtrl+Shift+M',
+        action: 'edit-last-commit'
+      },
+      { label: 'Undo latest commit', action: 'undo-commit' },
+      { separator: true },
+      { label: 'New branch…', action: 'new-branch' },
+      { label: 'Rename branch…', action: 'rename-branch' },
+      { label: 'Delete branch…', action: 'delete-branch' },
+      { separator: true },
+      {
+        label: 'Fetch',
+        accelerator: 'CmdOrCtrl+Shift+F',
+        action: 'fetch'
+      },
+      {
+        label: 'Pull',
+        accelerator: 'CmdOrCtrl+Shift+P',
+        action: 'pull'
+      },
+      {
+        label: 'Push',
+        accelerator: 'CmdOrCtrl+Shift+U',
+        action: 'push'
+      },
+      { separator: true },
+      {
+        label: 'View on GitHub',
+        accelerator: 'CmdOrCtrl+Shift+G',
+        action: 'view-on-github'
+      },
+      {
+        label: 'Refresh',
+        accelerator: 'CmdOrCtrl+R',
+        action: 'refresh'
+      }
+    ]
+  },
+  {
+    label: 'History',
+    items: [
+      {
+        label: 'Copy SHA of selected commit',
+        action: 'copy-sha'
+      },
+      {
+        label: 'Create branch from selected commit…',
+        action: 'create-branch-from-commit'
+      },
+      { label: 'Revert selected commit…', action: 'revert-commit' },
+      { label: 'Cherry-pick selected commit…', action: 'cherry-pick-commit' },
+      { separator: true },
+      {
+        label: 'View selected commit on GitHub',
+        action: 'view-on-github'
+      }
+    ]
+  },
+  {
+    label: 'Help',
+    items: [
+      { label: 'About GitDesk', action: 'show-about' },
+      { separator: true },
+      { label: 'Donate via PayPal', action: 'donate' }
+    ]
+  }
+]
+
+/** 'CmdOrCtrl+X' -> 'Ctrl+X' — the band only ever shows on win32. */
+function bandAccelerator(entry: MenuEntry): string | undefined {
+  if (entry.accelerator === undefined) return undefined
+  return entry.accelerator
+    .replace('CmdOrCtrl', 'Ctrl')
+    .replace('Ctrl+Plus', 'Ctrl++')
+}
+
+function toBandSpec(menu: TopMenu): MenuBarSpec {
+  const items: MenuEntrySpec[] = menu.items.map(entry => ({
+    label: entry.label,
+    accelerator: bandAccelerator(entry),
+    action: entry.action,
+    role: entry.role,
+    ...(entry.separator === true ? { separator: true } : {})
+  }))
+  return { label: menu.label, items }
+}
+
+/** The menu-bar contract for the win32 title band (components/TitleBar). */
+export function getMenuBarSpec(): MenuBarSpec[] {
+  return MENUS.map(toBandSpec)
+}
+
+/**
+ * Execute a role item from the band dropdown — same WebContents/window
+ * primitives Electron's hidden native bar runs for its own role items.
+ */
+export function runMenuRole(role: MenuRole): void {
+  const window = getMainWindow()
+  if (window === null) return
+  const contents = window.webContents
+  switch (role) {
+    case 'undo':
+      contents.undo()
+      break
+    case 'redo':
+      contents.redo()
+      break
+    case 'cut':
+      contents.cut()
+      break
+    case 'copy':
+      contents.copy()
+      break
+    case 'paste':
+      contents.paste()
+      break
+    case 'selectAll':
+      contents.selectAll()
+      break
+    case 'reload':
+      contents.reload()
+      break
+    case 'toggleDevTools':
+      if (contents.isDevToolsOpened()) contents.closeDevTools()
+      else contents.openDevTools()
+      break
+    case 'resetZoom':
+      contents.setZoomFactor(1)
+      break
+    case 'zoomIn':
+      contents.setZoomFactor(Math.min(3, contents.getZoomFactor() + 0.5))
+      break
+    case 'zoomOut':
+      contents.setZoomFactor(Math.max(0.5, contents.getZoomFactor() - 0.5))
+      break
+    case 'togglefullscreen':
+      window.setFullScreen(!window.isFullScreen())
+      break
+    case 'close':
+      window.close()
+      break
+    case 'quit':
+      app.quit()
+      break
+  }
+}
+
+/**
+ * App menu mirroring the categories GitHub Desktop exposes. The declarative
+ * MENUS above feeds it, so the native bar (macOS/Linux) and the themed win32
+ * title-band dropdowns stay one source of truth; repository operations are
+ * forwarded to the renderer as menu actions, the same pattern the original
+ * uses with menu item indices.
+ */
 export function buildAppMenu(): void {
   const isMac = process.platform === 'darwin'
 
@@ -31,169 +270,28 @@ export function buildAppMenu(): void {
           } as Electron.MenuItemConstructorOptions
         ]
       : []),
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Manage repositories…',
-          accelerator: 'CmdOrCtrl+T',
-          click: () => sendAction('manage-repositories')
-        },
-        { label: 'Add local repository…', click: () => sendAction('add-repository') },
-        { label: 'Clone repository…', click: () => sendAction('clone-repository') },
-        { type: 'separator' },
-        {
-          label: 'Preferences',
-          accelerator: isMac ? 'Cmd+,' : 'Ctrl+,',
-          click: () => sendAction('show-preferences')
-        },
-        ...(isMac ? [] : [{ role: 'quit' } as Electron.MenuItemConstructorOptions])
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
-    {
-      label: 'Repository',
-      submenu: [
-        {
-          label: 'Commit',
-          accelerator: 'CmdOrCtrl+Enter',
-          click: () => sendAction('commit')
-        },
-        {
-          label: 'Stage all',
-          accelerator: 'CmdOrCtrl+Shift+X',
-          click: () => sendAction('stage-all')
-        },
-        {
-          label: 'Unstage all',
-          accelerator: 'CmdOrCtrl+Shift+Z',
-          click: () => sendAction('unstage-all')
-        },
-        { type: 'separator' },
-        {
-          label: 'Stash all my changes',
-          accelerator: 'CmdOrCtrl+Shift+S',
-          click: () => sendAction('stash-all')
-        },
-        {
-          label: 'Edit latest commit…',
-          accelerator: 'CmdOrCtrl+Shift+M',
-          click: () => sendAction('edit-last-commit')
-        },
-        {
-          label: 'Undo latest commit',
-          click: () => sendAction('undo-commit')
-        },
-        { type: 'separator' },
-        { label: 'New branch…', click: () => sendAction('new-branch') },
-        { label: 'Rename branch…', click: () => sendAction('rename-branch') },
-        { label: 'Delete branch…', click: () => sendAction('delete-branch') },
-        { type: 'separator' },
-        {
-          label: 'Fetch',
-          accelerator: 'CmdOrCtrl+Shift+F',
-          click: () => sendAction('fetch')
-        },
-        {
-          label: 'Pull',
-          accelerator: 'CmdOrCtrl+Shift+P',
-          click: () => sendAction('pull')
-        },
-        {
-          label: 'Push',
-          accelerator: 'CmdOrCtrl+Shift+U',
-          click: () => sendAction('push')
-        },
-        { type: 'separator' },
-        {
-          label: 'View on GitHub',
-          accelerator: 'CmdOrCtrl+Shift+G',
-          click: () => sendAction('view-on-github')
-        },
-        {
-          label: 'Refresh',
-          accelerator: 'CmdOrCtrl+R',
-          click: () => sendAction('refresh')
-        }
-      ]
-    },
-    {
-      label: 'History',
-      submenu: [
-        {
-          label: 'Copy SHA of selected commit',
-          click: () => sendAction('copy-sha')
-        },
-        {
-          label: 'Create branch from selected commit…',
-          click: () => sendAction('create-branch-from-commit')
-        },
-        {
-          label: 'Revert selected commit…',
-          click: () => sendAction('revert-commit')
-        },
-        {
-          label: 'Cherry-pick selected commit…',
-          click: () => sendAction('cherry-pick-commit')
-        },
-        { type: 'separator' },
-        {
-          label: 'View selected commit on GitHub',
-          click: () => sendAction('view-on-github')
-        }
-      ]
-    },
-    {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'About GitDesk',
-          click: () => sendAction('show-about')
-        }
-      ]
-    }
+    ...MENUS.map(
+      menu =>
+        ({
+          label: menu.label,
+          submenu: menu.items.map(entry => {
+            if (entry.separator === true) return { type: 'separator' }
+            if (entry.role !== undefined) {
+              return { label: entry.label, role: entry.role }
+            }
+            return {
+              label: entry.label,
+              ...(entry.accelerator !== undefined
+                ? { accelerator: entry.accelerator }
+                : {}),
+              click: () => {
+                if (entry.action !== undefined) sendAction(entry.action)
+              }
+            }
+          })
+        }) as Electron.MenuItemConstructorOptions
+    )
   ]
 
-  builtMenu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(builtMenu)
-}
-
-/** The labels for the win32 title band (macOS keeps the system menu instead,
- *  where the first item is the app name — it has no band anyway). */
-export function getTopLevelMenuLabels(): string[] {
-  if (builtMenu === null) return []
-  return builtMenu.items.map(item => item.label).filter(label => label !== '')
-}
-
-/** Open one menu's native popup below its band label. Coordinates are
- *  window-content pixels (DIP), matching the renderer's CSS layout. */
-export function popupMenuAt(label: string, x: number, y: number): void {
-  const window = getMainWindow()
-  if (window === null) return
-  const item = builtMenu?.items.find(candidate => candidate.label === label)
-  item?.submenu?.popup({ window, x: Math.round(x), y: Math.round(y) })
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }

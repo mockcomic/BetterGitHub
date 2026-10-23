@@ -9,6 +9,8 @@ import type {
   Repository
 } from '../shared/models'
 import type {
+  MenuAction,
+  MenuRole,
   RequestResponseChannel,
   RequestResponseChannels
 } from '../shared/ipc'
@@ -73,7 +75,7 @@ import {
   saveSettings
 } from './settings'
 import { generateCommitMessage, testConnection } from './ai/commit-agent'
-import { getTopLevelMenuLabels, popupMenuAt } from './menu'
+import { dispatchMenuAction, getMenuBarSpec, runMenuRole } from './menu'
 import { applyTheme, getMainWindow, isTrustedSender } from './windows'
 import { getWatchedPath, startWatching, stopWatching } from './watcher'
 
@@ -543,13 +545,17 @@ const handlers: Handlers = {
     clipboard.writeText(text)
   },
 
-  // The win32 title band asks for the menu labels and pops the native
-  // menus there; same template as the classic menu bar (menu.ts).
-  async getMenuLabels() {
-    return getTopLevelMenuLabels()
+  // The win32 title band: menu data for its dropdowns, action forwarding
+  // through the same route the native bar's clicks use, and role items run
+  // against the window here in main (src/main/menu.ts).
+  async getMenuBar() {
+    return getMenuBarSpec()
   },
-  async popupMenu(label: string, x: number, y: number) {
-    popupMenuAt(label, x, y)
+  async triggerMenuAction(action: MenuAction) {
+    dispatchMenuAction(action)
+  },
+  async runMenuRole(role: MenuRole) {
+    runMenuRole(role)
   },
 
   async generateCommitMessage(

@@ -1,27 +1,70 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <!--
-    GitDesk app mark — one commit graph, one hue.
+    GitDesk app mark — the record itself: one punched card.
 
-    The tile is the dark desk ground (#0b1120, styles.css); the glyph is Beacon
-    Blue (#4493f8), the interaction hue, and it is the only chromatic value in
-    the mark (see DESIGN.md, "Named Hues Do Jobs"). Flat at rest: no gradient,
-    no shadow, no decoration — a trunk with three commits and one branch that
-    leaves the middle commit and stays ahead of it.
+    A commit is a hole punched permanently into a record, so the mark IS that
+    record: card-stock paper (#e9e2cf) as the tile, a printed keyline in deep
+    ink (#0b1120) drawing every rim — outer edge, corner cut, notch, hole —
+    and commit blue (#0969da) used exactly once, as the head-commit hole
+    punched and inked. The two empty holes are true alpha knockouts: the
+    desktop ground shows through the record. Two-value purity: flat fills,
+    no gradient, no gray.
 
-    Sizes are 512-unit space: keep the stroke at 38 and the nodes at r=50 so
-    the graph still separates at 16 px.
+    Identity marks: the 45° corner cut at the top right (the branch leaving
+    the deck), the semicircular timing notch on the top edge, and three
+    oversized holes on a strict 128-unit grid (x = 128/256/384, y = 280,
+    r = 52) so the row still separates at 16 px. Corner radius 64, cut legs
+    168, notch r = 36, keyline stroke 8. Keep scripts/make-icons.mjs (the
+    SDF rasterizer) in step with this file.
   -->
-  <rect width="512" height="512" rx="112" fill="#0b1120" />
-  <g stroke="#4493f8" fill="#4493f8" stroke-width="38">
-    <path d="M187 128 V384" stroke-linecap="round" />
+  <defs>
+    <!-- The card body: rounded square, straight 45° corner cut top-right,
+         semicircular notch on the top edge. Used to clip the keyline so the
+    	rim stays inside the card. -->
+    <clipPath id="card">
+      <path
+        clip-rule="evenodd"
+        d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z
+           M220 0 A36 36 0 0 1 292 0 Z"
+      />
+    </clipPath>
+    <!-- The two empty holes erase paper and keyline alike: punched after
+         printing, so nothing survives inside their rims. -->
+    <mask id="punched">
+      <rect width="512" height="512" fill="#fff" />
+      <circle cx="128" cy="280" r="52" fill="#000" />
+      <circle cx="256" cy="280" r="52" fill="#000" />
+    </mask>
+  </defs>
+
+  <!-- Card stock: the outline minus the notch and the two punched holes. -->
+  <path
+    fill="#e9e2cf"
+    fill-rule="evenodd"
+    d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z
+       M220 0 A36 36 0 0 1 292 0 Z
+       M76 280 a52 52 0 1 0 104 0 a52 52 0 1 0 -104 0 Z
+       M204 280 a52 52 0 1 0 104 0 a52 52 0 1 0 -104 0 Z"
+  />
+
+  <!-- The head commit: punched and inked, the one place blue appears. -->
+  <circle cx="384" cy="280" r="52" fill="#0969da" />
+
+  <!-- Printed keyline: every rim, clipped to the card, erased where the two
+       empty holes were punched. -->
+  <g
+    clip-path="url(#card)"
+    mask="url(#punched)"
+    fill="none"
+    stroke="#0b1120"
+    stroke-width="8"
+  >
     <path
-      d="M187 256 C187 190 235 152 322 152"
-      fill="none"
-      stroke-linecap="round"
+      d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z"
     />
-    <circle cx="187" cy="128" r="50" stroke="none" />
-    <circle cx="187" cy="256" r="50" stroke="none" />
-    <circle cx="187" cy="384" r="50" stroke="none" />
-    <circle cx="322" cy="152" r="50" stroke="none" />
+    <path d="M220 0 A36 36 0 0 1 292 0" />
+    <circle cx="128" cy="280" r="52" />
+    <circle cx="256" cy="280" r="52" />
+    <circle cx="384" cy="280" r="52" />
   </g>
 </svg>

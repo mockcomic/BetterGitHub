@@ -56,6 +56,9 @@ colors:
   syntax-function-dark: "#d2a8ff"
   syntax-constant-dark: "#79c0ff"
   syntax-entity-dark: "#ffa657"
+  # App mark only — brand-asset colors, not UI roles (see Colors ▸ Brand Mark).
+  card-stock: "#e9e2cf"
+  printed-ink: "#0b1120"
 typography:
   display:
     fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
@@ -252,6 +255,12 @@ Two attributes drive the skin: `html[data-theme-base]` selects the Primer light 
 - **Scrim** (rgba(31, 35, 40, 0.5); dark `rgba(1, 4, 9, 0.68)`): the dialog overlay. No blur — GitHub Desktop dims and stays sharp.
 - **Scrollbar** (rgba(110, 118, 129, 0.4), 0.7 on hover): a neutral pill thumb on a transparent track; it never takes a hue.
 
+### Brand Mark (mark-only colors)
+- **Card Stock** (#e9e2cf): the punched-card tile in the app mark only — never a desk surface, panel, well, or text ground.
+- **Printed Ink** (#0b1120): the mark's printed keyline only — an outline that never takes a UI role (text stays Ink; borders stay Hairline).
+
+Commit Blue on the mark is the same accent token as on the desk, under a different contract: exactly one hole, inked once. These asset colors answer to the brand, not to UI roles; they appear nowhere else, and no UI surface borrows them.
+
 ### Named Rules
 **The One Blue Rule.** One accent does all interaction: `#0969da` / `#1f6feb`. A desk, a panel, or a section never gets its own hue — the window does not change color when you change tabs, because GitHub Desktop's does not. What changes is which tab is lifted and which row is solid blue.
 
@@ -261,7 +270,7 @@ Two attributes drive the skin: `html[data-theme-base]` selects the Primer light 
 
 **The Amber-Never-Shouts Rule.** Amber is for warnings you can continue past. Anything blocking or failed is red.
 
-**The Named-Colors-Do-Jobs Rule.** Every chromatic value answers to one of the roles above. A color with no role — no state, no interaction, no agent — does not ship. Hue supplements state; it never replaces it (selection is solid accent *plus* the file's status symbol and the row's weight; conflicts are still labelled).
+**The Named-Colors-Do-Jobs Rule.** Every chromatic value answers to one of the roles above. A color with no role — no state, no interaction, no agent — does not ship. Hue supplements state; it never replaces it (selection is solid accent *plus* the file's status symbol and the row's weight; conflicts are still labelled). The app mark's Card Stock and Printed Ink answer to the brand, not to UI roles — they are exempt from this roster and appear only on the mark, never on the desk.
 
 ## Typography
 
@@ -373,6 +382,19 @@ What moves: buttons change face color on hover and press without moving a pixel;
 
 ### Status Bar & Busy Indicator
 - **Style:** ~18px `--bg-panel` strip under a 1px hairline, 11.5px muted items at 14px gaps. A busy item turns accent blue and grows an 8px spinning ring (0.8s linear) — the app's only looping motion, reserved for "the machine is thinking." The agent's own busy readout answers in violet, so the two kinds of waiting look different.
+
+## Brand Mark
+
+GitDesk's identity asset is the app mark — **the Punched Card** — at `resources/gitdesk-icon.svg`: one IBM punched card, because a commit is a hole punched permanently into a record, and the mark *is* that record rather than a picture of one. It is the desktop's face everywhere the app appears — `BrowserWindow.icon` in `src/main/windows.ts`, the electron-builder icons in `package.json`, and at 16px leading the Windows title bar ahead of the type-only wordmark in `src/renderer/src/components/TitleBar.tsx`.
+
+- **The object:** a card-stock paper tile with a printed keyline and three holes on one row — flat, hard-edged, printed, not drawn.
+- **Palette roles:** Card Stock is the tile; Printed Ink is a keyline only, an 8-unit stroke along every rim (outer edge, corner cut, notch, hole rims) and never a fill; Commit Blue appears exactly once, as the head-commit hole punched and inked. The accent is monofrequency on the mark — one hole, once — where on the desk it does all interaction work.
+- **Two-value purity:** flat fills, no gradient, no gray, no shadow. The mark obeys the Flat-By-Default Rule and the no-gradient ban exactly as the UI does.
+- **Knockout rule:** the two empty holes are true alpha knockouts — paper and keyline alike are erased inside their rims — so the desktop ground shows through the record. History is empty holes; exactly one carries the app's blue.
+- **Identity marks:** the 45° corner cut at the top right (chord (344,0)→(512,168) — the branch leaving the deck), the semicircular timing notch on the top edge (center (256,0), r 36), and three oversized holes on a strict 128-unit grid (cx 128/256/384, cy 280, r 52); tile corner radius 64 in 512-space. The silhouette must survive alone at 16px; the cut, the notch, and the three-hole row are what make it recognizable at that size.
+
+### Named Rules
+**The One-Source Mark Rule.** The mark exists in exactly one hand-authored form — `resources/gitdesk-icon.svg`. `scripts/make-icons.mjs`, the dependency-free SDF rasterizer, mirrors its geometry through `MARK` constants and must stay in step; everything under `resources/icons/` (PNG 16–1024, `gitdesk.ico`, `gitdesk.png`, each carrying embedded provenance) is build output, never an asset. Never hand-edit a raster: change the SVG, update the rasterizer's `MARK` constants to match, and regenerate with `npm run icons`.
 
 ## Do's and Don'ts
 

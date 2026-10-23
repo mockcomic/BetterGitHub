@@ -1334,8 +1334,19 @@ html[data-wco] .titlebar {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--text-muted);
+  color: var(--text);
   white-space: nowrap;
+}
+
+/* The desktop mark (resources/gitdesk-icon.svg) leading the wordmark — the
+   same asset the taskbar button and tray use, so the window reads as the
+   app at a glance. */
+.titlebar-logo {
+  width: 16px;
+  height: 16px;
+  margin-right: 7px;
+  display: block;
+  -webkit-user-drag: none;
 }
 
 /*
@@ -1365,6 +1376,30 @@ html[data-wco] .titlebar {
 
 .titlebar-item:hover {
   background: var(--bg-hover);
+}
+
+.titlebar-item[aria-expanded='true'] {
+  background: var(--bg-active, var(--bg-hover));
+  color: var(--accent);
+}
+
+/*
+ * Right-aligned shortcut hint for the band's dropdowns (ContextMenu
+ * carries the accelerator span). Row layout applies only inside
+ * .context-menu, so the app's other popover items are untouched.
+ */
+.context-menu .popover-item {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.menu-accel {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .header-left,
@@ -3338,6 +3373,20 @@ select {
 
 .muted {
   color: var(--text-muted);
+}
+
+/* ------------------------------------------------------- donation section */
+
+.donate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.donate-row small {
+  font-size: 11.5px;
+  user-select: text;
 }
 
 .diff-line.split-row td {
