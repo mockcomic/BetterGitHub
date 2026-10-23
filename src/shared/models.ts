@@ -6,6 +6,8 @@
  * messages), simplified for this clone.
  */
 
+import type { ThemeId } from './themes'
+
 /** UI-facing classification of a file's git status. */
 export type FileStatusKind =
   | 'new' // untracked or added in index
@@ -198,7 +200,7 @@ export interface PublicSettings {
   }
   readonly confirmOverrideWithGeneratedMessage: boolean
   readonly autoRefresh: boolean
-  readonly theme: 'system' | 'light' | 'dark'
+  readonly theme: ThemeId
 }
 
 export interface SettingsPatch {
@@ -211,7 +213,7 @@ export interface SettingsPatch {
   }
   readonly confirmOverrideWithGeneratedMessage?: boolean
   readonly autoRefresh?: boolean
-  readonly theme?: 'system' | 'light' | 'dark'
+  readonly theme?: ThemeId
 }
 
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: string }

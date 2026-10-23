@@ -73,7 +73,8 @@ import {
   saveSettings
 } from './settings'
 import { generateCommitMessage, testConnection } from './ai/commit-agent'
-import { getMainWindow, isTrustedSender } from './windows'
+import { getTopLevelMenuLabels, popupMenuAt } from './menu'
+import { applyTheme, getMainWindow, isTrustedSender } from './windows'
 import { getWatchedPath, startWatching, stopWatching } from './watcher'
 
 type Handlers = {
@@ -256,7 +257,12 @@ const handlers: Handlers = {
     return getPublicSettings()
   },
   async saveSettings(patch) {
-    return saveSettings(patch)
+    const settings = await saveSettings(patch)
+    // A theme patch must re-skin the OS-drawn chrome (nativeTheme source,
+    // background, and win32 frame) immediately, not just on next launch; a
+    // no-op repaint is cheap when the patch touched something else.
+    applyTheme(settings.theme)
+    return settings
   },
   async selectDirectory() {
     const parent = getMainWindow() ?? undefined
@@ -535,6 +541,15 @@ const handlers: Handlers = {
   },
   async writeClipboard(text: string) {
     clipboard.writeText(text)
+  },
+
+  // The win32 title band asks for the menu labels and pops the native
+  // menus there; same template as the classic menu bar (menu.ts).
+  async getMenuLabels() {
+    return getTopLevelMenuLabels()
+  },
+  async popupMenu(label: string, x: number, y: number) {
+    popupMenuAt(label, x, y)
   },
 
   async generateCommitMessage(

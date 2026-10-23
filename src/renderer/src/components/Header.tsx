@@ -120,7 +120,7 @@ export function Header(): JSX.Element {
             {busy === 'fetch' ? <span className="spinner" /> : null} Fetch
           </button>
           <button
-            className="btn"
+            className="btn pull"
             disabled={busy !== null}
             onClick={() => void store.doSync('pull')}
             title="Pull from upstream"
@@ -135,10 +135,14 @@ export function Header(): JSX.Element {
             )}
           </button>
           <button
-            className={`btn${celebrating ? ' celebrating' : ''}`}
-            disabled={busy !== null || status === null}
+            className={`btn push${celebrating ? ' celebrating' : ''}`}
+            disabled={busy !== null || status === null || (ahead === 0 && hasUpstream)}
             onClick={() => void store.doSync('push')}
-            title="Push to origin"
+            title={
+              ahead === 0 && hasUpstream
+                ? 'Nothing to push — the branch is up to date with its upstream'
+                : 'Push to origin'
+            }
           >
             {busy === 'push' ? <span className="spinner" /> : null} ↑ Push
             {ahead > 0 ? (

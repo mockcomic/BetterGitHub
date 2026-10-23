@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import { useState } from 'react'
 import type { FileStatus } from '../../../shared/models'
-import { useStore, useStoreState } from '../store'
+import { useStore, useStoreState, type AppState } from '../store'
 import { relativeTime } from '../time'
 import {
   ContextMenu,
@@ -568,6 +568,8 @@ export function CommitTray(): JSX.Element {
   const amending = state.amend !== null
   const busy = state.busy !== null
   const total = state.status?.files.length ?? 0
+  const ahead = state.status?.ahead ?? 0
+  const hasUpstream = state.status?.upstream !== undefined
   const checked = draft?.checked ?? new Set<string>()
   const scopeTitle =
     checked.size === 0
@@ -668,9 +670,48 @@ export function CommitTray(): JSX.Element {
           )}
           {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
         </button>
+        <button
+          className="btn push"
+          disabled={
+            busy ||
+            state.aiBusy ||
+            state.status === null ||
+            (ahead === 0 && hasUpstream)
+          }
+          onClick={() => void store.doSync('push')}
+          title={pushTitle(state)}
+        >
+          {state.busy === 'push' ? (
+            <>
+              <span className="spinner" /> Pushing…
+            </>
+          ) : (
+            <>
+              ↑ Push
+              {ahead > 0 ? (
+                <span className="count-pop" key={`tray-push-count-${ahead}`}>
+                  {' '}{ahead}
+                </span>
+              ) : (
+                ''
+              )}
+            </>
+          )}
+        </button>
       </div>
     </>
   )
+}
+
+function pushTitle(state: AppState): string {
+  if (state.status === null) return 'Loading repository status…'
+  if (state.status.upstream === undefined) {
+    return 'No upstream branch yet — Push publishes this branch and sets upstream on origin'
+  }
+  const ahead = state.status.ahead ?? 0
+  return ahead > 0
+    ? `Push ${ahead} commit${ahead === 1 ? '' : 's'} to ${state.status.upstream}`
+    : `Nothing to push — ${state.status.branch} is up to date with ${state.status.upstream}`
 }
 
 // ----------------------------------------------------------------- shared

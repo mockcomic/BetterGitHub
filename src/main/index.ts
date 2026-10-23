@@ -6,6 +6,7 @@ import { applyTheme, createMainWindow, getMainWindow } from './windows'
 import { getThemeSetting } from './settings'
 import { initCrashLogging } from './diagnostics'
 import { stopWatching } from './watcher'
+import { configureGitBroker } from './git/sandbox'
 
 if (process.env['ELECTRON_RENDERER_URL'] !== undefined) {
   app.setPath('userData', join(process.cwd(), '.userdata-dev'))
@@ -38,6 +39,12 @@ if (!app.requestSingleInstanceLock()) {
     app.setAppUserModelId('com.kh.gitdesk')
 
     applyTheme(await getThemeSetting())
+    // Where the app finds the elevated git broker when this whole process
+    // tree was started inside an agent/command sandbox (see
+    // src/main/git/sandbox.ts). In dev mode userData is .userdata-dev inside
+    // the checkout — which is exactly the folder a Low-integrity sandbox is
+    // allowed to write, so the queue works from both sides there.
+    configureGitBroker({ queueDir: join(app.getPath('userData'), 'git-broker') })
     registerIpc()
     buildAppMenu()
     createMainWindow(process.env['ELECTRON_RENDERER_URL'])

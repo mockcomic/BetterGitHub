@@ -147,6 +147,12 @@ export interface RequestResponseChannels {
   openExternal: (url: string) => void
   writeClipboard: (text: string) => void
 
+  // window-frame menu (win32 WCO title band, src/renderer/components/
+  // TitleBar.tsx): the labels shown in the band, and asking main to popup
+  // the native menu for one of them at renderer pixel coordinates.
+  getMenuLabels: () => string[]
+  popupMenu: (label: string, x: number, y: number) => void
+
   // AI commit messages
   generateCommitMessage: (
     repoPath: string,

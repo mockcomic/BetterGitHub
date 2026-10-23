@@ -12,6 +12,13 @@ import {
  * RequestResponseChannels map and unwraps the {ok,data|error} envelope.
  */
 const api = {
+  /**
+   * Static platform tag. The renderer gates the Windows title band on it
+   * (main enables the Window Controls Overlay on win32 only, in
+   * src/main/windows.ts) — the web-exposed overlay API has no reliable
+   * `enabled` property to ask.
+   */
+  platform: process.platform,
   invoke: (
     channel: RequestResponseChannel,
     ...args: ReadonlyArray<unknown>

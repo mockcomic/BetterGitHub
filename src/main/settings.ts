@@ -3,6 +3,8 @@ import { existsSync } from 'fs'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
 import { app, safeStorage } from 'electron'
+import type { ThemeId } from '../shared/themes'
+import { isThemeId } from '../shared/themes'
 import type {
   ManagedRepository,
   PublicSettings,
@@ -21,7 +23,7 @@ interface StoredSettings {
   ai: { baseUrl: string; model: string; customInstructions: string }
   confirmOverrideWithGeneratedMessage: boolean
   autoRefresh: boolean
-  theme: 'system' | 'light' | 'dark'
+  theme: ThemeId
 }
 
 const DEFAULTS: StoredSettings = {
@@ -60,6 +62,11 @@ async function load(): Promise<StoredSettings> {
           ? parsed.repositories
           : []
       }
+      // The settings file is user-editable and theme ids are a closed
+      // registry; anything unknown falls back to the automatic mode
+      // rather than selecting a palette with no CSS block (an unskinned
+      // :root with only font tokens).
+      if (!isThemeId(cached.theme)) cached.theme = DEFAULTS.theme
       return cached
     }
   } catch (err) {
@@ -107,7 +114,7 @@ export async function saveSettings(patch: SettingsPatch): Promise<PublicSettings
       patch.confirmOverrideWithGeneratedMessage
   }
   if (patch.autoRefresh !== undefined) s.autoRefresh = patch.autoRefresh
-  if (patch.theme !== undefined) s.theme = patch.theme
+  if (patch.theme !== undefined && isThemeId(patch.theme)) s.theme = patch.theme
   await persist()
   return getPublicSettings()
 }
@@ -157,7 +164,7 @@ export async function removeRepositoriesByIds(
   return removed
 }
 
-export async function getThemeSetting(): Promise<'system' | 'light' | 'dark'> {
+export async function getThemeSetting(): Promise<ThemeId> {
   return (await load()).theme
 }
 

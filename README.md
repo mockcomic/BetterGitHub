@@ -89,6 +89,46 @@ Then, on first run, open **Preferences** (File menu or the link on the empty
 screen) and set the AI **Base URL**, **Model**, and **API key**, and press
 *Test connection*.
 
+## Running inside an agent / command sandbox (Windows)
+
+Agent CLIs and CI runners often execute commands in a **sandboxed shell**:
+on Windows the whole process tree (dev server, Electron, and the `git`
+children GitDesk spawns) then runs at *Low process integrity*, with write
+access narrowed to a few folders and RPC/named-pipe service calls blocked.
+Git can still read the repository — status, diffs and history look fine —
+but the first command that writes into `.git` (stage, commit, stash…) dies
+with `fatal: Unable to create '…\.git\index.lock': Permission denied`
+even though the repository itself is healthy. (GitHub Desktop never hits
+this; it is always launched normally at Medium integrity.)
+
+Two mitigations ship with GitDesk:
+
+- **Actionable errors** — `src/main/git/sandbox.ts` recognizes the
+  blocked `.git` write signature and replaces the raw `exit 128` fatal
+  with an explanation that names both fixes below.
+- **File-queue git broker** — `scripts/git-broker.mjs`. Register it once
+  from a *normal* (non-sandboxed) shell:
+
+  ```
+  npm run git-broker:install     # = node scripts/git-broker.mjs --install-task
+  npm run git-broker:status
+  npm run git-broker:uninstall
+  ```
+
+  The Task Scheduler logon task keeps a tiny broker alive at normal
+  integrity. It never talks to the app: the app drops a request JSON into
+  `<queue>/requests` (inside the app's profile; override with the
+  `GITDESK_BROKER_DIR` env var or `--queue <dir>`) and polls the matching
+  response. The broker executes the queued git command with the same
+  environment hygiene as the direct path and writes the result back. File
+  I/O is deliberate — RPC/pipe based brokers are unreachable from inside
+  the sandbox, while plain files cross the boundary reliably. `execGit`
+  automatically reruns sandbox-blocked commands through the broker, so
+  staging/committing keeps working in the UI and nobody notices.
+
+Outside the sandbox nothing changes: commands run directly and the broker
+is simply never consulted.
+
 ## How the AI agent works
 
 1. You check the files you're committing and press **✨ Generate**.

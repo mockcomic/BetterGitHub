@@ -8,6 +8,7 @@ import type {
 declare global {
   interface Window {
     gitdesk: {
+      platform: string
       invoke(
         channel: RequestResponseChannel,
         ...args: ReadonlyArray<unknown>

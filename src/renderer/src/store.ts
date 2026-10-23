@@ -18,6 +18,8 @@ import type {
   WorkflowKind
 } from '../../shared/models'
 import type { MenuAction } from '../../shared/ipc'
+import type { ThemeId } from '../../shared/themes'
+import { themeBase } from '../../shared/themes'
 import { call, onMenuAction, onRepoChanged } from './api'
 
 export interface ToastAction {
@@ -365,13 +367,22 @@ export class AppStore {
     })
   }
 
-  private applyTheme(theme: 'system' | 'light' | 'dark'): void {
+  private applyTheme(theme: ThemeId): void {
     // Replace any previous listener instead of stacking one per settings save.
     if (this.mediaQuery !== null && this.mediaHandler !== null) {
       this.mediaQuery.removeEventListener('change', this.mediaHandler)
     }
     this.mediaQuery = null
     this.mediaHandler = null
+
+    // Cache the raw setting so main.tsx can re-apply it synchronously
+    // before first paint on the next launch — a saved custom palette
+    // should never flash through Primer first.
+    try {
+      window.localStorage.setItem('gitdesk.theme', theme)
+    } catch {
+      /* private-mode storage: first-paint cache is best-effort */
+    }
 
     if (theme === 'system') {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
@@ -380,16 +391,28 @@ export class AppStore {
           'data-theme',
           e.matches ? 'dark' : 'light'
         )
+        document.documentElement.setAttribute(
+          'data-theme-base',
+          e.matches ? 'dark' : 'light'
+        )
       }
       document.documentElement.setAttribute(
         'data-theme',
+        mq.matches ? 'dark' : 'light'
+      )
+      document.documentElement.setAttribute(
+        'data-theme-base',
         mq.matches ? 'dark' : 'light'
       )
       mq.addEventListener('change', handler)
       this.mediaQuery = mq
       this.mediaHandler = handler
     } else {
+      // data-theme names the palette block; data-theme-base keeps the
+      // inherited Primer block of the same family selected underneath it.
+      const base = themeBase(theme, false)
       document.documentElement.setAttribute('data-theme', theme)
+      document.documentElement.setAttribute('data-theme-base', base)
     }
   }
 

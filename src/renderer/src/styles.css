@@ -15,11 +15,23 @@
  *   --caution                      soft warnings you can continue past
  *   --ai                           the agent alone: the one accent that is
  *                                  allowed to be decorative
+ *   --pull-face / --push-face      the sync verbs' own hues: amber for
+ *                                  incoming, green for outgoing — the
+ *                                  filled faces the Pull/Push buttons wear
  *
  * Chrome (strip, queue, tray, toolbars, status bar) is --bg-panel; the work
  * surface is --bg; every boundary is a 1px --border hairline.
+ *
+ * Two attributes drive the palette: html[data-theme-base] selects one of
+ * the two Primer blocks below (every theme inherits its family for
+ * anything it does not redefine), and html[data-theme] names the active
+ * palette block — either 'light'/'dark' (no override: the base itself) or
+ * one of the named themes further down. Both attributes are always
+ * present. Every named block must define the full roster below; the
+ * registry in shared/themes.ts and tests/themes.test.ts keep that honest,
+ * along with the window-chrome colors main paints from the same values.
  */
-html[data-theme='light'] {
+html[data-theme-base='light'] {
   --bg: #ffffff;
   --bg-panel: #f6f8fa;
   --bg-header: #f6f8fa;
@@ -45,6 +57,10 @@ html[data-theme='light'] {
   --ai: #8250df;
   --ai-face: #8250df;
   --ai-face-hover: #6639ba;
+  --pull-face: #9a6700;
+  --pull-face-hover: #7d5300;
+  --push-face: #1f883d;
+  --push-face-hover: #1a7f37;
   --chip-face: #ffffff;
   --bg-selected-hover: #0860ca;
   --syntax-comment: #6e7781;
@@ -90,9 +106,9 @@ html[data-theme='light'] {
   --scroll-thumb-hover: rgba(110, 118, 129, 0.7);
 }
 
-html[data-theme='dark'] {
-  /* GitHub Desktop's dark desk: Primer dark's #0d1117 ground, with the same
-     blue doing the same jobs it does in the light theme. */
+html[data-theme-base='dark'] {
+  /* GitHub Desktop's dark desk: Primer dark's #0d1117 ground, with the
+     same blue doing the same jobs it does in the light theme. */
   --bg: #0d1117;
   --bg-panel: #161b22;
   --bg-header: #161b22;
@@ -118,6 +134,10 @@ html[data-theme='dark'] {
   --ai: #a371f7;
   --ai-face: #8250df;
   --ai-face-hover: #6e40c9;
+  --pull-face: #9e6a03;
+  --pull-face-hover: #b08800;
+  --push-face: #238636;
+  --push-face-hover: #2ea043;
   --chip-face: #21262d;
   --bg-selected-hover: #1f6feb;
   --syntax-comment: #8b949e;
@@ -157,6 +177,894 @@ html[data-theme='dark'] {
   --word-del-strike: rgba(255, 129, 130, 0.6);
   --scroll-thumb: rgba(110, 118, 129, 0.4);
   --scroll-thumb-hover: rgba(110, 118, 129, 0.7);
+}
+
+/* ---------------------------------------------------------------- themes */
+/*
+ * Named palettes from shared/themes.ts. Each block is a complete re-ink of
+ * its family above: the roster is identical on purpose, so a theme never
+ * leaves a lone foreign token behind, and roles keep the jobs Primer gave
+ * them (accent = navigation/selection, green/red = diff state, the
+ * --syntax-* set re-lights the blob view exactly as the real thing does).
+ * Washes (add/del/hunk/word marks) are the theme's own state colors at
+ * low alpha over the ground — the same visual weight Primer achieves with
+ * flattened solids.
+ */
+
+/* Gruvbox (morhetz/gruvbox), dark hard variant: the retro groove's warm
+   grey-browns, with gruvbox's own blue dark as the fillable accent. */
+html[data-theme='gruvbox-dark'] {
+  --bg: #1d2021;
+  --bg-panel: #282828;
+  --bg-header: #282828;
+  --bg-inset: #161819;
+  --bg-hover: rgba(235, 219, 178, 0.08);
+  --bg-selected: #076678;
+  --border: #3c3836;
+  --border-subtle: #32302f;
+  --text: #ebdbb2;
+  --text-muted: #a89984;
+  --accent: #83a598;
+  --accent-emphasis: #458588;
+  --accent-hover: #93b3a7;
+  --accent-active: #458588;
+  --primary: #458588;
+  --primary-hover: #83a598;
+  --success: #b8bb26;
+  --danger: #fb4934;
+  --danger-face: #cc241d;
+  --danger-face-hover: #9d0006;
+  --danger-hover: #cc241d;
+  --caution: #fabd2f;
+  --ai: #d3869b;
+  --ai-face: #b16286;
+  --ai-face-hover: #8f4f66;
+  --pull-face: #b57614;
+  --pull-face-hover: #9d6610;
+  --push-face: #79740e;
+  --push-face-hover: #65610b;
+  --chip-face: #32302f;
+  --bg-selected-hover: #076678;
+  --syntax-comment: #928374;
+  --syntax-keyword: #fb4934;
+  --syntax-string: #b8bb26;
+  --syntax-constant: #d3869b;
+  --syntax-function: #fabd2f;
+  --syntax-entity: #8ec07c;
+  --add-bg: rgba(184, 187, 38, 0.13);
+  --add-gutter: rgba(184, 187, 38, 0.22);
+  --add-text: #b8bb26;
+  --del-bg: rgba(251, 73, 52, 0.12);
+  --del-gutter: rgba(251, 73, 52, 0.22);
+  --del-text: #fb4934;
+  --hunk-bg: rgba(131, 165, 152, 0.1);
+  --hunk-gutter: rgba(131, 165, 152, 0.18);
+  --hunk-text: #83a598;
+  --scrim: rgba(13, 14, 15, 0.68);
+  --shadow: 0 12px 28px rgba(13, 14, 15, 0.6), 0 2px 4px rgba(13, 14, 15, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #3c3836;
+  --btn-bg-hover: #504945;
+  --btn-bg-active: #3c3836;
+  --btn-border: rgba(235, 219, 178, 0.14);
+  --btn-border-hover: rgba(235, 219, 178, 0.14);
+  --btn-disabled-bg: #504945;
+  --btn-disabled-ink: #7c6f64;
+  --border-muted-solid: #504945;
+  --focus-ring: 0 0 0 3px rgba(131, 165, 152, 0.4);
+  --row-on-accent: #fbf1c7;
+  --row-on-accent-muted: rgba(251, 241, 199, 0.82);
+  --on-accent: #fbf1c7;
+  --on-accent-chip: rgba(251, 241, 199, 0.12);
+  --on-accent-chip-border: rgba(251, 241, 199, 0.45);
+  --word-add: rgba(184, 187, 38, 0.3);
+  --word-del: rgba(251, 73, 52, 0.32);
+  --word-del-strike: rgba(251, 73, 52, 0.6);
+  --scroll-thumb: rgba(168, 153, 132, 0.4);
+  --scroll-thumb-hover: rgba(168, 153, 132, 0.7);
+}
+
+/* Gruvbox light, the same groove on parchment: the *_0 dim variants keep
+   state colors legible on the warm ground. */
+html[data-theme='gruvbox-light'] {
+  --bg: #fbf1c7;
+  --bg-panel: #ebdbb2;
+  --bg-header: #ebdbb2;
+  --bg-inset: #d5c4a1;
+  --bg-hover: rgba(60, 56, 54, 0.1);
+  --bg-selected: #076678;
+  --border: #d5c4a1;
+  --border-subtle: #ece2c9;
+  --text: #3c3836;
+  --text-muted: #7c6f64;
+  --accent: #076678;
+  --accent-emphasis: #076678;
+  --accent-hover: #065a6a;
+  --accent-active: #044d59;
+  --primary: #076678;
+  --primary-hover: #065a6a;
+  --success: #79740e;
+  --danger: #9d0006;
+  --danger-face: #9d0006;
+  --danger-face-hover: #7c0005;
+  --danger-hover: #7c0005;
+  --caution: #b57614;
+  --ai: #8f3f71;
+  --ai-face: #8f3f71;
+  --ai-face-hover: #723059;
+  --pull-face: #b57614;
+  --pull-face-hover: #9d6610;
+  --push-face: #79740e;
+  --push-face-hover: #65610b;
+  --chip-face: #f9f5d7;
+  --bg-selected-hover: #065a6a;
+  --syntax-comment: #928374;
+  --syntax-keyword: #9d0006;
+  --syntax-string: #79740e;
+  --syntax-constant: #8f3f71;
+  --syntax-function: #b57614;
+  --syntax-entity: #427b58;
+  --add-bg: rgba(121, 116, 14, 0.14);
+  --add-gutter: rgba(121, 116, 14, 0.22);
+  --add-text: #79740e;
+  --del-bg: rgba(157, 0, 6, 0.1);
+  --del-gutter: rgba(157, 0, 6, 0.18);
+  --del-text: #9d0006;
+  --hunk-bg: rgba(7, 102, 120, 0.1);
+  --hunk-gutter: rgba(7, 102, 120, 0.18);
+  --hunk-text: #076678;
+  --scrim: rgba(60, 56, 54, 0.5);
+  --shadow: 0 12px 28px rgba(168, 153, 132, 0.35), 0 2px 4px rgba(168, 153, 132, 0.15);
+  --btn-shadow: 0 1px 0 rgba(60, 56, 54, 0.05);
+  --btn-bg: #f2e5bc;
+  --btn-bg-hover: #ebdbb2;
+  --btn-bg-active: #e6d3a9;
+  --btn-border: rgba(60, 56, 54, 0.15);
+  --btn-border-hover: rgba(60, 56, 54, 0.15);
+  --btn-disabled-bg: #ebdbb2;
+  --btn-disabled-ink: #a89984;
+  --border-muted-solid: #bdae93;
+  --focus-ring: 0 0 0 3px rgba(7, 102, 120, 0.3);
+  --row-on-accent: #fbf1c7;
+  --row-on-accent-muted: rgba(251, 241, 199, 0.85);
+  --on-accent: #fbf1c7;
+  --on-accent-chip: rgba(251, 241, 199, 0.12);
+  --on-accent-chip-border: rgba(251, 241, 199, 0.45);
+  --word-add: rgba(121, 116, 14, 0.25);
+  --word-del: rgba(157, 0, 6, 0.28);
+  --word-del-strike: rgba(157, 0, 6, 0.55);
+  --scroll-thumb: rgba(124, 111, 100, 0.4);
+  --scroll-thumb-hover: rgba(124, 111, 100, 0.7);
+}
+
+/* Nord (arctic-introduction): the frost blues for navigation, the
+   aurora greens/reds for state, polar-night grounds beneath. */
+html[data-theme='nord'] {
+  --bg: #2e3440;
+  --bg-panel: #3b4252;
+  --bg-header: #3b4252;
+  --bg-inset: #272c36;
+  --bg-hover: rgba(216, 222, 233, 0.08);
+  --bg-selected: #434c5e;
+  --border: #434c5e;
+  --border-subtle: #363d4a;
+  --text: #d8dee9;
+  --text-muted: #8793a7;
+  --accent: #88c0d0;
+  --accent-emphasis: #5e81ac;
+  --accent-hover: #98cadd;
+  --accent-active: #5e81ac;
+  --primary: #5e81ac;
+  --primary-hover: #6f8fb8;
+  --success: #a3be8c;
+  --danger: #bf616a;
+  --danger-face: #bf616a;
+  --danger-face-hover: #a54f56;
+  --danger-hover: #a54f56;
+  --caution: #ebcb8b;
+  --ai: #b48ead;
+  --ai-face: #b48ead;
+  --ai-face-hover: #9b6f94;
+  --pull-face: #c7a76a;
+  --pull-face-hover: #b4945c;
+  --push-face: #8ba473;
+  --push-face-hover: #7c9566;
+  --chip-face: #434c5e;
+  --bg-selected-hover: #4c566a;
+  --syntax-comment: #616e88;
+  --syntax-keyword: #81a1c1;
+  --syntax-string: #a3be8c;
+  --syntax-constant: #b48ead;
+  --syntax-function: #88c0d0;
+  --syntax-entity: #8fbcbb;
+  --add-bg: rgba(163, 190, 140, 0.14);
+  --add-gutter: rgba(163, 190, 140, 0.24);
+  --add-text: #a3be8c;
+  --del-bg: rgba(191, 97, 106, 0.14);
+  --del-gutter: rgba(191, 97, 106, 0.26);
+  --del-text: #bf616a;
+  --hunk-bg: rgba(136, 192, 208, 0.1);
+  --hunk-gutter: rgba(136, 192, 208, 0.18);
+  --hunk-text: #88c0d0;
+  --scrim: rgba(24, 26, 32, 0.68);
+  --shadow: 0 12px 28px rgba(24, 26, 32, 0.6), 0 2px 4px rgba(24, 26, 32, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #434c5e;
+  --btn-bg-hover: #4c566a;
+  --btn-bg-active: #434c5e;
+  --btn-border: rgba(216, 222, 233, 0.1);
+  --btn-border-hover: rgba(216, 222, 233, 0.1);
+  --btn-disabled-bg: #4c566a;
+  --btn-disabled-ink: #616e88;
+  --border-muted-solid: #4c566a;
+  --focus-ring: 0 0 0 3px rgba(94, 129, 172, 0.4);
+  --row-on-accent: #eceff4;
+  --row-on-accent-muted: rgba(236, 239, 244, 0.8);
+  --on-accent: #eceff4;
+  --on-accent-chip: rgba(236, 239, 244, 0.12);
+  --on-accent-chip-border: rgba(236, 239, 244, 0.45);
+  --word-add: rgba(163, 190, 140, 0.3);
+  --word-del: rgba(191, 97, 106, 0.35);
+  --word-del-strike: rgba(191, 97, 106, 0.65);
+  --scroll-thumb: rgba(135, 147, 167, 0.4);
+  --scroll-thumb-hover: rgba(135, 147, 167, 0.7);
+}
+
+/* Atom's One Dark (atom/one-dark-syntax): the slate UI ground with the
+   syntax palette doing double duty as state. */
+html[data-theme='one-dark'] {
+  --bg: #282c34;
+  --bg-panel: #21252b;
+  --bg-header: #21252b;
+  --bg-inset: #1b1e24;
+  --bg-hover: rgba(171, 178, 191, 0.08);
+  --bg-selected: #3e4451;
+  --border: #3e4451;
+  --border-subtle: #333842;
+  --text: #abb2bf;
+  --text-muted: #7f848e;
+  --accent: #61afef;
+  --accent-emphasis: #4d9fdc;
+  --accent-hover: #74bbf3;
+  --accent-active: #4d9fdc;
+  --primary: #4d9fdc;
+  --primary-hover: #61afef;
+  --success: #98c379;
+  --danger: #e06c75;
+  --danger-face: #be5046;
+  --danger-face-hover: #a54242;
+  --danger-hover: #be5046;
+  --caution: #e5c07b;
+  --ai: #c678dd;
+  --ai-face: #a557ba;
+  --ai-face-hover: #8f47a3;
+  --pull-face: #e5c07b;
+  --pull-face-hover: #d8b46f;
+  --push-face: #98c379;
+  --push-face-hover: #8bb76c;
+  --chip-face: #2c313a;
+  --bg-selected-hover: #4b5263;
+  --syntax-comment: #5c6370;
+  --syntax-keyword: #c678dd;
+  --syntax-string: #98c379;
+  --syntax-constant: #d19a66;
+  --syntax-function: #61afef;
+  --syntax-entity: #e5c07b;
+  --add-bg: rgba(152, 195, 121, 0.14);
+  --add-gutter: rgba(152, 195, 121, 0.24);
+  --add-text: #98c379;
+  --del-bg: rgba(224, 108, 117, 0.14);
+  --del-gutter: rgba(224, 108, 117, 0.26);
+  --del-text: #e06c75;
+  --hunk-bg: rgba(97, 175, 239, 0.1);
+  --hunk-gutter: rgba(97, 175, 239, 0.18);
+  --hunk-text: #61afef;
+  --scrim: rgba(18, 20, 25, 0.68);
+  --shadow: 0 12px 28px rgba(18, 20, 25, 0.6), 0 2px 4px rgba(18, 20, 25, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #2c313a;
+  --btn-bg-hover: #333842;
+  --btn-bg-active: #2c313a;
+  --btn-border: rgba(171, 178, 191, 0.1);
+  --btn-border-hover: rgba(171, 178, 191, 0.1);
+  --btn-disabled-bg: #333842;
+  --btn-disabled-ink: #5c6370;
+  --border-muted-solid: #4b5263;
+  --focus-ring: 0 0 0 3px rgba(97, 175, 239, 0.4);
+  --row-on-accent: #d7dae0;
+  --row-on-accent-muted: rgba(215, 218, 224, 0.8);
+  --on-accent: #1b1e24;
+  --on-accent-chip: rgba(27, 30, 36, 0.1);
+  --on-accent-chip-border: rgba(27, 30, 36, 0.45);
+  --word-add: rgba(152, 195, 121, 0.3);
+  --word-del: rgba(224, 108, 117, 0.35);
+  --word-del-strike: rgba(224, 108, 117, 0.65);
+  --scroll-thumb: rgba(127, 132, 142, 0.4);
+  --scroll-thumb-hover: rgba(127, 132, 142, 0.7);
+}
+
+/* Atom's One Light: the paper UI ground, ink text and the same syntax
+   set re-lit for daylight. */
+html[data-theme='one-light'] {
+  --bg: #fafafa;
+  --bg-panel: #f0f0f1;
+  --bg-header: #f0f0f1;
+  --bg-inset: #e8e8e9;
+  --bg-hover: rgba(56, 58, 66, 0.08);
+  --bg-selected: #4078f2;
+  --border: #d9d9db;
+  --border-subtle: #e8e8e9;
+  --text: #383a42;
+  --text-muted: #6f7179;
+  --accent: #4078f2;
+  --accent-emphasis: #4078f2;
+  --accent-hover: #3668da;
+  --accent-active: #2c56b8;
+  --primary: #4078f2;
+  --primary-hover: #3668da;
+  --success: #50a14f;
+  --danger: #e45649;
+  --danger-face: #e45649;
+  --danger-face-hover: #c94034;
+  --danger-hover: #c94034;
+  --caution: #c18401;
+  --ai: #a626a4;
+  --ai-face: #a626a4;
+  --ai-face-hover: #8b1f89;
+  --pull-face: #c18401;
+  --pull-face-hover: #a87301;
+  --push-face: #4a9a49;
+  --push-face-hover: #3e8a3d;
+  --chip-face: #ffffff;
+  --bg-selected-hover: #3668da;
+  --syntax-comment: #a0a1a7;
+  --syntax-keyword: #a626a4;
+  --syntax-string: #50a14f;
+  --syntax-constant: #986801;
+  --syntax-function: #4078f2;
+  --syntax-entity: #c18401;
+  --add-bg: rgba(80, 161, 79, 0.1);
+  --add-gutter: rgba(80, 161, 79, 0.18);
+  --add-text: #50a14f;
+  --del-bg: rgba(228, 86, 73, 0.08);
+  --del-gutter: rgba(228, 86, 73, 0.16);
+  --del-text: #c94034;
+  --hunk-bg: rgba(64, 120, 242, 0.08);
+  --hunk-gutter: rgba(64, 120, 242, 0.16);
+  --hunk-text: #2c56b8;
+  --scrim: rgba(56, 58, 66, 0.5);
+  --shadow: 0 12px 28px rgba(140, 141, 145, 0.3), 0 2px 4px rgba(140, 141, 145, 0.12);
+  --btn-shadow: 0 1px 0 rgba(56, 58, 66, 0.05);
+  --btn-bg: #f1f1f2;
+  --btn-bg-hover: #e9e9ea;
+  --btn-bg-active: #dfdfdf;
+  --btn-border: rgba(56, 58, 66, 0.15);
+  --btn-border-hover: rgba(56, 58, 66, 0.15);
+  --btn-disabled-bg: #f0f0f1;
+  --btn-disabled-ink: #a0a1a7;
+  --border-muted-solid: #d4d4d6;
+  --focus-ring: 0 0 0 3px rgba(64, 120, 242, 0.35);
+  --row-on-accent: #fafafa;
+  --row-on-accent-muted: rgba(250, 250, 250, 0.85);
+  --on-accent: #ffffff;
+  --on-accent-chip: rgba(255, 255, 255, 0.1);
+  --on-accent-chip-border: rgba(255, 255, 255, 0.45);
+  --word-add: rgba(80, 161, 79, 0.3);
+  --word-del: rgba(228, 86, 73, 0.3);
+  --word-del-strike: rgba(228, 86, 73, 0.55);
+  --scroll-thumb: rgba(111, 113, 121, 0.4);
+  --scroll-thumb-hover: rgba(111, 113, 121, 0.7);
+}
+
+/* Everforest (sainnhe/everforest), dark medium: the soft green-grey forest
+   in shade. Its own blue is bright, so filled controls carry ground ink. */
+html[data-theme='everforest-dark'] {
+  --bg: #2f383e;
+  --bg-panel: #343f44;
+  --bg-header: #343f44;
+  --bg-inset: #273136;
+  --bg-hover: rgba(211, 198, 170, 0.08);
+  --bg-selected: #475258;
+  --border: #475258;
+  --border-subtle: #3d484d;
+  --text: #d3c6aa;
+  --text-muted: #93a297;
+  --accent: #7fbbb3;
+  --accent-emphasis: #5f9a92;
+  --accent-hover: #8cc4bc;
+  --accent-active: #5f9a92;
+  --primary: #7fbbb3;
+  --primary-hover: #8cc4bc;
+  --success: #a7c080;
+  --danger: #e67e80;
+  --danger-face: #dd6f71;
+  --danger-face-hover: #c1585c;
+  --danger-hover: #c1585c;
+  --caution: #dbbc7f;
+  --ai: #d699b6;
+  --ai-face: #c787a5;
+  --ai-face-hover: #b06d8b;
+  --pull-face: #dbbc7f;
+  --pull-face-hover: #cdb073;
+  --push-face: #a7c080;
+  --push-face-hover: #98b373;
+  --chip-face: #3d484d;
+  --bg-selected-hover: #4f585e;
+  --syntax-comment: #566369;
+  --syntax-keyword: #e67e80;
+  --syntax-string: #a7c080;
+  --syntax-constant: #e69875;
+  --syntax-function: #83c092;
+  --syntax-entity: #dbbc7f;
+  --add-bg: rgba(167, 192, 128, 0.14);
+  --add-gutter: rgba(167, 192, 128, 0.24);
+  --add-text: #a7c080;
+  --del-bg: rgba(230, 126, 128, 0.13);
+  --del-gutter: rgba(230, 126, 128, 0.24);
+  --del-text: #e67e80;
+  --hunk-bg: rgba(127, 187, 179, 0.1);
+  --hunk-gutter: rgba(127, 187, 179, 0.18);
+  --hunk-text: #7fbbb3;
+  --scrim: rgba(39, 46, 51, 0.68);
+  --shadow: 0 12px 28px rgba(26, 31, 34, 0.6), 0 2px 4px rgba(26, 31, 34, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #3d484d;
+  --btn-bg-hover: #475258;
+  --btn-bg-active: #3d484d;
+  --btn-border: rgba(211, 198, 170, 0.12);
+  --btn-border-hover: rgba(211, 198, 170, 0.12);
+  --btn-disabled-bg: #475258;
+  --btn-disabled-ink: #566369;
+  --border-muted-solid: #566369;
+  --focus-ring: 0 0 0 3px rgba(127, 187, 179, 0.4);
+  --row-on-accent: #d3c6aa;
+  --row-on-accent-muted: rgba(211, 198, 170, 0.8);
+  --on-accent: #2f383e;
+  --on-accent-chip: rgba(47, 56, 62, 0.12);
+  --on-accent-chip-border: rgba(47, 56, 62, 0.45);
+  --word-add: rgba(167, 192, 128, 0.3);
+  --word-del: rgba(230, 126, 128, 0.32);
+  --word-del-strike: rgba(230, 126, 128, 0.6);
+  --scroll-thumb: rgba(147, 162, 151, 0.4);
+  --scroll-thumb-hover: rgba(147, 162, 151, 0.7);
+}
+
+/* Everforest light medium: sunlit birch, the same roles in the lighter
+   steps of the palette. */
+html[data-theme='everforest-light'] {
+  --bg: #f5f2e3;
+  --bg-panel: #e6e2d0;
+  --bg-header: #e6e2d0;
+  --bg-inset: #ddd9c5;
+  --bg-hover: rgba(92, 106, 114, 0.1);
+  --bg-selected: #2f7fa9;
+  --border: #d1cdb8;
+  --border-subtle: #e2dfcc;
+  --text: #5c6a72;
+  --text-muted: #829181;
+  --accent: #3a94c5;
+  --accent-emphasis: #2f7fa9;
+  --accent-hover: #3490be;
+  --accent-active: #2f7fa9;
+  --primary: #2f7fa9;
+  --primary-hover: #2a739a;
+  --success: #8da101;
+  --danger: #e04e4a;
+  --danger-face: #e04e4a;
+  --danger-face-hover: #c43e3b;
+  --danger-hover: #c43e3b;
+  --caution: #dfa000;
+  --ai: #df69ba;
+  --ai-face: #df69ba;
+  --ai-face-hover: #c24f9f;
+  --pull-face: #b38100;
+  --pull-face-hover: #9c7100;
+  --push-face: #6f8001;
+  --push-face-hover: #5f6e01;
+  --chip-face: #f5f2e3;
+  --bg-selected-hover: #2a739a;
+  --syntax-comment: #93a297;
+  --syntax-keyword: #f85552;
+  --syntax-string: #8da101;
+  --syntax-constant: #f57d26;
+  --syntax-function: #3a94c5;
+  --syntax-entity: #df69ba;
+  --add-bg: rgba(141, 161, 1, 0.14);
+  --add-gutter: rgba(141, 161, 1, 0.22);
+  --add-text: #75890c;
+  --del-bg: rgba(248, 85, 82, 0.1);
+  --del-gutter: rgba(248, 85, 82, 0.18);
+  --del-text: #d0433f;
+  --hunk-bg: rgba(58, 148, 197, 0.1);
+  --hunk-gutter: rgba(58, 148, 197, 0.18);
+  --hunk-text: #2f7fa9;
+  --scrim: rgba(92, 106, 114, 0.5);
+  --shadow: 0 12px 28px rgba(139, 134, 110, 0.3), 0 2px 4px rgba(139, 134, 110, 0.12);
+  --btn-shadow: 0 1px 0 rgba(92, 106, 114, 0.05);
+  --btn-bg: #e6e2d0;
+  --btn-bg-hover: #ddd9c6;
+  --btn-bg-active: #d6d2be;
+  --btn-border: rgba(92, 106, 114, 0.15);
+  --btn-border-hover: rgba(92, 106, 114, 0.15);
+  --btn-disabled-bg: #e6e2d0;
+  --btn-disabled-ink: #a9b0a0;
+  --border-muted-solid: #b9b7a2;
+  --focus-ring: 0 0 0 3px rgba(58, 148, 197, 0.35);
+  --row-on-accent: #f5f2e3;
+  --row-on-accent-muted: rgba(245, 242, 227, 0.85);
+  --on-accent: #f5f2e3;
+  --on-accent-chip: rgba(245, 242, 227, 0.12);
+  --on-accent-chip-border: rgba(245, 242, 227, 0.45);
+  --word-add: rgba(141, 161, 1, 0.28);
+  --word-del: rgba(248, 85, 82, 0.3);
+  --word-del-strike: rgba(248, 85, 82, 0.55);
+  --scroll-thumb: rgba(130, 145, 129, 0.4);
+  --scroll-thumb-hover: rgba(130, 145, 129, 0.7);
+}
+
+/* Dracula (dracula/theme): the classic vampire purple-green on
+   background-dark, pink for the self-expressive roles. */
+html[data-theme='dracula'] {
+  --bg: #282a36;
+  --bg-panel: #21222c;
+  --bg-header: #21222c;
+  --bg-inset: #191a21;
+  --bg-hover: rgba(248, 248, 242, 0.07);
+  --bg-selected: #44475a;
+  --border: #44475a;
+  --border-subtle: #373947;
+  --text: #f8f8f2;
+  --text-muted: #9aa4b8;
+  --accent: #bd93f9;
+  --accent-emphasis: #9d74e0;
+  --accent-hover: #caa6fa;
+  --accent-active: #9d74e0;
+  --primary: #bd93f9;
+  --primary-hover: #ca9ffa;
+  --success: #50fa7b;
+  --danger: #ff5555;
+  --danger-face: #e04949;
+  --danger-face-hover: #c53f3f;
+  --danger-hover: #e04949;
+  --caution: #f1fa8c;
+  --ai: #ff79c6;
+  --ai-face: #ff79c6;
+  --ai-face-hover: #e062b0;
+  --pull-face: #f1fa8c;
+  --pull-face-hover: #e2eb7e;
+  --push-face: #50fa7b;
+  --push-face-hover: #45e66e;
+  --chip-face: #343746;
+  --bg-selected-hover: #4d5163;
+  --syntax-comment: #6272a4;
+  --syntax-keyword: #ff79c6;
+  --syntax-string: #f1fa8c;
+  --syntax-constant: #bd93f9;
+  --syntax-function: #50fa7b;
+  --syntax-entity: #8be9fd;
+  --add-bg: rgba(80, 250, 123, 0.13);
+  --add-gutter: rgba(80, 250, 123, 0.22);
+  --add-text: #50fa7b;
+  --del-bg: rgba(255, 85, 85, 0.13);
+  --del-gutter: rgba(255, 85, 85, 0.24);
+  --del-text: #ff5555;
+  --hunk-bg: rgba(189, 147, 249, 0.1);
+  --hunk-gutter: rgba(189, 147, 249, 0.18);
+  --hunk-text: #bd93f9;
+  --scrim: rgba(19, 20, 26, 0.68);
+  --shadow: 0 12px 28px rgba(19, 20, 26, 0.6), 0 2px 4px rgba(19, 20, 26, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #44475a;
+  --btn-bg-hover: #4d5163;
+  --btn-bg-active: #44475a;
+  --btn-border: rgba(248, 248, 242, 0.08);
+  --btn-border-hover: rgba(248, 248, 242, 0.08);
+  --btn-disabled-bg: #4d5163;
+  --btn-disabled-ink: #6f7894;
+  --border-muted-solid: #565a6e;
+  --focus-ring: 0 0 0 3px rgba(189, 147, 249, 0.4);
+  --row-on-accent: #f8f8f2;
+  --row-on-accent-muted: rgba(248, 248, 242, 0.8);
+  --on-accent: #282a36;
+  --on-accent-chip: rgba(40, 42, 54, 0.14);
+  --on-accent-chip-border: rgba(40, 42, 54, 0.45);
+  --word-add: rgba(80, 250, 123, 0.3);
+  --word-del: rgba(255, 85, 85, 0.35);
+  --word-del-strike: rgba(255, 85, 85, 0.65);
+  --scroll-thumb: rgba(154, 164, 184, 0.4);
+  --scroll-thumb-hover: rgba(154, 164, 184, 0.7);
+}
+
+/* Solarized (ethanschoonover/solarized), the hexadic accuracy set on the
+   base03 sea — state colors are the palette's own yellow-green and red. */
+html[data-theme='solarized-dark'] {
+  --bg: #002b36;
+  --bg-panel: #073642;
+  --bg-header: #073642;
+  --bg-inset: #00212b;
+  --bg-hover: rgba(147, 161, 161, 0.08);
+  --bg-selected: #0a4a5c;
+  --border: #0a4a5c;
+  --border-subtle: #063540;
+  --text: #93a1a1;
+  --text-muted: #657b83;
+  --accent: #268bd2;
+  --accent-emphasis: #1a6fac;
+  --accent-hover: #3595db;
+  --accent-active: #1a6fac;
+  --primary: #1a6fac;
+  --primary-hover: #268bd2;
+  --success: #859900;
+  --danger: #dc322f;
+  --danger-face: #d3362f;
+  --danger-face-hover: #b52a27;
+  --danger-hover: #b52a27;
+  --caution: #b58900;
+  --ai: #d33682;
+  --ai-face: #d33682;
+  --ai-face-hover: #b52d6f;
+  --pull-face: #b58900;
+  --pull-face-hover: #9a7400;
+  --push-face: #6d7e00;
+  --push-face-hover: #5c6b00;
+  --chip-face: #0a4252;
+  --bg-selected-hover: #0e5569;
+  --syntax-comment: #586e75;
+  --syntax-keyword: #859900;
+  --syntax-string: #2aa198;
+  --syntax-constant: #6c71c4;
+  --syntax-function: #268bd2;
+  --syntax-entity: #b58900;
+  --add-bg: rgba(133, 153, 0, 0.13);
+  --add-gutter: rgba(133, 153, 0, 0.22);
+  --add-text: #859900;
+  --del-bg: rgba(220, 50, 47, 0.13);
+  --del-gutter: rgba(220, 50, 47, 0.24);
+  --del-text: #dc322f;
+  --hunk-bg: rgba(38, 139, 210, 0.12);
+  --hunk-gutter: rgba(38, 139, 210, 0.2);
+  --hunk-text: #268bd2;
+  --scrim: rgba(0, 21, 27, 0.68);
+  --shadow: 0 12px 28px rgba(0, 21, 27, 0.6), 0 2px 4px rgba(0, 21, 27, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #0a4252;
+  --btn-bg-hover: #0d5162;
+  --btn-bg-active: #0a4252;
+  --btn-border: rgba(147, 161, 161, 0.12);
+  --btn-border-hover: rgba(147, 161, 161, 0.12);
+  --btn-disabled-bg: #0d5162;
+  --btn-disabled-ink: #586e75;
+  --border-muted-solid: #115a6e;
+  --focus-ring: 0 0 0 3px rgba(38, 139, 210, 0.4);
+  --row-on-accent: #eee8d5;
+  --row-on-accent-muted: rgba(238, 232, 213, 0.82);
+  --on-accent: #fdf6e3;
+  --on-accent-chip: rgba(253, 246, 227, 0.12);
+  --on-accent-chip-border: rgba(253, 246, 227, 0.45);
+  --word-add: rgba(133, 153, 0, 0.3);
+  --word-del: rgba(220, 50, 47, 0.35);
+  --word-del-strike: rgba(220, 50, 47, 0.65);
+  --scroll-thumb: rgba(101, 123, 131, 0.5);
+  --scroll-thumb-hover: rgba(101, 123, 131, 0.75);
+}
+
+/* Solarized light on base3 parchment. */
+html[data-theme='solarized-light'] {
+  --bg: #fdf6e3;
+  --bg-panel: #eee8d5;
+  --bg-header: #eee8d5;
+  --bg-inset: #e6e0cb;
+  --bg-hover: rgba(88, 110, 117, 0.1);
+  --bg-selected: #1a6fac;
+  --border: #dbd4bf;
+  --border-subtle: #eee8d5;
+  --text: #586e75;
+  --text-muted: #657b83;
+  --accent: #1a6fac;
+  --accent-emphasis: #1a6fac;
+  --accent-hover: #17619a;
+  --accent-active: #134f7f;
+  --primary: #1a6fac;
+  --primary-hover: #17619a;
+  --success: #859900;
+  --danger: #dc322f;
+  --danger-face: #dc322f;
+  --danger-face-hover: #c42a28;
+  --danger-hover: #c42a28;
+  --caution: #b58900;
+  --ai: #d33682;
+  --ai-face: #d33682;
+  --ai-face-hover: #bd2f76;
+  --pull-face: #b58900;
+  --pull-face-hover: #9a7400;
+  --push-face: #6d7e00;
+  --push-face-hover: #5c6b00;
+  --chip-face: #fdf6e3;
+  --bg-selected-hover: #17619a;
+  --syntax-comment: #93a1a1;
+  --syntax-keyword: #859900;
+  --syntax-string: #2aa198;
+  --syntax-constant: #6c71c4;
+  --syntax-function: #268bd2;
+  --syntax-entity: #cb4b16;
+  --add-bg: rgba(133, 153, 0, 0.12);
+  --add-gutter: rgba(133, 153, 0, 0.2);
+  --add-text: #6c7c00;
+  --del-bg: rgba(220, 50, 47, 0.08);
+  --del-gutter: rgba(220, 50, 47, 0.16);
+  --del-text: #c42a28;
+  --hunk-bg: rgba(38, 139, 210, 0.08);
+  --hunk-gutter: rgba(38, 139, 210, 0.16);
+  --hunk-text: #1a6fac;
+  --scrim: rgba(88, 110, 117, 0.5);
+  --shadow: 0 12px 28px rgba(147, 161, 161, 0.3), 0 2px 4px rgba(147, 161, 161, 0.12);
+  --btn-shadow: 0 1px 0 rgba(88, 110, 117, 0.05);
+  --btn-bg: #eee8d5;
+  --btn-bg-hover: #e6dfca;
+  --btn-bg-active: #dfd8c2;
+  --btn-border: rgba(88, 110, 117, 0.18);
+  --btn-border-hover: rgba(88, 110, 117, 0.18);
+  --btn-disabled-bg: #eee8d5;
+  --btn-disabled-ink: #93a1a1;
+  --border-muted-solid: #c9c1a6;
+  --focus-ring: 0 0 0 3px rgba(38, 139, 210, 0.35);
+  --row-on-accent: #fdf6e3;
+  --row-on-accent-muted: rgba(253, 246, 227, 0.85);
+  --on-accent: #fdf6e3;
+  --on-accent-chip: rgba(253, 246, 227, 0.14);
+  --on-accent-chip-border: rgba(253, 246, 227, 0.45);
+  --word-add: rgba(133, 153, 0, 0.28);
+  --word-del: rgba(220, 50, 47, 0.3);
+  --word-del-strike: rgba(220, 50, 47, 0.55);
+  --scroll-thumb: rgba(131, 148, 150, 0.45);
+  --scroll-thumb-hover: rgba(131, 148, 150, 0.7);
+}
+
+/* Tokyo Night (enkia/tokyo-night-vscode-theme): the neon city in
+   indigo, cyan-blue for navigation and the peach/purple syntax steps
+   for constants and entities. */
+html[data-theme='tokyo-night'] {
+  --bg: #1a1b26;
+  --bg-panel: #16161e;
+  --bg-header: #16161e;
+  --bg-inset: #13131a;
+  --bg-hover: rgba(168, 177, 214, 0.07);
+  --bg-selected: #292e42;
+  --border: #292e42;
+  --border-subtle: #232433;
+  --text: #a9b1d6;
+  --text-muted: #828bb0;
+  --accent: #7aa2f7;
+  --accent-emphasis: #5d86e8;
+  --accent-hover: #8caffa;
+  --accent-active: #5d86e8;
+  --primary: #5d86e8;
+  --primary-hover: #7aa2f7;
+  --success: #9ece6a;
+  --danger: #f7768e;
+  --danger-face: #db4b4b;
+  --danger-face-hover: #c04343;
+  --danger-hover: #db4b4b;
+  --caution: #e0af68;
+  --ai: #bb9af7;
+  --ai-face: #9d7cd8;
+  --ai-face-hover: #8664c0;
+  --pull-face: #e0af68;
+  --pull-face-hover: #d1a05c;
+  --push-face: #9ece6a;
+  --push-face-hover: #91c15d;
+  --chip-face: #232433;
+  --bg-selected-hover: #33394f;
+  --syntax-comment: #565f89;
+  --syntax-keyword: #bb9af7;
+  --syntax-string: #9ece6a;
+  --syntax-constant: #ff9e64;
+  --syntax-function: #7aa2f7;
+  --syntax-entity: #7dcfff;
+  --add-bg: rgba(158, 206, 106, 0.12);
+  --add-gutter: rgba(158, 206, 106, 0.2);
+  --add-text: #9ece6a;
+  --del-bg: rgba(247, 118, 142, 0.12);
+  --del-gutter: rgba(247, 118, 142, 0.22);
+  --del-text: #f7768e;
+  --hunk-bg: rgba(122, 162, 247, 0.1);
+  --hunk-gutter: rgba(122, 162, 247, 0.18);
+  --hunk-text: #7aa2f7;
+  --scrim: rgba(16, 17, 23, 0.68);
+  --shadow: 0 12px 28px rgba(16, 17, 23, 0.6), 0 2px 4px rgba(16, 17, 23, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #292e42;
+  --btn-bg-hover: #33394f;
+  --btn-bg-active: #292e42;
+  --btn-border: rgba(168, 177, 214, 0.1);
+  --btn-border-hover: rgba(168, 177, 214, 0.1);
+  --btn-disabled-bg: #33394f;
+  --btn-disabled-ink: #545c7e;
+  --border-muted-solid: #3b4261;
+  --focus-ring: 0 0 0 3px rgba(122, 162, 247, 0.4);
+  --row-on-accent: #c0caf5;
+  --row-on-accent-muted: rgba(192, 202, 245, 0.8);
+  --on-accent: #1a1b26;
+  --on-accent-chip: rgba(26, 27, 38, 0.14);
+  --on-accent-chip-border: rgba(26, 27, 38, 0.45);
+  --word-add: rgba(158, 206, 106, 0.3);
+  --word-del: rgba(247, 118, 142, 0.35);
+  --word-del-strike: rgba(247, 118, 142, 0.65);
+  --scroll-thumb: rgba(130, 139, 176, 0.4);
+  --scroll-thumb-hover: rgba(130, 139, 176, 0.7);
+}
+
+/* Catppuccin Mocha: the warmest of the community pastels, so soft that
+   the diff washes carry slightly more alpha than the rest. */
+html[data-theme='catppuccin-mocha'] {
+  --bg: #1e1e2e;
+  --bg-panel: #181825;
+  --bg-header: #181825;
+  --bg-inset: #11111b;
+  --bg-hover: rgba(205, 214, 244, 0.07);
+  --bg-selected: #313244;
+  --border: #313244;
+  --border-subtle: #262639;
+  --text: #cdd6f4;
+  --text-muted: #a6adc8;
+  --accent: #89b4fa;
+  --accent-emphasis: #6e9ff6;
+  --accent-hover: #9cc2fb;
+  --accent-active: #6e9ff6;
+  --primary: #89b4fa;
+  --primary-hover: #9cc2fb;
+  --success: #a6e3a1;
+  --danger: #f38ba8;
+  --danger-face: #e26e85;
+  --danger-face-hover: #c55e73;
+  --danger-hover: #e26e85;
+  --caution: #f9e2af;
+  --ai: #cba6f7;
+  --ai-face: #ba8ef0;
+  --ai-face-hover: #a374d8;
+  --pull-face: #f9e2af;
+  --pull-face-hover: #ead4a3;
+  --push-face: #a6e3a1;
+  --push-face-hover: #98d694;
+  --chip-face: #313244;
+  --bg-selected-hover: #3b3d54;
+  --syntax-comment: #6c7086;
+  --syntax-keyword: #cba6f7;
+  --syntax-string: #a6e3a1;
+  --syntax-constant: #fab387;
+  --syntax-function: #89b4fa;
+  --syntax-entity: #74c7ec;
+  --add-bg: rgba(166, 227, 161, 0.12);
+  --add-gutter: rgba(166, 227, 161, 0.2);
+  --add-text: #a6e3a1;
+  --del-bg: rgba(243, 139, 168, 0.12);
+  --del-gutter: rgba(243, 139, 168, 0.22);
+  --del-text: #f38ba8;
+  --hunk-bg: rgba(137, 180, 250, 0.1);
+  --hunk-gutter: rgba(137, 180, 250, 0.18);
+  --hunk-text: #89b4fa;
+  --scrim: rgba(17, 17, 27, 0.68);
+  --shadow: 0 12px 28px rgba(17, 17, 27, 0.6), 0 2px 4px rgba(17, 17, 27, 0.4);
+  --btn-shadow: 0 0 transparent;
+  --btn-bg: #313244;
+  --btn-bg-hover: #45475a;
+  --btn-bg-active: #313244;
+  --btn-border: rgba(205, 214, 244, 0.08);
+  --btn-border-hover: rgba(205, 214, 244, 0.08);
+  --btn-disabled-bg: #45475a;
+  --btn-disabled-ink: #6c7086;
+  --border-muted-solid: #45475a;
+  --focus-ring: 0 0 0 3px rgba(137, 180, 250, 0.4);
+  --row-on-accent: #cdd6f4;
+  --row-on-accent-muted: rgba(205, 214, 244, 0.8);
+  --on-accent: #1e1e2e;
+  --on-accent-chip: rgba(30, 30, 46, 0.14);
+  --on-accent-chip-border: rgba(30, 30, 46, 0.45);
+  --word-add: rgba(166, 227, 161, 0.3);
+  --word-del: rgba(243, 139, 168, 0.35);
+  --word-del-strike: rgba(243, 139, 168, 0.65);
+  --scroll-thumb: rgba(166, 173, 200, 0.4);
+  --scroll-thumb-hover: rgba(166, 173, 200, 0.7);
 }
 
 * {
@@ -310,6 +1218,43 @@ button {
   border-color: var(--btn-border);
 }
 
+/* The sync verbs keep their own hue so the desk reads by color alone:
+   green is outgoing — the push adds to the remote, the same green the
+   diff gives additions — and amber is incoming, a pull that will touch
+   your working tree and worth a second of caution. Blue stays the
+   commit verb's own; fetch, which changes nothing locally, stays a
+   neutral button. */
+.btn.pull {
+  background: var(--pull-face);
+  border-color: var(--btn-border);
+  color: var(--on-accent);
+}
+
+.btn.pull:hover:not(:disabled) {
+  background: var(--pull-face-hover);
+  border-color: var(--btn-border);
+}
+
+.btn.push {
+  background: var(--push-face);
+  border-color: var(--btn-border);
+  color: var(--on-accent);
+}
+
+.btn.push:hover:not(:disabled) {
+  background: var(--push-face-hover);
+  border-color: var(--btn-border);
+}
+
+/* A filled verb that is unavailable takes Primer's disabled face, exactly
+   like the commit button: grayed means grayed the same way everywhere. */
+.btn.pull:disabled,
+.btn.push:disabled {
+  background: var(--btn-disabled-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-disabled-ink);
+}
+
 .icon-btn {
   background: transparent;
   border: none;
@@ -353,6 +1298,73 @@ button {
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
+}
+
+/*
+ * Window frame, Windows: main hides the OS title bar and floats the
+ * caption buttons in a Window Controls Overlay painted from --bg-header
+ * (src/main/windows.ts). The title band below is the window's drag
+ * handle and the overlay's ground — a quiet strip all its own, so the
+ * command bar beneath stays 100% clickable and Min/Max/Close never sit
+ * on top of an app button. Its height must equal titleBarHeight in
+ * src/main/windows.ts so the caption buttons and the band end on the
+ * same line. The paddings follow the caption safe area through
+ * env(titlebar-area-*), which also covers left-side buttons (RTL /
+ * some Linux setups); without the overlay (data-wco unset) the band is
+ * display:none and the layout is exactly the old one.
+ */
+.titlebar {
+  display: none;
+}
+
+html[data-wco] .titlebar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 40px; /* matches titleBarHeight in src/main/windows.ts */
+  -webkit-app-region: drag;
+  background: var(--bg-header);
+  padding-left: calc(12px + env(titlebar-area-x, 0px));
+  padding-right: calc(
+    12px + 100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)
+  );
+}
+
+.titlebar-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/*
+ * The band's menu labels: same template the classic menu bar uses, popped
+ * as native menus by main (src/main/menu.ts popupMenuAt). Draggable
+ * regions swallow pointer events, so they explicitly opt back out.
+ */
+.titlebar-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.titlebar-item {
+  -webkit-app-region: no-drag;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.titlebar-item:hover {
+  background: var(--bg-hover);
 }
 
 .header-left,
@@ -516,8 +1528,17 @@ button {
   min-height: 0;
 }
 
+/* The desk's two docked panels size from these variables so dragging the
+   divider between them retunes the layout without touching any rule; the
+   inline value a user drag writes on .work-area wins over the narrow-desk
+   media query below, which is the point — explicit intent beats breakpoint. */
+.work-area {
+  --queue-w: 340px;
+  --tray-w: 300px;
+}
+
 .queue-col {
-  flex: 0 0 340px;
+  flex: 0 0 var(--queue-w);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -531,6 +1552,55 @@ button {
   min-width: 0;
   display: flex;
   background: var(--bg);
+}
+
+/* ------------------------------------------------------------ resizers */
+/* The draggable hairlines between the desk's zones. They sit in the flex row
+   but pull themselves out of the width budget with negative margins, so the
+   panels measure exactly as before the feature. The grip appears only on
+   hover, focus, or mid-drag — the boundary stays a plain hairline at rest. */
+
+.resizer {
+  position: relative;
+  flex: 0 0 5px;
+  margin: 0 -3px;
+  z-index: 6;
+  cursor: col-resize;
+  background: transparent;
+  border: none;
+  padding: 0;
+  touch-action: none;
+}
+
+.resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 1px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.resizer:hover::after,
+.resizer:focus-visible::after,
+body.desk-resizing .resizer::after {
+  background: var(--accent);
+}
+
+.resizer:focus-visible {
+  outline: none;
+}
+
+/* One gesture class on <body> so the cursor and text selection survive the
+   pointer racing off the 5px strip and over the diff. */
+body.desk-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.desk-resizing iframe,
+body.desk-resizing .main-pane {
+  pointer-events: none;
 }
 
 /* ------------------------------------------------------------ desk switch */
@@ -833,7 +1903,7 @@ button {
 /* ------------------------------------------------------------ commit tray */
 
 .commit-tray {
-  flex: 0 0 300px;
+  flex: 0 0 var(--tray-w);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -873,6 +1943,10 @@ button {
 }
 
 .commit-tray .commit-actions .btn.ai {
+  justify-content: center;
+}
+
+.commit-tray .commit-actions .btn.push {
   justify-content: center;
 }
 
@@ -2772,18 +3846,22 @@ select {
 }
 
 @media (max-width: 1160px) {
-  .queue-col {
-    flex-basis: 290px;
-  }
-
-  .commit-tray {
-    flex-basis: 260px;
+  /* The defaults shrink; an explicit width from a drag rides on .work-area's
+     inline style and wins, which is the intended precedence. */
+  .work-area {
+    --queue-w: 290px;
+    --tray-w: 260px;
   }
 }
 
 @media (max-width: 980px) {
   .work-area {
     flex-direction: column;
+  }
+
+  /* Stacked, the widths no longer mean anything — the dividers retire. */
+  .resizer {
+    display: none;
   }
 
   .queue-col {

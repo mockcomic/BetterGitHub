@@ -12,7 +12,13 @@ function sendAction(action: MenuAction): void {
  * Repository/History/Help); repository operations are forwarded to the
  * renderer as menu actions, the same pattern the original uses with menu item
  * indices.
+ *
+ * The built menu is also reused as the popup source for the win32 title
+ * band (see popupMenuAt): the standard menu bar hides there (autoHideMenuBar),
+ * so the band shows these top-level labels and pops the same native menus.
  */
+let builtMenu: Menu | null = null
+
 export function buildAppMenu(): void {
   const isMac = process.platform === 'darwin'
 
@@ -172,5 +178,22 @@ export function buildAppMenu(): void {
     }
   ]
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  builtMenu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(builtMenu)
+}
+
+/** The labels for the win32 title band (macOS keeps the system menu instead,
+ *  where the first item is the app name — it has no band anyway). */
+export function getTopLevelMenuLabels(): string[] {
+  if (builtMenu === null) return []
+  return builtMenu.items.map(item => item.label).filter(label => label !== '')
+}
+
+/** Open one menu's native popup below its band label. Coordinates are
+ *  window-content pixels (DIP), matching the renderer's CSS layout. */
+export function popupMenuAt(label: string, x: number, y: number): void {
+  const window = getMainWindow()
+  if (window === null) return
+  const item = builtMenu?.items.find(candidate => candidate.label === label)
+  item?.submenu?.popup({ window, x: Math.round(x), y: Math.round(y) })
 }

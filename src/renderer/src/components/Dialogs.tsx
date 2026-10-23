@@ -2,7 +2,13 @@ import type { JSX } from 'react'
 import { useEffect, useState } from 'react'
 import { call } from '../api'
 import { useStore, useStoreState } from '../store'
+import type { ThemeId } from '../../../shared/themes'
+import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field } from './Dialog'
+
+const autoEntries = THEME_ENTRIES.filter(e => e.group === 'auto')
+const lightEntries = THEME_ENTRIES.filter(e => e.group === 'light')
+const darkEntries = THEME_ENTRIES.filter(e => e.group === 'dark')
 
 export function SettingsDialog(): JSX.Element | null {
   const state = useStoreState()
@@ -15,7 +21,7 @@ export function SettingsDialog(): JSX.Element | null {
   const [customInstructions, setCustomInstructions] = useState('')
   const [confirmOverride, setConfirmOverride] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
-  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
+  const [theme, setTheme] = useState<ThemeId>('system')
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
 
@@ -159,13 +165,30 @@ export function SettingsDialog(): JSX.Element | null {
         <Field label="Theme">
           <select
             value={theme}
-            onChange={e =>
-              setTheme(e.target.value as 'system' | 'light' | 'dark')
-            }
+            onChange={e => {
+              const next = e.target.value
+              if (isThemeId(next)) setTheme(next)
+            }}
           >
-            <option value="system">System default</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
+            {autoEntries.map(entry => (
+              <option key={entry.id} value={entry.id}>
+                {entry.label}
+              </option>
+            ))}
+            <optgroup label="Light">
+              {lightEntries.map(entry => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Dark">
+              {darkEntries.map(entry => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </Field>
       </section>

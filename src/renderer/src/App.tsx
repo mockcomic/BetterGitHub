@@ -1,7 +1,8 @@
 import type { JSX } from 'react'
 import type { CSSProperties } from 'react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Header } from './components/Header'
+import { TitleBar } from './components/TitleBar'
 import {
   ChangesQueue,
   CommitTray,
@@ -13,6 +14,8 @@ import {
 } from './components/ChangesSidebar'
 import { DiffView } from './components/DiffView'
 import { HistoryView } from './components/HistoryView'
+import { ResizeHandle } from './components/ResizeHandle'
+import type { WidthRange } from './components/ResizeHandle'
 import { Toasts } from './components/Toasts'
 import {
   AboutDialog,
@@ -34,6 +37,34 @@ const DESK_TABS: ReadonlyArray<{ id: DeskView; label: string }> = [
   { id: 'stash', label: 'Stash' }
 ]
 
+/* The docked panels are drag-resizable within these bounds; `def` is the
+   DESIGN.md measure the responsive defaults fall back to. */
+const QUEUE_KEY = 'gitdesk.layout.queueWidth'
+const TRAY_KEY = 'gitdesk.layout.trayWidth'
+const QUEUE_RANGE: WidthRange = { min: 220, max: 480, def: 340 }
+const TRAY_RANGE: WidthRange = { min: 220, max: 420, def: 300 }
+
+function readStoredWidth(key: string, range: WidthRange): number | null {
+  try {
+    const raw = localStorage.getItem(key)
+    if (raw === null) return null
+    const value = Number(raw)
+    if (!Number.isFinite(value)) return null
+    return Math.min(range.max, Math.max(range.min, Math.round(value)))
+  } catch {
+    return null
+  }
+}
+
+function writeStoredWidth(key: string, value: number | null): void {
+  try {
+    if (value === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, String(value))
+  } catch {
+    // Storage unavailable — the width just lives for this session.
+  }
+}
+
 export function App(): JSX.Element {
   const state = useStoreState()
   const store = useStore()
@@ -46,9 +77,37 @@ export function App(): JSX.Element {
     void store.recomputeScope()
   }, [store, state.selectedRepo, state.status, state.drafts])
 
+  // Dragged panel widths. The live drag writes the variable straight on the
+  // work area (see ResizeHandle); React only holds the committed value so it
+  // survives view switches and restarts. The style object is memoised so a
+  // mid-drag re-render cannot wipe the handle's direct writes.
+  const [queueWidth, setQueueWidth] = useState<number | null>(() =>
+    readStoredWidth(QUEUE_KEY, QUEUE_RANGE)
+  )
+  const [trayWidth, setTrayWidth] = useState<number | null>(() =>
+    readStoredWidth(TRAY_KEY, TRAY_RANGE)
+  )
+  const workStyle = useMemo(
+    () =>
+      ({
+        ...(queueWidth !== null ? { '--queue-w': `${queueWidth}px` } : {}),
+        ...(trayWidth !== null ? { '--tray-w': `${trayWidth}px` } : {})
+      }) as CSSProperties,
+    [queueWidth, trayWidth]
+  )
+  const commitQueueWidth = (value: number | null): void => {
+    setQueueWidth(value)
+    writeStoredWidth(QUEUE_KEY, value)
+  }
+  const commitTrayWidth = (value: number | null): void => {
+    setTrayWidth(value)
+    writeStoredWidth(TRAY_KEY, value)
+  }
+
   if (state.selectedRepo === null) {
     return (
       <div className="app" data-view="empty">
+        <TitleBar />
         <Header />
         <EmptyState />
         <Toasts />
@@ -68,6 +127,7 @@ export function App(): JSX.Element {
 
   return (
     <div className="app" data-view={view}>
+      <TitleBar />
       <Header />
       {state.initError !== null && (
         <div className="app-banner error">
@@ -78,13 +138,21 @@ export function App(): JSX.Element {
         </div>
       )}
       <SegmentedSwitch />
-      <div className="body work-area">
+      <div className="body work-area" style={workStyle}>
         <aside className="queue-col pane-enter" key={`queue-${view}`}>
           {view === 'review' && <ChangesQueue />}
           {view === 'history' && <HistoryQueue />}
           {view === 'conflicts' && <ConflictsQueue />}
           {view === 'stash' && <StashQueue />}
         </aside>
+        <ResizeHandle
+          side="prev"
+          range={QUEUE_RANGE}
+          label="Queue width"
+          cssVar="--queue-w"
+          width={queueWidth}
+          onCommit={commitQueueWidth}
+        />
         <main
           className="main-pane pane-enter"
           id="desk-panel"
@@ -138,14 +206,34 @@ export function App(): JSX.Element {
           {view === 'stash' && <StashDetail />}
         </main>
         {view === 'review' && (
-          <aside className="commit-tray" aria-label="Commit tray">
-            <CommitTray />
-          </aside>
+          <>
+            <ResizeHandle
+              side="next"
+              range={TRAY_RANGE}
+              label="Commit tray width"
+              cssVar="--tray-w"
+              width={trayWidth}
+              onCommit={commitTrayWidth}
+            />
+            <aside className="commit-tray" aria-label="Commit tray">
+              <CommitTray />
+            </aside>
+          </>
         )}
         {view === 'conflicts' && (
-          <aside className="commit-tray" aria-label="Conflict guidance">
-            <ResolveHelp />
-          </aside>
+          <>
+            <ResizeHandle
+              side="next"
+              range={TRAY_RANGE}
+              label="Commit tray width"
+              cssVar="--tray-w"
+              width={trayWidth}
+              onCommit={commitTrayWidth}
+            />
+            <aside className="commit-tray" aria-label="Conflict guidance">
+              <ResolveHelp />
+            </aside>
+          </>
         )}
       </div>
       <StatusBar />

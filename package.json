@@ -18,7 +18,11 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "test": "vitest run"
+    "test": "vitest run",
+    "git-broker": "node scripts/git-broker.mjs",
+    "git-broker:status": "node scripts/git-broker.mjs --status",
+    "git-broker:install": "node scripts/git-broker.mjs --install-task",
+    "git-broker:uninstall": "node scripts/git-broker.mjs --uninstall-task"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
