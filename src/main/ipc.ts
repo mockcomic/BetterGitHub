@@ -23,6 +23,7 @@ import {
   deleteBranch,
   deleteRemoteBranch,
   getBranches,
+  mergeBranch,
   renameBranch
 } from './git/branches'
 import {
@@ -433,6 +434,12 @@ const handlers: Handlers = {
   },
   async checkoutBranch(repoPath: string, name: string, fromRemote?: string) {
     await checkoutBranch(repoPath, name, fromRemote)
+  },
+  async mergeBranch(repoPath: string, name: string, fromRemote?: string) {
+    // All preconditions (detached HEAD, paused workflow, dirty tree,
+    // self-merge) are enforced inside the git module, so this handler is a
+    // plain pass-through like its checkout/delete siblings.
+    return mergeBranch(repoPath, name, fromRemote)
   },
   async createBranch(repoPath: string, name: string, startPoint?: string) {
     await createBranch(repoPath, name, startPoint)

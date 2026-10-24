@@ -107,6 +107,77 @@ export async function checkoutBranch(
   })
 }
 
+/**
+ * Merges `name` (or `${fromRemote}/${name}` when a remote is given) into the
+ * checked-out branch. Git itself decides fast-forward vs merge commit — the
+ * same semantics as `pull` — and `--no-edit` uses the prepared merge message
+ * without an interactive editor (execGit also pins `GIT_EDITOR=:`).
+ *
+ * A merge that stops on conflicts exits non-zero while leaving the worktree
+ * mid-merge; that is the paused-merge workflow the conflicts view already
+ * knows how to continue or abort, so the error (carrying git's CONFLICT
+ * lines) simply travels to the renderer.
+ */
+export async function mergeBranch(
+  repoPath: string,
+  name: string,
+  fromRemote?: string
+): Promise<string> {
+  const status = await getStatus(repoPath)
+  if (status.detached || status.branch === '(detached)') {
+    throw new Error(
+      'Cannot merge while on a detached HEAD — check out a branch first.'
+    )
+  }
+  const { merge, rebase, cherryPick, revert } = status.inProgress
+  if (merge || rebase || cherryPick || revert) {
+    throw new Error(
+      'Finish or abort the current merge/rebase before starting another.'
+    )
+  }
+  if (status.files.length > 0) {
+    throw new Error('Commit or stash your local changes before merging.')
+  }
+  const trimmed = name.trim()
+  if (trimmed.length === 0) {
+    throw new Error('Pick a branch to merge first.')
+  }
+  const ref =
+    fromRemote !== undefined && fromRemote.length > 0
+      ? `${fromRemote}/${trimmed}`
+      : trimmed
+  if (ref === status.branch) {
+    throw new Error(`"${trimmed}" is already the branch you are on.`)
+  }
+  // `--` after the options: branch names cannot start with '-' (git's
+  // check-ref-format), but keep the separator so a remote name like a path
+  // can never be parsed as another option. git merge treats the trailing
+  // positionals as revisions to merge (proven by the integration suite).
+  try {
+    const r = await execGit(['merge', '--no-edit', '--', ref], {
+      cwd: repoPath,
+      timeoutMs: 120_000
+    })
+    return (r.stdout + r.stderr).trim()
+  } catch (err) {
+    // A conflicted merge exits 1 while leaving MERGE_HEAD behind, and
+    // GitExecError only carries git's first stderr line ("Auto-merging
+    // …"), which hides the CONFLICT lines. Detect the paused merge from the
+    // repo itself and rethrow with the full output, so the renderer can
+    // explain the state instead of toasting a truncated error.
+    if (err instanceof GitExecError && err.result.exitCode === 1) {
+      const after = await getStatus(repoPath)
+      if (after.inProgress.merge) {
+        throw new Error(
+          `Merge conflict — "${ref}" needs conflict resolution:\n` +
+            (err.result.stdout + err.result.stderr).trim()
+        )
+      }
+    }
+    throw err
+  }
+}
+
 export async function createBranch(
   repoPath: string,
   name: string,

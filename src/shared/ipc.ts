@@ -121,6 +121,8 @@ export interface RequestResponseChannels {
   // branches
   getBranches: (repoPath: string) => BranchList
   checkoutBranch: (repoPath: string, name: string, fromRemote?: string) => void
+  /** Merge a branch into HEAD; resolves with git's merge output. */
+  mergeBranch: (repoPath: string, name: string, fromRemote?: string) => string
   createBranch: (repoPath: string, name: string, startPoint?: string) => void
   deleteBranch: (repoPath: string, name: string, force: boolean) => void
   renameBranch: (repoPath: string, oldName: string, newName: string) => void
@@ -181,6 +183,7 @@ export type MenuAction =
   | 'pull'
   | 'push'
   | 'new-branch'
+  | 'merge-branch'
   | 'show-preferences'
   | 'add-repository'
   | 'clone-repository'

@@ -127,6 +127,7 @@ export interface AppState {
   readonly showNewBranch: boolean
   readonly newBranchBase: string | null
   readonly renameBranchTarget: string | null
+  readonly mergeBranchOpen: boolean
   readonly showAbout: boolean
   readonly confirm: ConfirmRequest | null
   readonly initError: string | null
@@ -189,6 +190,7 @@ const initialState: AppState = {
   showNewBranch: false,
   newBranchBase: null,
   renameBranchTarget: null,
+  mergeBranchOpen: false,
   showAbout: false,
   confirm: null,
   initError: null,
@@ -454,6 +456,9 @@ export class AppStore {
       case 'new-branch':
         this.update({ showNewBranch: true, newBranchBase: null })
         break
+      case 'merge-branch':
+        this.update({ mergeBranchOpen: true })
+        break
       case 'show-preferences':
         this.update({ showSettings: true })
         break
@@ -531,6 +536,7 @@ export class AppStore {
       stashes: [],
       view: 'review',
       deskFilter: '',
+      mergeBranchOpen: false,
       selectedStashIndex: null,
   scopeAdds: 0,
   scopeDels: 0,
@@ -1519,6 +1525,78 @@ export class AppStore {
     }
   }
 
+  /** Row shortcut: confirm first, then merge (the dialog is its own confirm). */
+  requestMergeBranch(name: string, fromRemote?: string): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const target = this.state.status?.branch ?? '(detached)'
+    const source =
+      fromRemote !== undefined && fromRemote.length > 0
+        ? `${fromRemote}/${name}`
+        : name
+    this.update({
+      confirm: {
+        title: `Merge "${source}" into "${target}"?`,
+        message:
+          'Git fast-forwards when possible and creates a merge commit ' +
+          'otherwise. If files conflict, the desk switches to conflict ' +
+          'resolution so you can finish or abort the merge.',
+        confirmLabel: 'Merge branch',
+        onConfirm: () => {
+          this.update({ confirm: null })
+          void this.mergeBranch(name, fromRemote)
+        }
+      }
+    })
+  }
+
+  /**
+   * Runs the merge. A conflicted merge is not a dead end: git leaves the
+   * repo paused mid-merge, refresh() moves the desk to the conflicts view,
+   * and the sidebar's banner offers Continue/Abort — so git's raw CONFLICT
+   * error is replaced by that explanation. Modelled on doSync: the refresh
+   * must happen on the error path too, which runGit deliberately skips.
+   */
+  async mergeBranch(name: string, fromRemote?: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const target = this.state.status?.branch ?? '(detached)'
+    const source =
+      fromRemote !== undefined && fromRemote.length > 0
+        ? `${fromRemote}/${name}`
+        : name
+    this.update({ busy: 'merge', mergeBranchOpen: false })
+    try {
+      const output = await call('mergeBranch', repo.path, name, fromRemote)
+      this.update({ busy: null })
+      if (/already up to date/i.test(output)) {
+        this.toast('info', `Already up to date — "${target}" contains "${source}".`)
+      } else {
+        const lines = output
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l.length > 0)
+        const summary = lines.length > 0 ? lines[lines.length - 1] : 'Done.'
+        this.toast(
+          'success',
+          `Merged "${source}" into "${target}" — ${summary.slice(0, 140)}`
+        )
+      }
+    } catch (err) {
+      this.update({ busy: null })
+      const message = err instanceof Error ? err.message : String(err)
+      if (/CONFLICT/i.test(message)) {
+        this.toast('info', 'Merge conflicts — resolve them to finish the merge.')
+      } else {
+        this.toast('error', message)
+      }
+    }
+    await this.refresh()
+    void this.refreshBranches()
+    void this.refreshStashes()
+    if (this.state.view === 'history') void this.loadLog(false)
+  }
+
   async createBranch(name: string, startPoint?: string): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
@@ -1632,6 +1710,10 @@ export class AppStore {
 
   setRenameBranchTarget(name: string | null): void {
     this.update({ renameBranchTarget: name })
+  }
+
+  setMergeBranchOpen(open: boolean): void {
+    this.update({ mergeBranchOpen: open })
   }
 
   // --------------------------------------------------------------- history

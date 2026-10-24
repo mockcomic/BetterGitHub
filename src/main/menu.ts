@@ -111,6 +111,10 @@ const MENUS: ReadonlyArray<TopMenu> = [
       { label: 'Undo latest commit', action: 'undo-commit' },
       { separator: true },
       { label: 'New branch…', action: 'new-branch' },
+      {
+        label: 'Merge branch into current branch…',
+        action: 'merge-branch'
+      },
       { label: 'Rename branch…', action: 'rename-branch' },
       { label: 'Delete branch…', action: 'delete-branch' },
       { separator: true },

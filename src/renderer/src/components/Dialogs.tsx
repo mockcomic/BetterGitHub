@@ -365,6 +365,132 @@ export function NewBranchDialog(): JSX.Element | null {
   )
 }
 
+/**
+ * Picks a branch to merge into the checked-out one. The dialog itself is
+ * the confirmation (unlike the branch popover's row shortcuts, which route
+ * through store.requestMergeBranch); opening it from Repository ▸ Merge… or
+ * the branch dropdown's footer item.
+ */
+export function MergeBranchDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  const [filter, setFilter] = useState('')
+  const [selected, setSelected] = useState<{
+    name: string
+    remote?: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!state.mergeBranchOpen) {
+      setFilter('')
+      setSelected(null)
+    }
+  }, [state.mergeBranchOpen])
+
+  if (!state.mergeBranchOpen) return null
+
+  const current = state.status?.branch ?? '(detached)'
+  const needle = filter.toLowerCase().trim()
+  const locals = state.branches.filter(
+    b => !b.current && b.name.toLowerCase().includes(needle)
+  )
+  const remotes = state.remoteBranches.filter(b =>
+    b.name.toLowerCase().includes(needle)
+  )
+  const nothingFound = locals.length === 0 && remotes.length === 0
+
+  const isSelected = (name: string, remote?: string): boolean =>
+    selected !== null &&
+    selected.name === name &&
+    (remote ?? undefined) === (selected.remote ?? undefined)
+
+  const merge = (): void => {
+    if (selected === null) return
+    void store.mergeBranch(selected.name, selected.remote)
+  }
+
+  return (
+    <Dialog
+      title={`Merge a branch into "${current}"`}
+      onClose={() => store.setMergeBranchOpen(false)}
+      width={520}
+      footer={
+        <>
+          <button className="btn" onClick={() => store.setMergeBranchOpen(false)}>
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            disabled={selected === null || state.busy !== null}
+            onClick={merge}
+          >
+            {state.busy === 'merge' ? <span className="spinner" /> : null} Merge
+          </button>
+        </>
+      }
+    >
+      <input
+        className="popover-filter"
+        autoFocus
+        placeholder="Filter branches"
+        value={filter}
+        onChange={e => setFilter(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') merge()
+          if (e.key === 'Escape') store.setMergeBranchOpen(false)
+        }}
+      />
+      <div className="dialog-branch-list">
+        {nothingFound && (
+          <div className="popover-empty">
+            {state.branches.length + state.remoteBranches.length <= 1
+              ? 'No other branches to merge'
+              : 'No matching branches'}
+          </div>
+        )}
+        {locals.map(b => (
+          <button
+            key={`merge-local-${b.name}`}
+            className={`popover-item${isSelected(b.name) ? ' active' : ''}`}
+            title={`Merge "${b.name}" into "${current}"`}
+            onClick={() => setSelected({ name: b.name })}
+          >
+            {b.name}
+          </button>
+        ))}
+        {remotes.length > 0 && (
+          <>
+            <div className="popover-sep" />
+            <div className="popover-heading">Remote branches</div>
+            {remotes.map(b => (
+              <button
+                key={`merge-remote-${b.remote}-${b.name}`}
+                className={`popover-item${
+                  isSelected(b.name, b.remote) ? ' active' : ''
+                }`}
+                title={`Merge the remote-tracking branch ${b.remote}/${b.name} into "${current}"`}
+                onClick={() =>
+                  setSelected({ name: b.name, remote: b.remote })
+                }
+              >
+                {b.name}
+                <small className="popover-path">
+                  {b.remote}/{b.name}
+                </small>
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+      <span className="field-hint">
+        The chosen branch is merged into{' '}
+        <strong>{current}</strong> — fast-forward when possible, a merge
+        commit otherwise.
+      </span>
+    </Dialog>
+  )
+}
+
 export function RenameBranchDialog(): JSX.Element | null {
   const state = useStoreState()
   const store = useStore()

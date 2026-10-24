@@ -10,11 +10,11 @@
     "start": "node scripts/launch.mjs preview",
     "build": "electron-vite build",
     "icons": "node scripts/make-icons.mjs",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:linux": "npm run build && electron-builder --linux",
-    "dist:all": "npm run build && electron-builder --win --mac --linux",
+    "dist": "npm run build && node scripts/stage-release.mjs",
+    "dist:win": "npm run build && node scripts/stage-release.mjs --win",
+    "dist:mac": "npm run build && node scripts/stage-release.mjs --mac",
+    "dist:linux": "npm run build && node scripts/stage-release.mjs --linux",
+    "dist:all": "npm run build && node scripts/stage-release.mjs --win --mac --linux",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -45,7 +45,7 @@
     "appId": "com.kh.gitdesk",
     "productName": "GitDesk",
     "directories": {
-      "output": "../gitdesk-dist"
+      "output": "release"
     },
     "files": [
       "out/**/*",

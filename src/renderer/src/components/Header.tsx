@@ -22,10 +22,14 @@ export function Header(): JSX.Element {
   const store = useStore()
   const [openMenu, setOpenMenu] = useState<'repo' | 'branch' | null>(null)
   const [filterFocused, setFilterFocused] = useState(false)
+  const repoFilterRef = useRef<HTMLInputElement | null>(null)
   const branchFilterRef = useRef<HTMLInputElement | null>(null)
   const deskFilterRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
+    if (openMenu === 'repo') {
+      repoFilterRef.current?.focus()
+    }
     if (openMenu === 'branch') {
       branchFilterRef.current?.focus()
     }
@@ -56,6 +60,7 @@ export function Header(): JSX.Element {
     <header className="header">
       <div className="header-left">
         <RepoButton
+          filterRef={repoFilterRef}
           open={openMenu === 'repo'}
           onToggle={() => setOpenMenu(openMenu === 'repo' ? null : 'repo')}
           onClose={() => setOpenMenu(null)}
@@ -295,18 +300,24 @@ function AddRemoteButton({ disabled }: { disabled: boolean }): JSX.Element {
 function RepoButton({
   open,
   onToggle,
-  onClose
+  onClose,
+  filterRef
 }: {
   open: boolean
   onToggle: () => void
   onClose: () => void
+  filterRef: RefObject<HTMLInputElement | null>
 }): JSX.Element {
   const state = useStoreState()
   const store = useStore()
   const wrapRef = useRef<HTMLDivElement>(null)
+  const [filter, setFilter] = useState('')
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setFilter('')
+      return
+    }
     const handler = (e: MouseEvent) => {
       if (wrapRef.current !== null && !wrapRef.current.contains(e.target as Node)) {
         onClose()
@@ -317,6 +328,14 @@ function RepoButton({
   }, [open, onClose])
 
   const visible = state.repositories.filter(r => !r.missing)
+  const needle = filter.toLowerCase().trim()
+  const matches =
+    needle.length === 0
+      ? visible
+      : visible.filter(
+          r =>
+            r.name.toLowerCase().includes(needle) || r.path.toLowerCase().includes(needle)
+        )
 
   return (
     <div className="menu-wrap" ref={wrapRef}>
@@ -329,10 +348,22 @@ function RepoButton({
       </button>
       {open && (
         <div className="popover">
+          <input
+            ref={filterRef}
+            className="popover-filter"
+            placeholder="Filter repositories"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Escape') onClose()
+            }}
+          />
           {visible.length === 0 ? (
             <div className="popover-empty">No repositories yet</div>
+          ) : matches.length === 0 ? (
+            <div className="popover-empty">No matching repositories</div>
           ) : (
-            visible.map(r => (
+            matches.map(r => (
               <button
                 key={r.id}
                 className={`popover-item${state.selectedRepo?.id === r.id ? ' active' : ''}`}
@@ -486,6 +517,16 @@ function BranchButton({
                 <span className="popover-item-actions">
                   <button
                     className="mini"
+                    title={`Merge "${b.name}" into the current branch`}
+                    onClick={() => {
+                      onClose()
+                      store.requestMergeBranch(b.name)
+                    }}
+                  >
+                    Merge
+                  </button>
+                  <button
+                    className="mini"
                     title="Rename this branch"
                     onClick={() => {
                       onClose()
@@ -529,6 +570,17 @@ function BranchButton({
                   </button>
                   <span className="popover-item-actions">
                     <button
+                      className="mini"
+                      title={`Merge ${b.remote}/${b.name} into the current branch`}
+                      onClick={() => {
+                        onClose()
+                        if (b.remote !== undefined)
+                          store.requestMergeBranch(b.name, b.remote)
+                      }}
+                    >
+                      Merge
+                    </button>
+                    <button
                       className="mini danger"
                       title={`Delete ${b.remote}/${b.name} on the remote`}
                       onClick={() => {
@@ -562,6 +614,15 @@ function BranchButton({
             }}
           >
             Rename current branch…
+          </button>
+          <button
+            className="popover-item"
+            onClick={() => {
+              onClose()
+              store.setMergeBranchOpen(true)
+            }}
+          >
+            Merge branch into current branch…
           </button>
           {state.remoteUrl !== null && (
             <button

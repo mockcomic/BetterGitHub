@@ -10,6 +10,7 @@ import {
   createBranch,
   deleteBranch,
   getBranches,
+  mergeBranch,
   renameBranch
 } from '../src/main/git/branches'
 import {
@@ -537,6 +538,106 @@ describe('git integration', () => {
     await expect(
       amendCommit(repo, 'nope', '', [], sha)
     ).rejects.toThrow(/changed since the amend started/)
+  })
+
+  describe('mergeBranch', () => {
+    it('fast-forwards a branch that is strictly ahead', async () => {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await git(['checkout', '-q', '-b', 'mgmt-ff'])
+      write('mgmt-ff.txt', 'ff\n')
+      await commitAll('mgmt ff commit')
+      await git(['checkout', '-q', 'main'])
+      const output = await mergeBranch(repo, 'mgmt-ff')
+      expect(/fast-forward|updating/i.test(output)).toBe(true)
+      const log = await getLog(repo, { maxCount: 10 })
+      expect(log.some(c => c.summary === 'mgmt ff commit')).toBe(true)
+      await git(['branch', '-D', 'mgmt-ff'])
+    })
+
+    it('creates a merge commit when the histories diverge', async () => {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await git(['checkout', '-q', '-b', 'mgmt-div'])
+      write('mgmt-div.txt', 'feature\n')
+      await commitAll('mgmt diverge feature')
+      await git(['checkout', '-q', 'main'])
+      write('mgmt-main.txt', 'main\n')
+      await commitAll('mgmt diverge main')
+      await mergeBranch(repo, 'mgmt-div')
+      const [tip] = await getLog(repo, { maxCount: 1 })
+      expect(tip?.isMerge).toBe(true)
+      expect(tip?.summary).toContain("Merge branch 'mgmt-div'")
+      expect((await getStatus(repo)).inProgress.merge).toBe(false)
+      await git(['branch', '-D', 'mgmt-div'])
+    })
+
+    it('leaves a conflicted merge paused and aborts cleanly', async () => {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await git(['checkout', '-q', '-b', 'mgmt-conf'])
+      write('mgmt-conflict.txt', 'theirs\n')
+      await commitAll('mgmt conflict side')
+      await git(['checkout', '-q', 'main'])
+      write('mgmt-conflict.txt', 'ours\n')
+      await commitAll('mgmt conflict ours')
+      try {
+        // The module rewrites git's truncated first-line error into a
+        // "Merge conflict" message carrying the full CONFLICT output.
+        await expect(mergeBranch(repo, 'mgmt-conf')).rejects.toThrow(
+          /merge conflict/i
+        )
+        const paused = await getStatus(repo)
+        expect(paused.inProgress.merge).toBe(true)
+        expect(paused.conflictCount).toBe(1)
+        // While paused, the workflow guard (not the dirty-tree guard)
+        // answers, telling the user what to do with the merge in flight.
+        await expect(mergeBranch(repo, 'main')).rejects.toThrow(
+          /current merge\/rebase/
+        )
+      } finally {
+        // Never leave the shared repo mid-merge for the tests after this one.
+        await abortOperation(repo, 'merge').catch(() => undefined)
+      }
+      const resumed = await getStatus(repo)
+      expect(resumed.inProgress.merge).toBe(false)
+      expect(resumed.conflictCount).toBe(0)
+      await git(['branch', '-D', 'mgmt-conf'])
+      await resetClean()
+    })
+
+    it('refuses self-merge, dirty trees and detached HEAD', async () => {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await expect(mergeBranch(repo, 'main')).rejects.toThrow(
+        /already the branch you are on/
+      )
+      write('mgmt-dirty.txt', 'dirty\n')
+      await expect(mergeBranch(repo, 'side')).rejects.toThrow(
+        /Commit or stash your local changes before merging\./
+      )
+      await resetClean()
+      await git(['checkout', '-q', '--detach', 'HEAD'])
+      await expect(mergeBranch(repo, 'side')).rejects.toThrow(/detached HEAD/)
+      await git(['checkout', '-q', 'main'])
+    })
+
+    it('merges a remote-tracking branch', async () => {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await git(['checkout', '-q', '-b', 'mgmt-remote'])
+      write('mgmt-remote.txt', 'remote\n')
+      await commitAll('mgmt remote commit')
+      await git(['push', '-q', 'origin', 'mgmt-remote'])
+      await git(['checkout', '-q', 'main'])
+      // Only the remote-tracking ref remains: the merge must resolve
+      // `origin/mgmt-remote` from (name, remote) exactly like the UI sends it.
+      await git(['branch', '-D', 'mgmt-remote'])
+      await mergeBranch(repo, 'mgmt-remote', 'origin')
+      const log = await getLog(repo, { maxCount: 10 })
+      expect(log.some(c => c.summary === 'mgmt remote commit')).toBe(true)
+      await git(['update-ref', '-d', 'refs/remotes/origin/mgmt-remote'])
+    })
   })
 
 })

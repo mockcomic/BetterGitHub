@@ -21,6 +21,7 @@ import {
   AboutDialog,
   CloneDialog,
   ConfirmDialog,
+  MergeBranchDialog,
   NewBranchDialog,
   RenameBranchDialog,
   SettingsDialog
@@ -115,6 +116,7 @@ export function App(): JSX.Element {
         <CloneDialog />
         <RepoManagerDialog />
         <NewBranchDialog />
+        <MergeBranchDialog />
         <RenameBranchDialog />
         <AboutDialog />
         <ConfirmDialog />
@@ -242,6 +244,7 @@ export function App(): JSX.Element {
       <CloneDialog />
       <RepoManagerDialog />
       <NewBranchDialog />
+      <MergeBranchDialog />
       <RenameBranchDialog />
       <AboutDialog />
       <ConfirmDialog />
@@ -383,6 +386,7 @@ const BUSY_LABELS: Record<string, string> = {
   resolve: 'Resolving conflict…',
   continue: 'Continuing operation…',
   abort: 'Aborting operation…',
+  merge: 'Merging…',
   stash: 'Stashing changes…',
   'stash-apply': 'Applying stash…',
   'stash-pop': 'Popping stash…',
