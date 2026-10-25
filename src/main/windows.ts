@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { BrowserWindow, nativeTheme } from 'electron'
+import { BrowserWindow, shell, nativeTheme } from 'electron'
 import { themeBase, themeFrame, type ThemeId } from '../shared/themes'
 import { logDiagnostics } from './diagnostics'
 
@@ -108,6 +108,35 @@ export function createMainWindow(devServerUrl: string | undefined): BrowserWindo
   // destroyed and reading `.id` throws "Object has been destroyed".
   const contentsId = window.webContents.id
   trustedWebContents.add(contentsId)
+
+  // Navigation guard. This window is a privileged UI: contextIsolation + no
+  // nodeIntegration, but the preload still bridges every IPC channel and the
+  // renderer process is unsandboxed. It must never end up showing arbitrary
+  // web content — a stray target=_blank click or a link dragged into the app
+  // would otherwise open (or navigate to) any site *with the full app API
+  // surface loaded*. Popups are denied outright and http(s) opens in the
+  // real browser (matching how DiffView/History route all links through
+  // openExternal); the app window itself stays on its own origin — the dev
+  // server in development, the packaged file:// app otherwise. (Programmatic
+  // loads via loadURL/loadFile never fire will-navigate, so boot and reloads
+  // keep working.)
+  const appOrigin =
+    devServerUrl !== undefined ? new URL(devServerUrl).origin : 'file:'
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url).catch(() => undefined)
+    return { action: 'deny' }
+  })
+  window.webContents.on('will-navigate', (event, url) => {
+    let same = false
+    try {
+      same = new URL(url).origin === appOrigin
+    } catch {
+      same = false
+    }
+    if (same) return
+    event.preventDefault()
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url).catch(() => undefined)
+  })
 
   window.webContents.on(
     'did-fail-load',

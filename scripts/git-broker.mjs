@@ -206,7 +206,23 @@ async function sweepQueue(queue) {
   }
   await prune(d.responses, RESPONSE_MAX_AGE_MS)
   await prune(d.done, DONE_MAX_AGE_MS)
-  await prune(d.requests, TMP_MAX_AGE_MS) // stale *.tmp publishes
+  // Stale *.tmp publishes only: a plain request here is *pending* work (the
+  // app is still polling for it), and deleting it after an hour — e.g. while
+  // the broker was busy on a long command — silently loses that command.
+  try {
+    const tmpNames = (await readdir(d.requests)).filter(n => n.endsWith('.tmp'))
+    for (const name of tmpNames) {
+      const full = join(d.requests, name)
+      try {
+        const info = await stat(full)
+        if (now - info.mtimeMs > TMP_MAX_AGE_MS) await unlink(full).catch(() => undefined)
+      } catch {
+        /* raced away */
+      }
+    }
+  } catch {
+    /* requests dir unreadable */
+  }
 }
 
 function pidAlive(pid) {

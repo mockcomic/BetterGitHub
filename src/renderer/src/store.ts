@@ -6,9 +6,12 @@ import {
 import type {
   BranchInfo,
   CommitInfo,
+  ExternalApp,
   FileStatus,
   GitConfigInfo,
   GitHubTarget,
+  GitignoreResult,
+  IgnoreRequest,
   ManagedRepository,
   PublicSettings,
   Repository,
@@ -115,6 +118,12 @@ export interface AppState {
   readonly stashes: ReadonlyArray<StashEntry>
   readonly identity: GitConfigInfo | null
   readonly remoteUrl: string | null
+  /**
+   * Targets for the strip's "Open in" menu: whatever the main process
+   * detected on this machine. Refreshed when the dropdown opens; an empty
+   * list simply means no supported editors were found.
+   */
+  readonly externalApps: ReadonlyArray<ExternalApp>
   readonly busy: string | null
   readonly aiBusy: boolean
   /** Last completing-verb success, so the button that did it can celebrate. */
@@ -179,6 +188,7 @@ const initialState: AppState = {
   stashes: [],
   identity: null,
   remoteUrl: null,
+  externalApps: [],
   busy: null,
   aiBusy: false,
   celebration: null,
@@ -1190,6 +1200,30 @@ export class AppStore {
     await this.guarded(() => call('revealInFolder', repo.path, path), 'reveal')
   }
 
+  /**
+   * Re-run the main-side detection for the "Open in" menu. Deliberately not
+   * `guarded`: a fast probe must not flip `busy` and grey out the strip —
+   * the menu keeps showing the previous list until fresh results arrive.
+   */
+  async refreshExternalApps(force = false): Promise<void> {
+    if (!force && this.state.externalApps.length > 0) return
+    try {
+      const apps = await call('listExternalApps', force)
+      this.update({ externalApps: apps })
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async openInApp(appId: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    await this.guarded(
+      () => call('openInExternalApp', repo.path, appId),
+      'open-in'
+    )
+  }
+
   async openFile(path: string): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
@@ -1206,12 +1240,32 @@ export class AppStore {
     this.toast('info', `${label ?? 'Copied'} to clipboard.`)
   }
 
-  async ignoreFile(path: string): Promise<void> {
+  async ignoreFile(path: string, request: IgnoreRequest): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
+    const outcome: { value: GitignoreResult | null } = { value: null }
     await this.guarded(async () => {
-      await call('addToGitignore', repo.path, path)
+      outcome.value = await call('addToGitignore', repo.path, path, request)
     }, 'ignore')
+    const result = outcome.value
+    if (result !== null) {
+      if (result.appended.length === 0) {
+        this.toast('info', 'Already in .gitignore.')
+      } else {
+        const tracked =
+          result.trackedInScope > 0
+            ? ` ${result.trackedInScope} tracked file${
+                result.trackedInScope === 1 ? '' : 's'
+              } in scope stay${result.trackedInScope === 1 ? 's' : ''} tracked.`
+            : ''
+        this.toast(
+          'info',
+          `Added ${result.appended.length} ignore rule${
+            result.appended.length === 1 ? '' : 's'
+          } to .gitignore.${tracked}`
+        )
+      }
+    }
     await this.refresh()
   }
 
@@ -1391,9 +1445,13 @@ export class AppStore {
         confirmLabel: 'Undo commit',
         onConfirm: () => {
           this.update({ confirm: null })
+          // runGit reports failure via its boolean, not a rejection: on a
+          // refused undo (tip moved, repo moved on) the user's current draft
+          // must survive untouched and the Undo offer must stay alive.
           void this.runGit(async () => {
             await call('undoLastCommit', repo.path, last.sha)
-          }, 'undo').then(() => {
+          }, 'undo').then(ok => {
+            if (!ok) return
             this.setDraft(repo.path, {
               summary: last.summary,
               description: last.description,
@@ -1978,15 +2036,17 @@ export class AppStore {
   private async runGit(
     fn: () => Promise<void>,
     busyKey: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     this.update({ busy: busyKey })
     try {
       await fn()
       this.update({ busy: null })
       await this.refresh()
+      return true
     } catch (err) {
       this.update({ busy: null })
       this.toast('error', err instanceof Error ? err.message : String(err))
+      return false
     }
   }
 }

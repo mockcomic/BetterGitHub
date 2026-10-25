@@ -1,6 +1,6 @@
 import { readFile } from 'fs/promises'
-import { join } from 'path'
 import { execGit, GitExecError } from './exec'
+import { safeJoin } from './repo-path'
 
 /**
  * Diff helpers. Working-tree diffs are expressed as `<path> vs HEAD` so a
@@ -41,8 +41,11 @@ export async function getPathDiff(
   }
 
   // Likely untracked: synthesize an added-file diff from file contents.
+  // The read goes through safeJoin — the path arrives from the renderer, and
+  // `..` segments must not turn this into an arbitrary file read outside the
+  // repository. A path that escapes (or vanished) simply yields no diff.
   try {
-    const content = await readFile(join(repoPath, ...path.split('/')))
+    const content = await readFile(safeJoin(repoPath, path))
     const text = content.toString('utf8')
     if (text.includes('\u0000')) {
       return `diff --git a/${path} b/${path}\nBinary files a/${path} and b/${path} differ\n`

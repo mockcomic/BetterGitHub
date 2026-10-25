@@ -2,6 +2,7 @@ import { existsSync } from 'fs'
 import { rm } from 'fs/promises'
 import { join } from 'path'
 import { execGit, GitExecError } from './exec'
+import { safeJoin } from './repo-path'
 import { getStatus } from './status'
 
 /** `fatal: pathspec 'foo' did not match any files` — git aborted the whole add. */
@@ -167,7 +168,9 @@ export async function discardPaths(
       cwd: repoPath,
       timeoutMs: 20_000
     }).catch(() => undefined)
-    await rm(join(repoPath, ...p.split('/')), { force: true, recursive: false })
+    // safeJoin: this is a *delete* driven by renderer-supplied paths; a
+    // `..`-laden path must never rm outside the repository.
+    await rm(safeJoin(repoPath, p), { force: true, recursive: false })
   }
 }
 

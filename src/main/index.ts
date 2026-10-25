@@ -13,6 +13,16 @@ if (process.env['ELECTRON_RENDERER_URL'] !== undefined) {
 }
 
 /**
+ * Dev-only: GITDESK_CDP_PORT=<n> opens a Chrome DevTools endpoint so UI
+ * probes can drive the renderer (used by the flyout/ignore QA pass).
+ */
+const cdpPort = process.env['GITDESK_CDP_PORT']
+if (cdpPort !== undefined && cdpPort !== '') {
+  app.commandLine.appendSwitch('remote-debugging-port', cdpPort)
+  app.commandLine.appendSwitch('remote-allow-origins', '*')
+}
+
+/**
  * Optional profile override. The single-instance lock is taken inside
  * `userData`, so pointing it somewhere else is what lets a second instance
  * run at all — useful for a portable profile, and how the screenshot QA pass

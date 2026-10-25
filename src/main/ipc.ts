@@ -1,9 +1,10 @@
 import { clipboard, dialog, ipcMain, shell } from 'electron'
-import { spawn } from 'child_process'
 import { existsSync, statSync } from 'fs'
-import { join, resolve, sep } from 'path'
+import { join, resolve } from 'path'
 import type {
+  ExternalApp,
   GitHubTarget,
+  IgnoreRequest,
   IpcResult,
   RepoSummaryEntry,
   Repository
@@ -15,6 +16,8 @@ import type {
   RequestResponseChannels
 } from '../shared/ipc'
 import { friendlyGitError } from './git/exec'
+import { safeJoin } from './git/repo-path'
+import { getDetectedApps, launchDetached, openRepoInApp } from './external-apps'
 import { getStatus } from './git/status'
 import { getCommitFileDiff, getCommitFileNames, getPathsDiffText, getPathDiff } from './git/diff'
 import {
@@ -47,7 +50,12 @@ import {
   popStash,
   stashAll
 } from './git/stash'
-import { appendGitignoreRule, gitignoreRuleFor } from './git/ignore'
+import {
+  appendGitignoreRules,
+  buildIgnoreRules,
+  gitignoreRuleFor,
+  trackedInScopeOf
+} from './git/ignore'
 import {
   branchUrl,
   commitUrl,
@@ -87,41 +95,6 @@ type Handlers = {
 }
 
 const generationControllers = new Map<string, AbortController>()
-
-/**
- * Resolves a repository-relative path (forward slashes, as git reports them)
- * against the repository root and refuses anything that escapes it.
- */
-function safeJoin(repoPath: string, path: string): string {
-  const root = resolve(repoPath)
-  const target = resolve(root, ...path.split('/').filter(p => p.length > 0))
-  if (target !== root && !target.startsWith(root + sep)) {
-    throw new Error(`Refusing to touch a path outside the repository: ${path}`)
-  }
-  return target
-}
-
-/**
- * Starts a Windows shell helper (explorer.exe, rundll32.exe) and resolves as
- * soon as the process exists. Waiting for it to exit is not an option:
- * `explorer.exe /select,<path>` hands the request to the running shell and
- * then leaves with exit code 1 *on success*, so the exit code cannot be the
- * failure signal. A real failure — a binary that cannot be started at all —
- * arrives through the `error` event instead of the exit code.
- */
-function launchDetached(
-  command: string,
-  args: ReadonlyArray<string>
-): Promise<void> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, { detached: true, stdio: 'ignore' })
-    child.once('error', rejectPromise)
-    child.once('spawn', () => {
-      child.unref()
-      resolvePromise()
-    })
-  })
-}
 
 async function openUrl(url: string): Promise<void> {
   if (!/^https?:\/\//i.test(url)) {
@@ -320,26 +293,56 @@ const handlers: Handlers = {
   ) {
     await resolveConflict(repoPath, path, side)
   },
-  async addToGitignore(repoPath: string, path: string) {
-    const target = safeJoin(repoPath, path)
-    let isDirectory = false
-    try {
-      isDirectory = statSync(target).isDirectory()
-    } catch {
-      isDirectory = false
+  async addToGitignore(repoPath: string, path: string, request: IgnoreRequest) {
+    let rules: string[]
+    let trackedPaths: string[]
+    if (request.mode === 'allUntracked') {
+      const status = await getStatus(repoPath)
+      const untracked = status.files.filter(f => f.untracked)
+      if (untracked.length === 0) {
+        throw new Error('There are no untracked files to ignore.')
+      }
+      rules = untracked.map(f => {
+        let isDirectory = false
+        try {
+          isDirectory = statSync(safeJoin(repoPath, f.path)).isDirectory()
+        } catch {
+          isDirectory = false
+        }
+        return gitignoreRuleFor(f.path, isDirectory)
+      })
+      trackedPaths = status.files.filter(f => !f.untracked).map(f => f.path)
+    } else {
+      const target = safeJoin(repoPath, path)
+      let isDirectory = false
+      try {
+        isDirectory = statSync(target).isDirectory()
+      } catch {
+        isDirectory = false
+      }
+      rules = buildIgnoreRules(path, isDirectory, request)
+      if (rules.length === 0) {
+        throw new Error(`Nothing to ignore for ${path} with that scope.`)
+      }
+      const status = await getStatus(repoPath)
+      trackedPaths = status.files.filter(f => !f.untracked).map(f => f.path)
+      // Check tracked state BEFORE writing the rule: if the promise in the
+      // error ("…then ignore it again") is honored, the retry must not
+      // no-op on the already-present rule while the file stays tracked.
+      if (
+        request.mode === 'file' &&
+        trackedPaths.some(f => f === path)
+      ) {
+        throw new Error(
+          `${path} is already tracked. Discard or unstage it first, then ignore it again.`
+        )
+      }
     }
-    const rule = gitignoreRuleFor(path, isDirectory)
-    // Check tracked state BEFORE writing the rule: if the promise in the
-    // error ("…then ignore it again") is honored, the retry used to no-op on
-    // the already-present rule and the file stayed tracked-but-hidden.
-    const status = await getStatus(repoPath)
-    const tracked = status.files.some(f => f.path === path && !f.untracked)
-    if (tracked) {
-      throw new Error(
-        `${path} is already tracked. Discard or unstage it first, then ignore it again.`
-      )
+    const appended = await appendGitignoreRules(repoPath, rules)
+    return {
+      appended,
+      trackedInScope: trackedInScopeOf(rules, trackedPaths)
     }
-    await appendGitignoreRule(repoPath, rule)
   },
 
   async getPathDiff(repoPath: string, path: string, oldPath?: string) {
@@ -550,6 +553,14 @@ const handlers: Handlers = {
   },
   async writeClipboard(text: string) {
     clipboard.writeText(text)
+  },
+  async listExternalApps(refresh?: boolean) {
+    const detected = await getDetectedApps(refresh === true)
+    const apps: ExternalApp[] = detected.map(d => d.app)
+    return apps
+  },
+  async openInExternalApp(repoPath: string, appId: string) {
+    await openRepoInApp(repoPath, appId)
   },
 
   // The win32 title band: menu data for its dropdowns, action forwarding

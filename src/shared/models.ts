@@ -36,6 +36,44 @@ export interface FileStatus {
   readonly untracked: boolean
 }
 
+/**
+ * What the context menu's Ignore submenu asked for. Rules are always written
+ * to the repository-root `.gitignore`; `extensionInFolder` limits how many
+ * directory levels below the containing folder the rule reaches.
+ */
+export type IgnoreRequest =
+  /** Exact repo-relative path (directories get a trailing `/`). */
+  | { mode: 'file' }
+  /** Basename rule with no directory part — matches at any depth. */
+  | { mode: 'name' }
+  /** `*.ext` basename rule — matches at any depth. */
+  | { mode: 'extension' }
+  /** `<dir>/` — the containing folder and its whole subtree. */
+  | { mode: 'folder' }
+  /** `<dir>/*` — direct children; a matched subdirectory hides its contents. */
+  | { mode: 'folderDirect' }
+  /** `<firstSegment>/` — the repo-root-level folder containing the path. */
+  | { mode: 'rootFolder' }
+  /**
+   * `*.ext` scoped to the containing folder: depth 1 covers the folder
+   * itself, depth n adds one wildcard directory per level (cumulative
+   * rules), `'any'` uses the `dir/ext-glob` doublestar form.
+   */
+  | { mode: 'extensionInFolder'; depth: 1 | 2 | 3 | 'any' }
+  /** Every currently untracked path from the working-tree status. */
+  | { mode: 'allUntracked' }
+
+/** Outcome of an addToGitignore request. */
+export interface GitignoreResult {
+  /** Rules newly written; empty when every rule was already present. */
+  readonly appended: ReadonlyArray<string>
+  /**
+   * Tracked files inside the rule's scope. `.gitignore` never hides tracked
+   * files, so these stay visible in the changes list until untracked.
+   */
+  readonly trackedInScope: number
+}
+
 /** Which long-running git operation (if any) is paused in the worktree. */
 export interface WorkflowState {
   readonly merge: boolean
@@ -68,6 +106,22 @@ export interface BranchInfo {
   readonly current: boolean
   /** For remote branches: the remote name ('origin'), absent for locals. */
   readonly remote?: string
+  /**
+   * Commits this branch is ahead of the checked-out branch (branch-only
+   * commits). Undefined when no comparison is possible: the current branch
+   * itself, a detached HEAD, or a repo without commits yet.
+   */
+  readonly ahead?: number
+  /** Commits the checked-out branch has that this branch lacks. */
+  readonly behind?: number
+  /** Tracking upstream ref name ('origin/main'), when the branch has one. */
+  readonly upstream?: string
+  /**
+   * Ahead/behind of the tracking upstream from `%(upstream:track)`.
+   * Undefined when the branch tracks nothing or its upstream is gone.
+   */
+  readonly upstreamAhead?: number
+  readonly upstreamBehind?: number
 }
 
 /** Local + remote branches, as returned by the getBranches channel. */
@@ -189,6 +243,21 @@ export type GitHubTarget =
   | { readonly kind: 'branch'; readonly branch: string }
   | { readonly kind: 'commit'; readonly sha: string }
   | { readonly kind: 'compare'; readonly branch: string; readonly base: string }
+
+/**
+ * One launchable target in the "Open in" strip button, detected at runtime by
+ * the main process (src/main/external-apps.ts). An app is only ever listed
+ * when its probe actually found it on this machine — never assumed, so a row
+ * in the dropdown is never a dead click.
+ */
+export interface ExternalApp {
+  /** Catalog key (e.g. 'code', 'cursor', 'files'); the launch allowlist. */
+  readonly id: string
+  /** Display name, e.g. 'Visual Studio Code'. */
+  readonly label: string
+  /** OS file manager vs. a source editor; also drives popover grouping. */
+  readonly kind: 'files' | 'editor'
+}
 
 /** Public (renderer-visible) settings. The API key never leaves main. */
 export interface PublicSettings {

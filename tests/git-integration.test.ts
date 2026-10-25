@@ -30,7 +30,7 @@ import {
 import { resolveConflict, stagePaths, unstagePaths } from '../src/main/git/staging'
 import { getPathsDiffText } from '../src/main/git/diff'
 import { abortOperation, continueOperation } from '../src/main/git/workflow'
-import { appendGitignoreRule, gitignoreRuleFor } from '../src/main/git/ignore'
+import { appendGitignoreRules, gitignoreRuleFor } from '../src/main/git/ignore'
 
 /**
  * Integration coverage for the git verb modules: runs the real `git` binary in
@@ -357,6 +357,81 @@ describe('git integration', () => {
     await git(['checkout', '-q', 'main'])
   })
 
+  it('reports ahead/behind of every branch against HEAD and its upstream', async () => {
+    await resetClean()
+    await git(['checkout', '-q', 'main'])
+
+    // Move main forward so older refs are strictly behind it.
+    write('divergence.txt', 'main moves\n')
+    await commitAll('branch divergence: main moves')
+    const tip = (await execGit(['rev-parse', 'HEAD'], { cwd: repo })).stdout.trim()
+    await git(['branch', 'behind-one', `${tip}^`])
+
+    // ahead-one: two local commits on top of main, pushed after the first,
+    // so its upstream is one commit behind it.
+    await git(['checkout', '-q', '-b', 'ahead-one'])
+    write('ahead.txt', 'ahead\n')
+    await commitAll('branch divergence: ahead 1')
+    await git(['push', '-q', '--set-upstream', 'origin', 'ahead-one'])
+    write('ahead2.txt', 'ahead more\n')
+    await commitAll('branch divergence: ahead 2')
+    await git(['checkout', '-q', 'main'])
+
+    const list = await getBranches(repo)
+    const current = list.local.find(b => b.current)
+    const ahead = list.local.find(b => b.name === 'ahead-one')
+    const behind = list.local.find(b => b.name === 'behind-one')
+    const remoteRow = list.remote.find(
+      b => b.remote === 'origin' && b.name === 'ahead-one'
+    )
+
+    expect(current?.name).toBe('main')
+    // The checked-out branch is never measured against itself.
+    expect(current?.ahead).toBeUndefined()
+    expect(current?.behind).toBeUndefined()
+    // main tracks origin/main and this test moved it one commit ahead.
+    expect(current?.upstream).toBe('origin/main')
+    expect(current?.upstreamAhead).toBe(1)
+    expect(current?.upstreamBehind).toBe(0)
+
+    expect(ahead).toMatchObject({ ahead: 2, behind: 0 })
+    expect(behind).toMatchObject({ ahead: 0, behind: 1 })
+    // The remote-tracking ref was pushed before the second ahead commit.
+    expect(remoteRow).toMatchObject({ ahead: 1, behind: 0 })
+
+    // Upstream tracking state rides along independently of vs-current.
+    expect(ahead?.upstream).toBe('origin/ahead-one')
+    expect(ahead?.upstreamAhead).toBe(1)
+    expect(ahead?.upstreamBehind).toBe(0)
+    expect(behind?.upstream).toBeUndefined()
+    expect(behind?.upstreamAhead).toBeUndefined()
+
+    // Detached HEAD: vs-current divergence has no anchor, so no row carries it
+    // (upstream tracking state still parses, as it needs no HEAD).
+    await git(['checkout', '-q', '--detach', 'HEAD'])
+    const detached = await getBranches(repo)
+    expect(
+      detached.local.every(b => b.ahead === undefined && b.behind === undefined)
+    ).toBe(true)
+    expect(
+      detached.remote.every(b => b.ahead === undefined && b.behind === undefined)
+    ).toBe(true)
+    await git(['checkout', '-q', 'main'])
+
+    // A repository without commits must simply list (no refs exist yet, and
+    // nothing may run a rev-list against the unborn HEAD).
+    const fresh = mkdtempSync(join(tmpdir(), 'gitdesk-unborn-'))
+    await execGit(['init', '--initial-branch=main', '--quiet', fresh], {
+      cwd: fresh
+    })
+    expect(await getBranches(fresh)).toEqual({ local: [], remote: [] })
+
+    // Leave the shared repo as we found it.
+    await git(['push', '-q', 'origin', '--delete', 'ahead-one'])
+    await git(['branch', '-D', 'ahead-one', 'behind-one'])
+    await git(['update-ref', '-d', 'refs/remotes/origin/ahead-one'])
+  })
+
   it('guards branch deletion and supports rename', async () => {
     await expect(deleteBranch(repo, 'main', false)).rejects.toThrow(/Switch to another branch/)
 
@@ -409,8 +484,8 @@ describe('git integration', () => {
 
     const rule = gitignoreRuleFor('ignored.log', false)
     expect(rule).toBe('ignored.log')
-    expect(await appendGitignoreRule(repo, rule)).toBe(true)
-    expect(await appendGitignoreRule(repo, 'ignored.log')).toBe(false)
+    expect(await appendGitignoreRules(repo, [rule])).toEqual([rule])
+    expect(await appendGitignoreRules(repo, ['ignored.log'])).toEqual([])
     const content = readFileSync(join(repo, '.gitignore'), 'utf8')
     expect(content.match(/ignored\.log/g)).toHaveLength(1)
 

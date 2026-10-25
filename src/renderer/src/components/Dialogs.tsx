@@ -5,6 +5,7 @@ import { useStore, useStoreState } from '../store'
 import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field } from './Dialog'
+import { BranchDivergence, divergenceTitleSuffix } from './BranchBadges'
 
 import { DONATE_URL } from '../../../shared/links'
 
@@ -452,10 +453,13 @@ export function MergeBranchDialog(): JSX.Element | null {
           <button
             key={`merge-local-${b.name}`}
             className={`popover-item${isSelected(b.name) ? ' active' : ''}`}
-            title={`Merge "${b.name}" into "${current}"`}
+            title={`Merge "${b.name}" into "${current}"${divergenceTitleSuffix(b)}`}
             onClick={() => setSelected({ name: b.name })}
           >
-            {b.name}
+            <span className="branch-line">
+              {b.name}
+              <BranchDivergence branch={b} current={current} />
+            </span>
           </button>
         ))}
         {remotes.length > 0 && (
@@ -468,12 +472,15 @@ export function MergeBranchDialog(): JSX.Element | null {
                 className={`popover-item${
                   isSelected(b.name, b.remote) ? ' active' : ''
                 }`}
-                title={`Merge the remote-tracking branch ${b.remote}/${b.name} into "${current}"`}
+                title={`Merge the remote-tracking branch ${b.remote}/${b.name} into "${current}"${divergenceTitleSuffix(b)}`}
                 onClick={() =>
                   setSelected({ name: b.name, remote: b.remote })
                 }
               >
-                {b.name}
+                <span className="branch-line">
+                  {b.name}
+                  <BranchDivergence branch={b} current={current} />
+                </span>
                 <small className="popover-path">
                   {b.remote}/{b.name}
                 </small>

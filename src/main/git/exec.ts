@@ -117,7 +117,18 @@ async function runGitDirect(
         chunks.push(d)
       }
     })
-    child.stderr?.on('data', (d: Buffer) => errChunks.push(d))
+    // stderr shares the output budget: without this a command flooding stderr
+    // (progress noise, a repo that makes git warn per line) accumulates
+    // unbounded memory while the stdout cap and the timeout both stay silent.
+    child.stderr?.on('data', (d: Buffer) => {
+      outBytes += d.length
+      if (outBytes > maxOut) {
+        killed = `output exceeded ${maxOut} bytes`
+        child.kill()
+      } else {
+        errChunks.push(d)
+      }
+    })
     child.stderr?.on('error', () => undefined)
 
     if (options.input !== undefined && child.stdin) {

@@ -2,10 +2,13 @@ import type {
   AddRepositoriesResult,
   BranchList,
   CommitInfo,
+  ExternalApp,
   FileStatus,
   GeneratedCommitMessage,
   GitHubTarget,
   GitConfigInfo,
+  GitignoreResult,
+  IgnoreRequest,
   IpcResult,
   LogQuery,
   ManagedRepository,
@@ -74,8 +77,16 @@ export interface RequestResponseChannels {
     path: string,
     side: 'ours' | 'theirs' | 'resolved'
   ) => void
-  /** Append an ignore rule for a path to the repository's .gitignore. */
-  addToGitignore: (repoPath: string, path: string) => void
+  /**
+   * Append .gitignore rule(s) for a path according to the requested scope
+   * (exact file, name/extension anywhere, folder subtree, folder contents,
+   * depth-limited extension glob, or every untracked file).
+   */
+  addToGitignore: (
+    repoPath: string,
+    path: string,
+    request: IgnoreRequest
+  ) => GitignoreResult
 
   // diffs
   /** Diff of a single path vs HEAD; synthesized +diff for untracked files. */
@@ -148,6 +159,13 @@ export interface RequestResponseChannels {
   openFile: (repoPath: string, path: string) => void
   openExternal: (url: string) => void
   writeClipboard: (text: string) => void
+  /**
+   * Launch targets for the strip's "Open in" button: the OS file manager and
+   * source editors detected on this machine, main-cached; `refresh` re-scans.
+   */
+  listExternalApps: (refresh?: boolean) => ExternalApp[]
+  /** Launch a detected target with the repository root (by catalog id). */
+  openInExternalApp: (repoPath: string, appId: string) => void
 
   // Window-frame menu (win32 WCO title band, components/TitleBar.tsx):
   // main owns the menu data (src/main/menu.ts); the band asks for the

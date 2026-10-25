@@ -2,13 +2,21 @@ import type { BranchInfo, BranchList } from '../../shared/models'
 import { execGit, GitExecError } from './exec'
 import { getStatus } from './status'
 
-/** Local branches plus remote-tracking branches (origin/foo…). */
+/**
+ * Local branches plus remote-tracking branches (origin/foo…).
+ *
+ * Besides the ref list, each branch carries its divergence from the
+ * checked-out branch (`ahead`/`behind`, one `rev-list` call per branch)
+ * and, for tracked locals, the upstream tracking state git reports via
+ * `%(upstream:track)` — the same ↑/↓ data GitHub Desktop shows in its
+ * branch menu. Detached or unborn HEAD skips the vs-current numbers.
+ */
 export async function getBranches(repoPath: string): Promise<BranchList> {
   const [forEachRef, remoteRef, status] = await Promise.all([
     execGit(
       [
         'for-each-ref',
-        '--format=%(refname:short)\t%(objectname)',
+        '--format=%(refname:short)\t%(objectname)\t%(upstream:short)\t%(upstream:track)',
         'refs/heads/'
       ],
       { cwd: repoPath, timeoutMs: 15_000 }
@@ -24,7 +32,7 @@ export async function getBranches(repoPath: string): Promise<BranchList> {
     getStatus(repoPath)
   ])
 
-  const local = parseRefs(forEachRef.stdout).map(b => ({
+  const local = parseLocalRefs(forEachRef.stdout).map(b => ({
     ...b,
     current: b.name === status.branch
   }))
@@ -46,7 +54,145 @@ export async function getBranches(repoPath: string): Promise<BranchList> {
   sortBranches(local)
   sortBranches(remote)
 
-  return { local, remote }
+  // HEAD must point at a real commit for `rev-list ...HEAD` to work; an
+  // unborn branch (porcelain `# branch.oid (unborn)`) has no divergence yet.
+  const canCompare =
+    !status.detached &&
+    status.branch !== '(detached)' &&
+    status.oid.length > 0 &&
+    status.oid !== '(unborn)'
+
+  const withDivergence = async (b: BranchInfo, ref: string, i: number) => {
+    if (!canCompare || b.current || i >= DIVERGENCE_LIMIT) return b
+    const div = await divergenceVsHead(repoPath, ref)
+    return div === null ? b : { ...b, ahead: div.ahead, behind: div.behind }
+  }
+
+  // One rev-list per branch — bounded so a huge branch list can't fork off
+  // hundreds of simultaneous git processes.
+  const jobs: Array<() => Promise<BranchInfo>> = []
+  local.forEach((b, i) =>
+    jobs.push(() => withDivergence(b, `refs/heads/${b.name}`, i))
+  )
+  remote.forEach((b, i) =>
+    jobs.push(() => withDivergence(b, `refs/remotes/${b.remote}/${b.name}`, i))
+  )
+  const done = await mapBounded(jobs, 8)
+  const localDiv = done.slice(0, local.length)
+  const remoteDiv = done.slice(local.length)
+
+  return { local: localDiv, remote: remoteDiv }
+}
+
+/** Run async thunks with at most `limit` in flight, preserving order. */
+async function mapBounded<T>(
+  jobs: ReadonlyArray<() => Promise<T>>,
+  limit: number
+): Promise<T[]> {
+  const out = new Array<T>(jobs.length)
+  let next = 0
+  const workers = Array.from(
+    { length: Math.min(limit, jobs.length) },
+    async () => {
+      while (next < jobs.length) {
+        const i = next++
+        out[i] = await jobs[i]()
+      }
+    }
+  )
+  await Promise.all(workers)
+  return out
+}
+
+/**
+ * Cap on the branches (per list) we spawn a `rev-list` for, bounding
+ * process churn on huge branch collections; rows past the cap simply
+ * carry no divergence instead of stalling the whole listing.
+ */
+const DIVERGENCE_LIMIT = 250
+
+/**
+ * Ahead/behind of `branchRef` relative to HEAD:
+ * `git rev-list --left-right --count <branchRef>...HEAD` prints
+ * "<branch-only> <head-only>" — i.e. ahead and behind of the branch.
+ * Full refs keep a tag with the same name from shadowing the rev.
+ * Any failure (unresolvable ref, timeout) yields null, not a wrong zero.
+ */
+async function divergenceVsHead(
+  repoPath: string,
+  branchRef: string
+): Promise<{ ahead: number; behind: number } | null> {
+  try {
+    const r = await execGit(
+      ['rev-list', '--left-right', '--count', `${branchRef}...HEAD`],
+      { cwd: repoPath, timeoutMs: 10_000 }
+    )
+    return parseDivergence(r.stdout)
+  } catch {
+    return null
+  }
+}
+
+/** Pure: `git rev-list --left-right --count` stdout → { ahead, behind }. */
+export function parseDivergence(
+  output: string
+): { ahead: number; behind: number } | null {
+  const m = output.trim().match(/^(\d+)[ \t]+(\d+)$/)
+  if (m === null) return null
+  return { ahead: parseInt(m[1], 10), behind: parseInt(m[2], 10) }
+}
+
+/**
+ * Pure: parse a `%(upstream:track)` field. Git prints `[ahead N]`,
+ * `[behind N]`, `[ahead N, behind M]` or `[gone]` (or empty for
+ * untracked branches). `[gone]` and anything unrecognized → null.
+ */
+export function parseUpstreamTrack(
+  track: string
+): { ahead: number; behind: number } | null {
+  const t = track.trim()
+  if (!t.startsWith('[') || !t.endsWith(']')) return null
+  const inner = t.slice(1, -1).trim()
+  if (inner === 'gone') return null
+  const ahead = inner.match(/ahead (\d+)/)
+  const behind = inner.match(/behind (\d+)/)
+  if (ahead === null && behind === null) return null
+  return {
+    ahead: ahead !== null ? parseInt(ahead[1], 10) : 0,
+    behind: behind !== null ? parseInt(behind[1], 10) : 0
+  }
+}
+
+/** Mutable builder shape for a parsed `refs/heads/` record. */
+interface ParsedLocalRef {
+  name: string
+  head: string
+  current: boolean
+  upstream?: string
+  upstreamAhead?: number
+  upstreamBehind?: number
+}
+
+function parseLocalRefs(output: string): ParsedLocalRef[] {
+  return output
+    .split('\n')
+    .filter(l => l.trim().length > 0)
+    .map(line => {
+      // refname \t oid \t upstream \t track  (track may be empty, and on
+      // some git versions the trailing tab is omitted for untracked refs)
+      const [name, head, upstream, track] = line.split('\t')
+      const ref: ParsedLocalRef = { name: name ?? '', head: head ?? '', current: false }
+      if (upstream !== undefined && upstream.length > 0) {
+        ref.upstream = upstream
+        const ab = parseUpstreamTrack(track ?? '')
+        if (ab !== null) {
+          ref.upstreamAhead = ab.ahead
+          ref.upstreamBehind = ab.behind
+        }
+      }
+      return ref
+    })
+    .filter(b => b.name.length > 0)
 }
 
 function parseRefs(output: string): BranchInfo[] {

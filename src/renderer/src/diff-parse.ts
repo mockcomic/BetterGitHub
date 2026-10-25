@@ -43,6 +43,9 @@ export function parseDiff(text: string): DiffLine[] {
   // (a deleted `--- foo` line arrives raw as `---- foo`? no — as `--- foo`
   // when the removed line itself begins with `-- `), and misreading them as
   // meta skips the line-number counters and shifts every later line.
+  // A new `diff --git` header ends the previous hunk: multi-file diffs must
+  // not parse the next file's `--- a/x` / `+++ b/x` header as -/+ content
+  // (that would paint header lines as changes and shift every line number).
   let inHunk = false
   for (const raw of text.split('\n')) {
     if (raw.length === 0) {
@@ -51,8 +54,13 @@ export function parseDiff(text: string): DiffLine[] {
       continue
     }
 
-    if (raw.startsWith('@@')) {
-      const m =
+    if (raw.startsWith('diff --git')) {
+      inHunk = false
+      lines.push({ kind: 'meta', text: raw, oldNo: null, newNo: null })
+      continue
+    }
+
+    if (raw.startsWith('@@')) {      const m =
         raw.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/) ??
         // Combined diff (merge commits) headers: @@@ -1,2 -1,2 +1,3 @@@
         raw.match(/^@@@+ -\d+(?:,\d+)? -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@@+/)
@@ -75,8 +83,7 @@ export function parseDiff(text: string): DiffLine[] {
 
     if (
       !inHunk &&
-      (raw.startsWith('diff --git') ||
-        raw.startsWith('index ') ||
+      (raw.startsWith('index ') ||
         raw.startsWith('--- ') ||
         raw.startsWith('+++ ') ||
         raw.startsWith('new file') ||

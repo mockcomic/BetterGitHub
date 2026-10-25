@@ -64,3 +64,43 @@ describe('tokenizeForDiff', () => {
     expect(tokenizeForDiff('ab (1)  x')).toEqual(['ab', ' ', '(', '1', ')', '  ', 'x'])
   })
 })
+
+describe('parseDiff multi-file diffs', () => {
+  const TWO_FILES = [
+    'diff --git a/a.ts b/a.ts',
+    'index 111..222 100644',
+    '--- a/a.ts',
+    '+++ b/a.ts',
+    '@@ -1,2 +1,2 @@',
+    '-const a = 1',
+    '+const a = 2',
+    ' same',
+    'diff --git a/b.ts b/b.ts',
+    'index 333..444 100644',
+    '--- a/b.ts',
+    '+++ b/b.ts',
+    '@@ -1,2 +1,2 @@',
+    ' same',
+    '-const b = 1',
+    '+const b = 2'
+  ].join('\n')
+
+  it('parses the second file header as meta, not as change lines', () => {
+    const lines = parseDiff(TWO_FILES)
+    // The second file's `--- a/b.ts` / `+++ b/b.ts` must NOT become -/+ rows.
+    const delTexts = lines.filter(l => l.kind === 'del').map(l => l.text)
+    const addTexts = lines.filter(l => l.kind === 'add').map(l => l.text)
+    expect(delTexts).toEqual(['const a = 1', 'const b = 1'])
+    expect(addTexts).toEqual(['const a = 2', 'const b = 2'])
+    expect(
+      lines.filter(l => l.kind === 'meta' && l.text.startsWith('diff --git'))
+    ).toHaveLength(2)
+  })
+
+  it('restarts line numbering for each file', () => {
+    const lines = parseDiff(TWO_FILES)
+    const dels = lines.filter(l => l.kind === 'del')
+    expect(dels[0].oldNo).toBe(1)
+    expect(dels[1].oldNo).toBe(2)
+  })
+})

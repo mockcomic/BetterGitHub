@@ -28,8 +28,20 @@ delete env.electron_exec_path
 // electron-vite turns this into --no-sandbox for the development child.
 if (args.includes('dev')) {
   env.NO_SANDBOX = '1'
+  // Extra Electron flags (e.g. --remote-debugging-port) may be provided by
+  // the caller; merge them with the dev profile flag instead of clobbering.
+  const userArgs = (() => {
+    try {
+      const raw = process.env.ELECTRON_CLI_ARGS
+      const parsed = raw ? JSON.parse(raw) : []
+      return Array.isArray(parsed) ? parsed.filter(a => typeof a === 'string') : []
+    } catch {
+      return []
+    }
+  })()
   env.ELECTRON_CLI_ARGS = JSON.stringify([
-    `--user-data-dir=${join(process.cwd(), '.userdata-dev')}`
+    `--user-data-dir=${join(process.cwd(), '.userdata-dev')}`,
+    ...userArgs.filter(a => !a.startsWith('--user-data-dir'))
   ])
 }
 

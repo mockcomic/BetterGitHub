@@ -80,8 +80,14 @@ export function parsePorcelainStatus(output: string): PorcelainStatus {
     if (marker === '2') {
       const parts = record.split(' ')
       // 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <Xscore> <path> ; next record = origPath
+      // The porcelain-v2 spec guarantees a rename/copy record is always
+      // followed by exactly one origPath record. Testing that record for a
+      // status marker would misfire on legitimate old paths that merely
+      // *start* with one (`#foo.ts`, `1-starter/old.ts`, `!important.css`):
+      // the entry silently lost its oldPath (or the origPath record was then
+      // misparsed as a status line). Consume it unconditionally instead.
       const next = i + 1 < records.length ? records[i + 1] : undefined
-      const hasOrigPath = next !== undefined && !isStatusRecord(next)
+      const hasOrigPath = next !== undefined
       if (hasOrigPath) i++
       entries.push({
         path: parts.slice(9).join(' '),
@@ -128,10 +134,6 @@ export function parsePorcelainStatus(output: string): PorcelainStatus {
   }
 
   return { header, entries }
-}
-
-function isStatusRecord(record: string): boolean {
-  return /^[#12u4?!]/.test(record)
 }
 
 function parseHeaderLine(record: string, header: PorcelainHeader): void {

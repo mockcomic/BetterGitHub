@@ -2,7 +2,9 @@ import type { JSX, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useStore, useStoreState } from '../store'
 import type { DeskView } from '../store'
+import type { ExternalApp } from '../../../shared/models'
 import { ConfettiBurst, useCelebration } from './Celebration'
+import { BranchDivergence } from './BranchBadges'
 
 /** Placeholder for the command strip's filter, per desk view. */
 const FILTER_LABELS: Record<DeskView, string> = {
@@ -164,6 +166,7 @@ export function Header(): JSX.Element {
               no upstream
             </span>
           )}
+          <OpenInButton disabled={busy !== null} />
           {state.remoteUrl === null && status !== null && (
             <AddRemoteButton disabled={busy !== null} />
           )}
@@ -291,6 +294,98 @@ function AddRemoteButton({ disabled }: { disabled: boolean }): JSX.Element {
               </button>
             </span>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * "Open in ▾": the strip's gateway out of the desk — the OS file manager plus
+ * every source editor main actually detected on this machine (see
+ * src/main/external-apps.ts). Detection is re-run whenever the menu opens, so
+ * installing an editor takes effect without an app restart; results are
+ * swapped in as they arrive, keeping the menu instant on reopen.
+ */
+function OpenInButton({ disabled }: { disabled: boolean }): JSX.Element {
+  const store = useStore()
+  const state = useStoreState()
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    void store.refreshExternalApps(true)
+    const onDown = (e: MouseEvent): void => {
+      if (wrapRef.current !== null && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open, store])
+
+  // First paint of the menu before any probe ever ran: warm the list once so
+  // the very first click already shows the cached machine inventory.
+  useEffect(() => {
+    void store.refreshExternalApps()
+  }, [store])
+
+  const managers: ReadonlyArray<ExternalApp> = state.externalApps.filter(a => a.kind === 'files')
+  const editors: ReadonlyArray<ExternalApp> = state.externalApps.filter(a => a.kind === 'editor')
+  const firstProbePending = state.externalApps.length === 0
+
+  const openRow = (app: ExternalApp): JSX.Element => (
+    <button
+      key={app.id}
+      className="popover-item"
+      title={`Open this repository in ${app.label}`}
+      onClick={() => {
+        setOpen(false)
+        void store.openInApp(app.id)
+      }}
+    >
+      {app.label}
+    </button>
+  )
+
+  return (
+    <div className="menu-wrap" ref={wrapRef}>
+      <button
+        className="btn"
+        disabled={disabled}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Open this repository in a file manager or editor"
+        onClick={() => setOpen(o => !o)}
+      >
+        Open in <span className="caret">▾</span>
+      </button>
+      {open && (
+        <div className="popover" role="menu">
+          {firstProbePending ? (
+            <div className="popover-empty">Checking this machine…</div>
+          ) : (
+            managers.map(openRow)
+          )}
+          {!firstProbePending && (
+            <>
+              <div className="popover-sep" />
+              <div className="popover-heading">Editors</div>
+              {editors.length === 0 ? (
+                <div className="popover-empty">No supported editors detected</div>
+              ) : (
+                editors.map(openRow)
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -510,8 +605,11 @@ function BranchButton({
                   if (!b.current) void store.checkoutBranch(b.name)
                 }}
               >
-                {b.current ? '✓ ' : ''}
-                {b.name}
+                <span className="branch-line">
+                  {b.current ? '✓ ' : ''}
+                  {b.name}
+                  <BranchDivergence branch={b} current={branch} />
+                </span>
               </button>
               {!b.current && (
                 <span className="popover-item-actions">
@@ -563,7 +661,10 @@ function BranchButton({
                       void store.checkoutBranch(b.name, b.remote)
                     }}
                   >
-                    {b.name}
+                    <span className="branch-line">
+                      {b.name}
+                      <BranchDivergence branch={b} current={branch} />
+                    </span>
                     <small className="popover-path">
                       {b.remote}/{b.name}
                     </small>

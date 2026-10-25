@@ -93,6 +93,20 @@ describe('parsePorcelainStatus', () => {
     expect(out.entries[0].indexCode).toBe('R')
   })
 
+  it('keeps origPaths that start with a status-record marker char', () => {
+    // The origPath record belongs to the rename by position (porcelain-v2
+    // spec); a marker-looking first char of the PATH must not misread it as
+    // its own record.
+    for (const old of ['#legacy notes.md', '1-first.ts', '!important.css', '2.txt']) {
+      const out = parsePorcelainStatus(
+        statusOutput('2 R. N... 100644 100644 100644 a b R100 docs/new.md', old)
+      )
+      expect(out.entries).toHaveLength(1)
+      expect(out.entries[0].path).toBe('docs/new.md')
+      expect(out.entries[0].oldPath).toBe(old)
+    }
+  })
+
   it('parses unmerged (conflicted) entries', () => {
     // Verbatim record captured from `git status --branch --porcelain=2 -z`
     // during a conflicted merge (no <Xscore> field on u-records).

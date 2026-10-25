@@ -20,7 +20,10 @@ parsing → cancellable request).
 - **Changes list** — porcelain-v2 status (new / modified / deleted / renamed /
   conflicted), per-file checkboxes that define the commit, staged/unstaged
   badges, one-click discard, discard-all, select-all, and a right-click menu
-  (open file, show in Explorer, copy path/name, add to `.gitignore`, discard).
+  (open file, show in Explorer, copy path/name, discard, plus a deep **Ignore
+  ▸** submenu: the exact file, a name or `*.ext` anywhere, the containing or
+  root folder, folder-direct `*`, `*.ext` limited to 1/2/3/any subfolder
+  levels, or all untracked files at once — all appended to `.gitignore`).
 - **Auto-refresh** — a debounced recursive watcher pushes working-tree changes
   to the UI (toggle in Preferences).
 - **Merge-conflict handling** — a banner for an in-progress merge / rebase /

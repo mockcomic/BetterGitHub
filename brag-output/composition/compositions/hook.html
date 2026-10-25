@@ -1,0 +1,215 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      font-family: Inter, sans-serif;
+    }
+    /* Flat brand ground: the punched holes are painted with exactly this value,
+       so a "knockout" reads as the film showing through the record. */
+    #hook-ground {
+      position: absolute;
+      inset: 0;
+      background: #0b1120;
+    }
+    #hook-halo {
+      position: absolute;
+      left: 960px;
+      top: 280px;
+      width: 900px;
+      height: 560px;
+      margin: -280px 0 0 -450px;
+      background: radial-gradient(closest-side, rgba(9, 105, 218, 0.12), rgba(11, 17, 32, 0));
+    }
+    #hook-mark {
+      position: absolute;
+      left: 830px;
+      top: 150px;
+      width: 260px;
+      height: 260px;
+    }
+    #hook-mark .glow {
+      position: absolute;
+      left: 100px;
+      top: 47px;
+      width: 190px;
+      height: 190px;
+      border-radius: 50%;
+      background: radial-gradient(closest-side, rgba(47, 129, 247, 0.55), rgba(47, 129, 247, 0));
+      opacity: 0;
+    }
+    #hook-mark svg {
+      position: relative;
+      display: block;
+      width: 260px;
+      height: 260px;
+      overflow: visible;
+    }
+    /* pathLength="1" on every stroked rim: one dash, offset 1 hides it, 0 prints it. */
+    #hook-mark .rim {
+      fill: none;
+      stroke: #0b1120;
+      stroke-width: 8;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+    }
+    #hook-mark .hole-ink {
+      fill: #0b1120;
+      opacity: 0;
+    }
+    #hook-mark .hole-head {
+      fill: #0969da;
+      opacity: 0;
+    }
+    #hook-title {
+      position: absolute;
+      left: 96px;
+      top: 452px;
+      width: 1728px;
+      text-align: center;
+      font-size: 118px;
+      line-height: 1.04;
+      font-weight: 700;
+      letter-spacing: -0.035em;
+    }
+    #hook-title .l1 {
+      display: block;
+      color: #e6edf3;
+      opacity: 0;
+    }
+    #hook-title .l2 {
+      display: block;
+      color: #2f81f7;
+      opacity: 0;
+    }
+    #hook-caption {
+      position: absolute;
+      left: 96px;
+      top: 812px;
+      width: 1728px;
+      text-align: center;
+      font-size: 36px;
+      font-weight: 400;
+      color: #8d959f;
+      letter-spacing: 0.01em;
+    }
+  </style>
+
+  <div data-hf-id="hf-ktv8" id="root" data-composition-id="hook" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-ym8n" id="hook-ground" data-layout-ignore="true"></div>
+    <div data-hf-id="hf-bwno" id="hook-halo" data-layout-ignore="true"></div>
+
+    <!-- The app mark, geometry lifted from resources/gitdesk-icon.svg (corner cut,
+         timing notch, three holes on the 128 grid) and punched on camera. -->
+    <div data-hf-id="hf-g4p8" id="hook-mark" class="clip" data-start="0" data-duration="3.4">
+      <div data-hf-id="hf-2s7n" class="glow"></div>
+      <svg data-hf-id="hf-we78" viewBox="0 0 512 512" aria-hidden="true">
+        <defs data-hf-id="hf-mh0t">
+          <clipPath data-hf-id="hf-5cx6" id="hook-card-clip">
+            <path data-hf-id="hf-mcma"
+              clip-rule="evenodd"
+              d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z
+                 M220 0 A36 36 0 0 1 292 0 Z"
+            />
+          </clipPath>
+        </defs>
+        <path data-hf-id="hf-b6sl"
+          class="card"
+          fill="#e9e2cf"
+          fill-rule="evenodd"
+          d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z
+             M220 0 A36 36 0 0 1 292 0 Z"
+        />
+        <circle data-hf-id="hf-3fs6" class="hole-head" cx="384" cy="280" r="52" />
+        <g data-hf-id="hf-hxxc" clip-path="url(#hook-card-clip)">
+          <path data-hf-id="hf-aksr" class="rim" pathLength="1" d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z" />
+          <path data-hf-id="hf-429s" class="rim" pathLength="1" d="M220 0 A36 36 0 0 1 292 0" />
+          <circle data-hf-id="hf-gc6w" class="rim" pathLength="1" cx="128" cy="280" r="52" />
+          <circle data-hf-id="hf-zpzo" class="rim" pathLength="1" cx="256" cy="280" r="52" />
+          <circle data-hf-id="hf-yu60" class="rim" pathLength="1" cx="384" cy="280" r="52" />
+        </g>
+        <!-- interiors painted after the rim so nothing survives inside it, as in the mark -->
+        <circle data-hf-id="hf-z3x5" id="hook-hole-1" class="hole-ink" cx="128" cy="280" r="48" />
+        <circle data-hf-id="hf-3t0c" id="hook-hole-2" class="hole-ink" cx="256" cy="280" r="48" />
+      </svg>
+    </div>
+
+    <h1 data-hf-id="hf-2wzh" id="hook-title" class="clip" data-start="0" data-duration="3.4">
+      <span data-hf-id="hf-c3nw" class="l1" data-var-text="hook_a">Stop writing</span>
+      <span data-hf-id="hf-nazh" class="l2" data-var-text="hook_b">commit messages.</span>
+    </h1>
+
+    <p data-hf-id="hf-r2rv" id="hook-caption" class="clip" data-start="0" data-duration="3.4">
+      A git client with an AI commit-message agent
+    </p>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // frame 0 already carries the record: it settles rather than fades in from nothing
+    tl.fromTo(
+      "#hook-mark svg",
+      { opacity: 0.55, y: -14, scale: 0.985 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.26, ease: "power3.out" },
+      0,
+    );
+    // printed keyline draws itself: every rim, one by one
+    tl.to(
+      "#hook-mark .rim",
+      { strokeDashoffset: 0, duration: 0.6, ease: "power2.inOut", stagger: 0.06 },
+      0.24,
+    );
+    // the two empty holes punch through
+    tl.fromTo(
+      "#hook-hole-1",
+      { opacity: 1, scale: 0, svgOrigin: "128 280" },
+      { scale: 1, duration: 0.22, ease: "back.out(1.7)" },
+      0.7,
+    );
+    tl.fromTo(
+      "#hook-hole-2",
+      { opacity: 1, scale: 0, svgOrigin: "256 280" },
+      { scale: 1, duration: 0.22, ease: "back.out(1.7)" },
+      0.8,
+    );
+    // beat-locked: 1.09 — the head commit is punched and inked, the one blue in the film
+    tl.fromTo(
+      "#hook-mark .hole-head",
+      { opacity: 1, scale: 0, svgOrigin: "384 280" },
+      { scale: 1.06, duration: 0.2, ease: "back.out(2.2)" },
+      1.09,
+    );
+    tl.to("#hook-mark .hole-head", { scale: 1, duration: 0.14, ease: "power2.out" }, 1.29);
+    tl.fromTo("#hook-mark .glow", { opacity: 0.95 }, { opacity: 0.28, duration: 0.5 }, 1.11);
+    // the claim: fast in, then a long hold
+    tl.fromTo(
+      "#hook-title .l1",
+      { opacity: 0, y: 34, filter: "blur(12px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.32, ease: "power4.out" },
+      0.2,
+    );
+    tl.fromTo(
+      "#hook-title .l2",
+      { opacity: 0, y: 34, filter: "blur(12px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.32, ease: "power4.out" },
+      0.32,
+    );
+    tl.fromTo(
+      "#hook-caption",
+      { opacity: 0, y: 14 },
+      { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" },
+      0.85,
+    );
+    // beat-grid: the inked hole breathes on the bed's 0.5455s period (1.64 / 2.19 / 2.73)
+    tl.to("#hook-mark .glow", { opacity: 0.42, duration: 0.14, ease: "sine.inOut" }, 1.64);
+    tl.to("#hook-mark .glow", { opacity: 0.26, duration: 0.2, ease: "sine.inOut" }, 1.8);
+    tl.to("#hook-mark .glow", { opacity: 0.4, duration: 0.14, ease: "sine.inOut" }, 2.19);
+    tl.to("#hook-mark .glow", { opacity: 0.26, duration: 0.2, ease: "sine.inOut" }, 2.35);
+    tl.to("#hook-mark .glow", { opacity: 0.38, duration: 0.16, ease: "sine.inOut" }, 2.73);
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines["hook"] = tl;
+  </script>
+</template>

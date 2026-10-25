@@ -192,7 +192,7 @@ export async function readApiKey(): Promise<string | null> {
 async function writeApiKey(value: string): Promise<void> {
   const trimmed = value.trim()
   if (trimmed.length === 0) {
-    await writeFile(apiKeyPath(), Buffer.alloc(0), { flag: 'w' }).catch(
+    await writeFile(apiKeyPath(), Buffer.alloc(0), { flag: 'w', mode: 0o600 }).catch(
       () => undefined
     )
     return
@@ -201,7 +201,9 @@ async function writeApiKey(value: string): Promise<void> {
     ? safeStorage.encryptString(trimmed)
     : Buffer.from(trimmed, 'utf8')
   await mkdir(app.getPath('userData'), { recursive: true })
-  await writeFile(apiKeyPath(), buf)
+  // 0600: on systems without a keychain (safeStorage unavailable) the key is
+  // stored verbatim — keep it owner-only on POSIX instead of the umask default.
+  await writeFile(apiKeyPath(), buf, { mode: 0o600 })
 }
 
 export async function getAiConfig(): Promise<{

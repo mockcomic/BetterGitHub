@@ -1,11 +1,12 @@
 import type { JSX } from 'react'
 import { useState } from 'react'
-import type { FileStatus } from '../../../shared/models'
+import type { FileStatus, IgnoreRequest } from '../../../shared/models'
 import { useStore, useStoreState, type AppState } from '../store'
 import { relativeTime } from '../time'
 import {
   ContextMenu,
   menuStateFromEvent,
+  type ContextMenuItem,
   type ContextMenuState
 } from './ContextMenu'
 import { ConfettiBurst, useCelebration } from './Celebration'
@@ -21,6 +22,121 @@ function fileMatches(file: FileStatus, filter: string): boolean {
     matches(file.path, filter) ||
     (file.oldPath !== undefined && matches(file.oldPath, filter))
   )
+}
+
+// ------------------------------------------------------------- ignore menu
+
+interface PathParts {
+  /** Repo-relative parent dir without trailing slash; '' at the root. */
+  readonly dir: string
+  readonly name: string
+  /** Extension glob body, or null for dot-files / extension-less names. */
+  readonly ext: string | null
+}
+
+function pathParts(path: string): PathParts {
+  const cut = path.lastIndexOf('/')
+  const dir = cut === -1 ? '' : path.slice(0, cut)
+  const name = path.slice(cut + 1)
+  const dot = name.lastIndexOf('.')
+  const ext = dot <= 0 || dot === name.length - 1 ? null : name.slice(dot + 1)
+  return { dir, name, ext }
+}
+
+/**
+ * GitHub Desktop's ignore actions, deepened: exact file, name or extension
+ * anywhere, the containing/root folder (whole subtree or direct contents
+ * only), and the extension scoped to the folder at a bounded depth.
+ */
+function ignoreSubmenu(
+  file: FileStatus,
+  store: ReturnType<typeof useStore>,
+  hasUntracked: boolean
+): ContextMenuItem[] {
+  const { dir, name, ext } = pathParts(file.path)
+  const items: ContextMenuItem[] = [
+    {
+      label: 'This file',
+      title: `Append \`${file.path}\` to .gitignore`,
+      onSelect: () => void store.ignoreFile(file.path, { mode: 'file' })
+    },
+    {
+      label: `“${name}” at any depth`,
+      title: `Append \`${name}\` to .gitignore (matches in every folder)`,
+      onSelect: () => void store.ignoreFile(file.path, { mode: 'name' })
+    }
+  ]
+  const ignore = (request: IgnoreRequest): (() => void) => (): void =>
+    void store.ignoreFile(file.path, request)
+  if (ext !== null) {
+    items.push({
+      label: `Extension “*.${ext}” anywhere`,
+      title: `Append \`*.${ext}\` to .gitignore (matches in every folder)`,
+      onSelect: ignore({ mode: 'extension' })
+    })
+  }
+  if (dir.length > 0) {
+    items.push(
+      { label: '', separator: true },
+      {
+        label: `Folder “${dir}/” (everything inside)`,
+        title: `Append \`${dir}/\` to .gitignore`,
+        onSelect: ignore({ mode: 'folder' })
+      },
+      {
+        label: 'Only its direct contents',
+        title: `Append \`${dir}/*\` to .gitignore (subfolders themselves match too, so git stops descending into them)`,
+        onSelect: ignore({ mode: 'folderDirect' })
+      }
+    )
+    const firstSeg = dir.split('/')[0]
+    if (dir.includes('/')) {
+      items.push({
+        label: `Root folder “${firstSeg}/”`,
+        title: `Append \`${firstSeg}/\` to .gitignore (the whole top-level tree)`,
+        onSelect: ignore({ mode: 'rootFolder' })
+      })
+    }
+    if (ext !== null) {
+      items.push(
+        {
+          label: `Extension “*.${ext}” inside “${dir}/”:`,
+          heading: true,
+          separatorBefore: true
+        },
+        {
+          label: 'only this folder',
+          title: `Append \`${dir}/*.${ext}\` to .gitignore`,
+          onSelect: ignore({ mode: 'extensionInFolder', depth: 1 })
+        },
+        {
+          label: '1 subfolder level down',
+          title: `Append \`${dir}/*.${ext}\` and \`${dir}/*/*.${ext}\` to .gitignore`,
+          onSelect: ignore({ mode: 'extensionInFolder', depth: 2 })
+        },
+        {
+          label: '2 subfolder levels down',
+          title: `Append \`${dir}/*.${ext}\` … \`${dir}/*/*/*.${ext}\` to .gitignore`,
+          onSelect: ignore({ mode: 'extensionInFolder', depth: 3 })
+        },
+        {
+          label: 'all subfolders (any depth)',
+          title: `Append \`${dir}/**/*.${ext}\` to .gitignore`,
+          onSelect: ignore({ mode: 'extensionInFolder', depth: 'any' })
+        }
+      )
+    }
+  }
+  items.push(
+    { label: '', separator: true },
+    {
+      label: 'All untracked files',
+      title: 'Append every untracked path to .gitignore',
+      disabled: !hasUntracked,
+      onSelect: ignore({ mode: 'allUntracked' })
+    }
+  )
+  return items
 }
 
 // ------------------------------------------------------------------ review
@@ -184,10 +300,14 @@ export function ChangesQueue(): JSX.Element {
                     )
                 },
                 {
-                  label: 'Ignore this file',
+                  label: 'Ignore',
                   separatorBefore: true,
-                  title: 'Add the path to .gitignore',
-                  onSelect: () => void store.ignoreFile(f.path)
+                  title: 'Add .gitignore rules for this path',
+                  children: ignoreSubmenu(
+                    f,
+                    store,
+                    state.status?.files.some(x => x.untracked) ?? false
+                  )
                 },
                 {
                   label: 'Discard changes',
