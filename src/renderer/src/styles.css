@@ -2314,7 +2314,12 @@ select {
 }
 
 .context-menu {
-  animation: layer-in var(--motion-fast) var(--ease-arrive) both;
+  /* `backwards`, never `both`: a filled animation on `transform` keeps the
+     element's transform flag on permanently (an identity matrix), which makes
+     the menu the containing block for its fixed-position submenu and clips it
+     inside the menu's own overflow. `backwards` still prevents the first-frame
+     flash but releases the transform once the entry animation finishes. */
+  animation: layer-in var(--motion-fast) var(--ease-arrive) backwards;
   transform-origin: top left;
 }
 
