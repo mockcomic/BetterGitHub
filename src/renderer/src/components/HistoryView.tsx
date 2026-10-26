@@ -169,6 +169,7 @@ export function HistoryView(): JSX.Element {
             diff={state.selectedCommitFileDiff}
             title={state.selectedCommitFilePath}
             error={state.selectedCommitFileError}
+            preview={state.selectedCommitFilePreview}
             onRetry={
               state.selectedCommitFilePath !== null
                 ? () => void store.selectCommitFile(state.selectedCommitFilePath!)

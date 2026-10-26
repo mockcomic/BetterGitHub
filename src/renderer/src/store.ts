@@ -7,6 +7,7 @@ import type {
   BranchInfo,
   CommitInfo,
   ExternalApp,
+  FilePreview,
   FileStatus,
   GitConfigInfo,
   GitHubTarget,
@@ -105,6 +106,8 @@ export interface AppState {
   readonly selectedFilePath: string | null
   readonly selectedFileDiff: string | null
   readonly selectedFileError: string | null
+  /** Media preview bytes when the selected file is an image/video/audio. */
+  readonly selectedFilePreview: FilePreview | null
   readonly selectedCommit: CommitInfo | null
   readonly commitFiles: ReadonlyArray<FileStatus>
   readonly commitFilesLoading: boolean
@@ -112,6 +115,8 @@ export interface AppState {
   readonly selectedCommitFilePath: string | null
   readonly selectedCommitFileDiff: string | null
   readonly selectedCommitFileError: string | null
+  /** Media preview bytes from the selected commit's tree. */
+  readonly selectedCommitFilePreview: FilePreview | null
   readonly drafts: ReadonlyMap<string, RepoDraft>
   readonly amend: AmendState | null
   readonly lastCommit: LastCommitState | null
@@ -175,6 +180,7 @@ const initialState: AppState = {
   selectedFilePath: null,
   selectedFileDiff: null,
   selectedFileError: null,
+  selectedFilePreview: null,
   selectedCommit: null,
   commitFiles: [],
   commitFilesLoading: false,
@@ -182,6 +188,7 @@ const initialState: AppState = {
   selectedCommitFilePath: null,
   selectedCommitFileDiff: null,
   selectedCommitFileError: null,
+  selectedCommitFilePreview: null,
   drafts: new Map(),
   amend: null,
   lastCommit: null,
@@ -536,11 +543,13 @@ export class AppStore {
       selectedFilePath: null,
       selectedFileDiff: null,
       selectedFileError: null,
+      selectedFilePreview: null,
       selectedCommit: null,
       commitFiles: [],
       commitFilesError: null,
       selectedCommitFilePath: null,
       selectedCommitFileDiff: null,
+      selectedCommitFilePreview: null,
       amend: null,
       lastCommit: null,
       stashes: [],
@@ -811,7 +820,8 @@ export class AppStore {
             this.update({
               selectedFilePath: null,
               selectedFileDiff: null,
-              selectedFileError: null
+              selectedFileError: null,
+              selectedFilePreview: null
             })
           }
           if (this.state.view === 'history') await this.loadLog(false)
@@ -975,10 +985,17 @@ export class AppStore {
     this.update({
       selectedFilePath: path,
       selectedFileDiff: '…',
-      selectedFileError: null
+      selectedFileError: null,
+      selectedFilePreview: null
     })
+    const entry = this.fileByPath(path)
+    // A conflicted media file holds conflict markers on disk — playing that
+    // would be nonsense, so the binary-diff panel stays there.
+    const preview: Promise<FilePreview | null> =
+      entry?.kind === 'conflicted'
+        ? Promise.resolve(null)
+        : call('getPreview', repo.path, path).catch(() => null)
     try {
-      const entry = this.fileByPath(path)
       const diff = await call(
         'getPathDiff',
         repo.path,
@@ -995,6 +1012,10 @@ export class AppStore {
           selectedFileError: err instanceof Error ? err.message : String(err)
         })
       }
+    }
+    const previewResult = await preview
+    if (this.state.selectedFilePath === path) {
+      this.update({ selectedFilePreview: previewResult })
     }
   }
 
@@ -1143,7 +1164,8 @@ export class AppStore {
       this.update({
         selectedFilePath: null,
         selectedFileDiff: null,
-        selectedFileError: null
+        selectedFileError: null,
+        selectedFilePreview: null
       })
     }
   }
@@ -1786,7 +1808,8 @@ export class AppStore {
       commitFilesError: null,
       selectedCommitFilePath: null,
       selectedCommitFileDiff: null,
-      selectedCommitFileError: null
+      selectedCommitFileError: null,
+      selectedCommitFilePreview: null
     })
     try {
       const files = await call('getCommitFiles', repo.path, commit.sha)
@@ -1810,20 +1833,42 @@ export class AppStore {
     this.update({
       selectedCommitFilePath: path,
       selectedCommitFileDiff: '…',
-      selectedCommitFileError: null
+      selectedCommitFileError: null,
+      selectedCommitFilePreview: null
     })
+    // The committed blob itself, not the working tree: history must show what
+    // the commit contains. (Deleted rows have no blob — the fetch answers null.)
+    const preview: Promise<FilePreview | null> = call(
+      'getPreview',
+      repo.path,
+      path,
+      commit.sha
+    ).catch(() => null)
     try {
       const diff = await call('getCommitFileDiff', repo.path, commit.sha, path)
-      if (this.state.selectedCommitFilePath === path) {
+      if (
+        this.state.selectedCommitFilePath === path &&
+        this.state.selectedCommit?.sha === commit.sha
+      ) {
         this.update({ selectedCommitFileDiff: diff })
       }
     } catch (err) {
-      if (this.state.selectedCommitFilePath === path) {
+      if (
+        this.state.selectedCommitFilePath === path &&
+        this.state.selectedCommit?.sha === commit.sha
+      ) {
         this.update({
           selectedCommitFileDiff: null,
           selectedCommitFileError: err instanceof Error ? err.message : String(err)
         })
       }
+    }
+    const previewResult = await preview
+    if (
+      this.state.selectedCommitFilePath === path &&
+      this.state.selectedCommit?.sha === commit.sha
+    ) {
+      this.update({ selectedCommitFilePreview: previewResult })
     }
   }
 

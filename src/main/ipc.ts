@@ -20,6 +20,7 @@ import { safeJoin } from './git/repo-path'
 import { getDetectedApps, launchDetached, openRepoInApp } from './external-apps'
 import { getStatus } from './git/status'
 import { getCommitFileDiff, getCommitFileNames, getPathsDiffText, getPathDiff } from './git/diff'
+import { getPreview } from './git/preview'
 import {
   checkoutBranch,
   createBranch,
@@ -350,6 +351,9 @@ const handlers: Handlers = {
   },
   async getCommitFileDiff(repoPath: string, sha: string, path: string) {
     return getCommitFileDiff(repoPath, sha, path)
+  },
+  async getPreview(repoPath: string, path: string, sha?: string) {
+    return getPreview(repoPath, path, sha)
   },
   async getCommitFiles(repoPath: string, sha: string) {
     const files = await getCommitFileNames(repoPath, sha)

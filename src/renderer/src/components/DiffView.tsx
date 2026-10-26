@@ -1,5 +1,6 @@
 import type { JSX } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import type { FilePreview } from '../../../shared/models'
 import Prism from 'prismjs'
 import 'prismjs/components/prism-clike'
 import 'prismjs/components/prism-javascript'
@@ -127,6 +128,7 @@ export function DiffView({
   emptyTitle,
   emptyHint,
   error,
+  preview,
   onRetry,
   onOpenFile
 }: {
@@ -136,6 +138,8 @@ export function DiffView({
   emptyHint: string
   /** Distinct from "nothing selected": fetching or rendering failed. */
   error?: string | null
+  /** Media bytes when the selected file is an image/video/audio. */
+  preview?: FilePreview | null
   onRetry?: () => void
   onOpenFile?: () => void
 }): JSX.Element {
@@ -178,6 +182,11 @@ export function DiffView({
   }
 
   if (isBinaryDiff(diff)) {
+    // Image/video/audio changes: play the file instead of announcing it is
+    // binary (store.ts fills `preview` from the getPreview channel).
+    if (preview !== undefined && preview !== null) {
+      return <MediaPreview preview={preview} title={title} onOpenFile={onOpenFile} />
+    }
     return (
       <div className="diff-view empty-diff">
         <h2>Binary file</h2>
@@ -261,6 +270,102 @@ function updateView(
   } catch {
     /* ignore */
   }
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  const units = ['KB', 'MB', 'GB']
+  let value = n
+  let unit = -1
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit++
+  }
+  return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`
+}
+
+const KIND_LABELS: Record<FilePreview['kind'], string> = {
+  image: 'Image',
+  video: 'Video',
+  audio: 'Audio'
+}
+
+/**
+ * The preview panel replacing the "Binary file" state for media files. The
+ * bytes arrive from main (working tree or commit tree) as an ArrayBuffer and
+ * are wrapped in a blob URL — revoked when the selection changes. Chromium's
+ * own <video>/<audio> decoding decides playability; a codec it lacks (HEVC
+ * .mov…) surfaces as the fallback note rather than a broken frame.
+ */
+function MediaPreview({
+  preview,
+  title,
+  onOpenFile
+}: {
+  preview: FilePreview
+  title: string | null
+  onOpenFile?: () => void
+}): JSX.Element {
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setUrl(null)
+    setFailed(false)
+    if (preview.data === undefined) return
+    const objectUrl = URL.createObjectURL(new Blob([preview.data], { type: preview.mime }))
+    setUrl(objectUrl)
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [preview])
+
+  return (
+    <div className="diff-view media-preview-view">
+      {title !== null && (
+        <div className="diff-title">
+          <span className="diff-title-path">{title}</span>
+          <span className="diff-title-actions">
+            {onOpenFile !== undefined && (
+              <button className="mini" onClick={onOpenFile} title="Open in default program">
+                Open
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+      <div className="media-preview">
+        {preview.data === undefined ? (
+          <p className="muted">
+            {KIND_LABELS[preview.kind]} is {formatBytes(preview.byteLength)} — too large to
+            preview here.
+          </p>
+        ) : failed ? (
+          <p className="muted">
+            This {preview.kind} could not be played here — GitDesk's viewer only ships the
+            codecs Chromium itself has.
+          </p>
+        ) : url === null ? (
+          <p className="muted">Loading preview…</p>
+        ) : (
+          <>
+            {preview.kind === 'image' && (
+              <img src={url} alt={title ?? 'Image preview'} onError={() => setFailed(true)} />
+            )}
+            {preview.kind === 'video' && (
+              <video src={url} controls onError={() => setFailed(true)} />
+            )}
+            {preview.kind === 'audio' && (
+              <audio src={url} controls onError={() => setFailed(true)} />
+            )}
+            <p className="media-caption muted">
+              {KIND_LABELS[preview.kind]} · {formatBytes(preview.byteLength)}
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  )
 }
 
 interface SplitRow {

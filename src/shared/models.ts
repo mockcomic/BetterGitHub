@@ -286,3 +286,18 @@ export interface SettingsPatch {
 }
 
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: string }
+
+/** The media families the diff pane can preview natively. */
+export type PreviewKind = 'image' | 'video' | 'audio'
+
+/**
+ * A media file's bytes for the diff pane's preview: from the working tree,
+ * or from a commit's tree when fetched with a sha. `data` is absent when the
+ * file exceeds the preview size limit — the pane says so instead of hanging.
+ */
+export interface FilePreview {
+  readonly kind: PreviewKind
+  readonly mime: string
+  readonly byteLength: number
+  readonly data?: ArrayBuffer
+}

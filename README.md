@@ -35,6 +35,9 @@ parsing → cancellable request).
   highlighting of what actually changed inside a modified line, syntax
   highlighting (Prism), a large-diff guard, distinct binary / error / empty
   states, and synthesized add-diffs for untracked files.
+- **Media previews** — selecting an image, video, or audio change shows it in
+  the pane instead of the binary notice (Chromium playback, up to 128 MB);
+  history previews read the exact committed blob, not the working tree.
 - **Commit** — summary + description (two `-m` paragraphs), restricted to the
   selected files via `git commit --only`; commit-message drafts are persisted
   per repository; **Undo** and **Edit latest commit…** (amend) with a

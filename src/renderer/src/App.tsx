@@ -167,6 +167,7 @@ export function App(): JSX.Element {
               diff={state.selectedFileDiff}
               title={state.selectedFilePath}
               error={state.selectedFileError}
+              preview={state.selectedFilePreview}
               onRetry={
                 state.selectedFilePath !== null
                   ? () => void store.selectFile(state.selectedFilePath!)
@@ -186,6 +187,7 @@ export function App(): JSX.Element {
               diff={state.selectedFileDiff}
               title={state.selectedFilePath}
               error={state.selectedFileError}
+              preview={state.selectedFilePreview}
               onRetry={
                 state.selectedFilePath !== null
                   ? () => void store.selectFile(state.selectedFilePath!)

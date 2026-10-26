@@ -3,6 +3,7 @@ import type {
   BranchList,
   CommitInfo,
   ExternalApp,
+  FilePreview,
   FileStatus,
   GeneratedCommitMessage,
   GitHubTarget,
@@ -98,6 +99,12 @@ export interface RequestResponseChannels {
   /** Raw unified diff text for a path within a commit. */
   getCommitFileDiff: (repoPath: string, sha: string, path: string) => string
   getCommitFiles: (repoPath: string, sha: string) => FileStatus[]
+  /**
+   * Media preview bytes for image/video/audio files — the working-tree file,
+   * or the blob in commit `sha`'s tree when one is given. Null for anything
+   * the previewer doesn't handle or that vanished since the listing.
+   */
+  getPreview: (repoPath: string, path: string, sha?: string) => FilePreview | null
 
   // committing
   commitPaths: (

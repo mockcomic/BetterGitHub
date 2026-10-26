@@ -3059,6 +3059,48 @@ select {
   white-space: pre-wrap;
 }
 
+/* --------------------------------------------------------- media preview */
+
+/*
+ * The panel that replaces the "Binary file" state for image/video/audio
+ * files (components/DiffView.tsx, MediaPreview). The stage is inset so the
+ * media reads as a viewer, not as page canvas; transparent images keep the
+ * theme's own inset tone behind them.
+ */
+.media-preview-view {
+  overflow: hidden;
+}
+
+.media-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  overflow: auto;
+  background: var(--bg-inset);
+}
+
+.media-preview img,
+.media-preview video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.media-preview audio {
+  width: min(480px, 100%);
+}
+
+.media-caption {
+  font-size: 12px;
+}
+
 /* -------------------------------------------------------- context menu */
 
 .context-menu {
