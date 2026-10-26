@@ -2876,6 +2876,305 @@ select {
   color: var(--accent);
 }
 
+/* ------------------------------------------------- hosted accounts / clone tabs */
+
+/* The clone dialog's source tabs: the same segmented tab language as the
+   desk switcher — the active tab owns the accent and a hairline underline. */
+.clone-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.clone-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 10px 5px;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.clone-tab:hover {
+  color: var(--text);
+}
+
+.clone-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.remote-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.remote-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.remote-search {
+  flex: 1 1 auto;
+}
+
+.remote-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  background: var(--bg);
+}
+
+.remote-repo {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  align-items: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  padding: 5px 8px;
+}
+
+.remote-repo:hover {
+  background: var(--bg-hover);
+}
+
+/* Picked rides the app's own accent selection surface, inverted per theme,
+   exactly like the file/commit/stash rows. */
+.remote-repo.picked {
+  background: var(--bg-selected);
+  color: var(--row-on-accent);
+}
+
+.remote-repo.picked:hover {
+  background: var(--bg-selected-hover);
+}
+
+.remote-repo.picked .remote-repo-owner,
+.remote-repo.picked .remote-repo-time {
+  color: var(--row-on-accent-muted);
+}
+
+.remote-repo.picked .repo-badge {
+  color: var(--row-on-accent);
+  background: var(--on-accent-chip);
+  border-color: var(--on-accent-chip-border);
+}
+
+.remote-repo-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-repo-owner {
+  color: var(--text-muted);
+}
+
+.remote-repo-time {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.remote-empty,
+.remote-error,
+.remote-loading {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+.remote-error {
+  color: var(--danger);
+}
+
+.accounts-empty {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg-header);
+}
+
+.account-avatar {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-inset);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.account-who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sub {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.account-chip {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: var(--bg);
+}
+
+.mini.danger {
+  color: var(--danger);
+}
+
+.signin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signin-browser {
+  display: flex;
+  gap: 8px;
+}
+
+.signin-token {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.signin-provider {
+  flex: 0 0 auto;
+}
+
+.signin-token-input {
+  flex: 1 1 auto;
+}
+
+.signin-instance {
+  width: 100%;
+}
+
+.signin-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.signin-notice {
+  color: var(--add-text);
+  font-size: 12px;
+  margin: 0;
+}
+
+.signin-progress {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--bg-header);
+}
+
+.signin-progress-line {
+  margin: 0 0 6px;
+}
+
+.signin-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.signin-code {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  user-select: all;
+}
+
+.signin-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  margin: 0 0 4px;
+}
+
+.signin-apps {
+  margin-top: 10px;
+}
+
+.signin-apps summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+
+.signin-apps .field {
+  margin-top: 8px;
+}
+
 /* ---------------------------------------------------------------- empty state / toasts */
 
 .empty-state {

@@ -1,4 +1,6 @@
 import type {
+  AccountInfo,
+  AccountProvider,
   AddRepositoriesResult,
   BranchList,
   CommitInfo,
@@ -14,11 +16,15 @@ import type {
   LogQuery,
   ManagedRepository,
   PublicSettings,
+  RemoteRepoPage,
+  RemoteRepoQuery,
   RemoveRepositoriesResult,
   RepoSummaryEntry,
   Repository,
   RepositoryStatus,
   SettingsPatch,
+  SignInChallenge,
+  SignInStatus,
   StashEntry,
   WorkflowKind
 } from './models'
@@ -62,6 +68,36 @@ export interface RequestResponseChannels {
     apiKey?: string
   }) => { ok: boolean; message: string }
   suggestCloneFolder: (url: string) => string
+
+  // hosted accounts (GitHub / GitLab) — sign in, browse, clone
+  /** Every signed-in account, token-free. */
+  listAccounts: () => AccountInfo[]
+  /**
+   * Validate a personal access token against the provider (`/user` first,
+   * nothing stored on failure) and remember the account. For GitLab,
+   * `apiBase` may name a self-hosted instance root.
+   */
+  signInWithToken: (
+    provider: AccountProvider,
+    token: string,
+    apiBase?: string
+  ) => AccountInfo
+  /**
+   * Start a browser sign-in: GitHub device flow (type the code) or GitLab
+   * OAuth PKCE (main already listens for the localhost redirect). Throws a
+   * clear message when the provider's client id is not configured.
+   */
+  beginSignIn: (provider: AccountProvider, apiBase?: string) => SignInChallenge
+  /** Poll a pending challenge; 'pending' keeps the UI's wait state alive. */
+  pollSignIn: (requestId: string) => SignInStatus
+  cancelSignIn: (requestId: string) => void
+  /** Forget an account and destroy its stored token. */
+  removeAccount: (id: string) => void
+  /** One page of the account's repositories, owner/collaborator/org-wide. */
+  listRemoteRepositories: (
+    accountId: string,
+    query?: RemoteRepoQuery
+  ) => RemoteRepoPage
 
   // filesystem watching (main pushes REPO_CHANGED_CHANNEL)
   startWatching: (repoPath: string) => void

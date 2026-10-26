@@ -11,16 +11,27 @@ import type {
   Repository,
   SettingsPatch
 } from '../shared/models'
+import {
+  DEFAULT_GITHUB_DEVICE_CLIENT_ID,
+  DEFAULT_GITLAB_CLIENT_ID
+} from './providers/config'
 
 /**
- * JSON settings + repository list in userData, and an API key kept in an
- * encrypted sidecar file when the OS supports it (GitHub Desktop used
- * keytar; we use Electron safeStorage).
+ * JSON settings + repository list in userData, and secrets (the AI API key,
+ * account tokens) kept in encrypted sidecar files when the OS supports it
+ * (GitHub Desktop used keytar; we use Electron safeStorage).
  */
 
 interface StoredSettings {
   repositories: Repository[]
   ai: { baseUrl: string; model: string; customInstructions: string }
+  /**
+   * OAuth app ids for browser sign-in. Empty falls back to the compiled
+   * defaults in providers/config.ts; a value entered in Preferences wins,
+   * which is how a self-built GitHub OAuth App or GitLab application is
+   * wired in without rebuilding the app.
+   */
+  accounts: { githubClientId: string; gitlabClientId: string }
   confirmOverrideWithGeneratedMessage: boolean
   autoRefresh: boolean
   theme: ThemeId
@@ -32,6 +43,10 @@ const DEFAULTS: StoredSettings = {
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
     customInstructions: ''
+  },
+  accounts: {
+    githubClientId: DEFAULT_GITHUB_DEVICE_CLIENT_ID,
+    gitlabClientId: DEFAULT_GITLAB_CLIENT_ID
   },
   confirmOverrideWithGeneratedMessage: true,
   autoRefresh: true,
@@ -58,6 +73,7 @@ async function load(): Promise<StoredSettings> {
         ...DEFAULTS,
         ...parsed,
         ai: { ...DEFAULTS.ai, ...(parsed.ai ?? {}) },
+        accounts: { ...DEFAULTS.accounts, ...(parsed.accounts ?? {}) },
         repositories: Array.isArray(parsed.repositories)
           ? parsed.repositories
           : []
@@ -72,7 +88,12 @@ async function load(): Promise<StoredSettings> {
   } catch (err) {
     console.error('Failed to read settings, using defaults:', err)
   }
-  cached = { ...DEFAULTS, ai: { ...DEFAULTS.ai }, repositories: [] }
+  cached = {
+    ...DEFAULTS,
+    ai: { ...DEFAULTS.ai },
+    accounts: { ...DEFAULTS.accounts },
+    repositories: []
+  }
   return cached
 }
 
@@ -84,6 +105,7 @@ async function persist(): Promise<void> {
 
 export async function getPublicSettings(): Promise<PublicSettings> {
   const s = await load()
+  const ids = effectiveClientIds(s)
   return {
     ai: {
       baseUrl: s.ai.baseUrl,
@@ -91,9 +113,35 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       customInstructions: s.ai.customInstructions,
       hasApiKey: (await readApiKey()) !== null
     },
+    accounts: {
+      hasGitHubClientId: ids.github.length > 0,
+      hasGitLabClientId: ids.gitlab.length > 0
+    },
     confirmOverrideWithGeneratedMessage: s.confirmOverrideWithGeneratedMessage,
     autoRefresh: s.autoRefresh,
     theme: s.theme
+  }
+}
+
+/**
+ * The client ids actually in force: a Preferences-entered id wins; an empty
+ * (or cleared) one falls back to the compiled default.
+ */
+export async function getAccountsConfig(): Promise<{
+  githubClientId: string
+  gitlabClientId: string
+}> {
+  const ids = effectiveClientIds(await load())
+  return { githubClientId: ids.github, gitlabClientId: ids.gitlab }
+}
+
+function effectiveClientIds(s: StoredSettings): {
+  github: string
+  gitlab: string
+} {
+  return {
+    github: s.accounts.githubClientId.trim() || DEFAULT_GITHUB_DEVICE_CLIENT_ID,
+    gitlab: s.accounts.gitlabClientId.trim() || DEFAULT_GITLAB_CLIENT_ID
   }
 }
 
@@ -107,6 +155,14 @@ export async function saveSettings(patch: SettingsPatch): Promise<PublicSettings
     }
     if (patch.ai.apiKey !== undefined) {
       await writeApiKey(patch.ai.apiKey)
+    }
+  }
+  if (patch.accounts !== undefined) {
+    if (patch.accounts.githubClientId !== undefined) {
+      s.accounts.githubClientId = patch.accounts.githubClientId.trim()
+    }
+    if (patch.accounts.gitlabClientId !== undefined) {
+      s.accounts.gitlabClientId = patch.accounts.gitlabClientId.trim()
     }
   }
   if (patch.confirmOverrideWithGeneratedMessage !== undefined) {
@@ -173,12 +229,17 @@ export async function isAutoRefreshEnabled(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// API key (never exposed to the renderer)
+// Secrets (never exposed to the renderer)
 
-export async function readApiKey(): Promise<string | null> {
+/**
+ * Read a secret sidecar written by {@link writeSecretFile}: decrypted when
+ * safeStorage is available, verbatim when it is not. Any unreadable,
+ * undecryptable or empty file reads as null so callers treat it as absent.
+ */
+export async function readSecretFile(path: string): Promise<string | null> {
   try {
-    if (!existsSync(apiKeyPath())) return null
-    const buf = await readFile(apiKeyPath())
+    if (!existsSync(path)) return null
+    const buf = await readFile(path)
     if (buf.length === 0) return null
     const value = safeStorage.isEncryptionAvailable()
       ? safeStorage.decryptString(buf)
@@ -189,10 +250,14 @@ export async function readApiKey(): Promise<string | null> {
   }
 }
 
-async function writeApiKey(value: string): Promise<void> {
+/** Store a secret; an empty value truncates the file (i.e. clears it). */
+export async function writeSecretFile(
+  path: string,
+  value: string
+): Promise<void> {
   const trimmed = value.trim()
   if (trimmed.length === 0) {
-    await writeFile(apiKeyPath(), Buffer.alloc(0), { flag: 'w', mode: 0o600 }).catch(
+    await writeFile(path, Buffer.alloc(0), { flag: 'w', mode: 0o600 }).catch(
       () => undefined
     )
     return
@@ -201,9 +266,18 @@ async function writeApiKey(value: string): Promise<void> {
     ? safeStorage.encryptString(trimmed)
     : Buffer.from(trimmed, 'utf8')
   await mkdir(app.getPath('userData'), { recursive: true })
-  // 0600: on systems without a keychain (safeStorage unavailable) the key is
-  // stored verbatim — keep it owner-only on POSIX instead of the umask default.
-  await writeFile(apiKeyPath(), buf, { mode: 0o600 })
+  // 0600: on systems without a keychain (safeStorage unavailable) the secret
+  // is stored verbatim — keep it owner-only on POSIX instead of the umask
+  // default.
+  await writeFile(path, buf, { mode: 0o600 })
+}
+
+export async function readApiKey(): Promise<string | null> {
+  return readSecretFile(apiKeyPath())
+}
+
+async function writeApiKey(value: string): Promise<void> {
+  await writeSecretFile(apiKeyPath(), value)
 }
 
 export async function getAiConfig(): Promise<{

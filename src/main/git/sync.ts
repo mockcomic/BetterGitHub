@@ -1,13 +1,48 @@
 import { existsSync, readdirSync } from 'fs'
 import { basename } from 'path'
-import { execGit, GitExecError } from './exec'
+import { gitRetryCredential } from '../accounts'
+import { buildTokenAuthEnv, httpsHostOf, isGitAuthFailure } from './auth'
+import { execGit, GitExecError, type GitExecOptions, type GitExecResult } from './exec'
 import { getStatus } from './status'
 
+/**
+ * Run a hosted-remote git command, and when it fails specifically because
+ * git could not authenticate, rerun it once with the signed-in account's
+ * token scoped to that URL's origin (see git/auth.ts). Any other failure —
+ * and the retry's own failure — surface unchanged.
+ */
+async function execGitWithTokenRetry(
+  args: ReadonlyArray<string>,
+  options: GitExecOptions,
+  remoteUrl: string | null
+): Promise<GitExecResult> {
+  try {
+    return await execGit(args, options)
+  } catch (err) {
+    if (
+      !(err instanceof GitExecError) ||
+      remoteUrl === null ||
+      !isGitAuthFailure(`${err.result.stderr}\n${err.result.stdout}`)
+    ) {
+      throw err
+    }
+    const host = httpsHostOf(remoteUrl)
+    if (host === null) throw err
+    const credential = await gitRetryCredential(host)
+    if (credential === null) throw err
+    const env = buildTokenAuthEnv(remoteUrl, credential)
+    if (env === null) throw err
+    return execGit(args, { ...options, env: { ...(options.env ?? {}), ...env } })
+  }
+}
+
 export async function fetch(repoPath: string): Promise<string> {
-  const r = await execGit(['fetch', '--prune', 'origin'], {
-    cwd: repoPath,
-    timeoutMs: 120_000
-  })
+  const remoteUrl = await getRemoteUrl(repoPath)
+  const r = await execGitWithTokenRetry(
+    ['fetch', '--prune', 'origin'],
+    { cwd: repoPath, timeoutMs: 120_000 },
+    remoteUrl
+  )
   return (r.stderr + r.stdout).trim()
 }
 
@@ -22,7 +57,12 @@ export async function push(repoPath: string): Promise<string> {
     ? ['push']
     : ['push', '--set-upstream', 'origin', status.branch]
 
-  const r = await execGit(args, { cwd: repoPath, timeoutMs: 120_000 })
+  const remoteUrl = await getRemoteUrl(repoPath)
+  const r = await execGitWithTokenRetry(
+    args,
+    { cwd: repoPath, timeoutMs: 120_000 },
+    remoteUrl
+  )
   return (r.stderr + r.stdout).trim()
 }
 
@@ -35,10 +75,12 @@ export async function pull(repoPath: string): Promise<string> {
   const args =
     upstream || status.detached ? ['pull'] : ['pull', 'origin', status.branch]
 
-  const r = await execGit(args, {
-    cwd: repoPath,
-    timeoutMs: 300_000
-  })
+  const remoteUrl = await getRemoteUrl(repoPath)
+  const r = await execGitWithTokenRetry(
+    args,
+    { cwd: repoPath, timeoutMs: 300_000 },
+    remoteUrl
+  )
   return (r.stderr + r.stdout).trim()
 }
 
@@ -169,9 +211,10 @@ export async function cloneRepository(
     )
   }
 
-  const r = await execGit(
+  const r = await execGitWithTokenRetry(
     ['clone', '--progress', '--end-of-options', url.trim(), destinationPath],
-    { cwd: destinationPath, timeoutMs: 15 * 60_000 }
+    { cwd: destinationPath, timeoutMs: 15 * 60_000 },
+    url.trim()
   )
   return (r.stderr + r.stdout).trim()
 }
