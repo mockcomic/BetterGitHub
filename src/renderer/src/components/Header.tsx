@@ -5,6 +5,7 @@ import type { DeskView } from '../store'
 import type { ExternalApp } from '../../../shared/models'
 import { ConfettiBurst, useCelebration } from './Celebration'
 import { BranchDivergence } from './BranchBadges'
+import { useJustArmed } from '../motion'
 
 /** Placeholder for the command strip's filter, per desk view. */
 const FILTER_LABELS: Record<DeskView, string> = {
@@ -57,6 +58,11 @@ export function Header(): JSX.Element {
   const hasUpstream = status?.upstream !== undefined
   const busy = state.busy
   const { nonce: celebrateNonce, celebrating } = useCelebration('push')
+  // The strip's Push arms with a ring the moment git makes it true — a commit
+  // landing elsewhere in the app turns ahead 0 → n and lights the verb.
+  const pushEnabled =
+    busy === null && status !== null && (ahead > 0 || !hasUpstream)
+  const pushArmed = useJustArmed(pushEnabled)
 
   return (
     <header className="header">
@@ -142,8 +148,8 @@ export function Header(): JSX.Element {
             )}
           </button>
           <button
-            className={`btn push${celebrating ? ' celebrating' : ''}`}
-            disabled={busy !== null || status === null || (ahead === 0 && hasUpstream)}
+            className={`btn push${celebrating ? ' celebrating' : ''}${pushArmed ? ' arming' : ''}`}
+            disabled={!pushEnabled}
             onClick={() => void store.doSync('push')}
             title={
               ahead === 0 && hasUpstream

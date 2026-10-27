@@ -1,6 +1,14 @@
 import { existsSync, readdirSync } from 'fs'
 import { basename } from 'path'
-import { execGit, GitExecError } from './exec'
+import {
+  GitExecError,
+  GitExecResult,
+  execGit
+} from './exec'
+import {
+  PUSH_NEEDS_PULL_MESSAGE,
+  isRemoteMovedAhead
+} from '../../shared/push-rejection'
 import { getStatus } from './status'
 
 export async function fetch(repoPath: string): Promise<string> {
@@ -22,7 +30,20 @@ export async function push(repoPath: string): Promise<string> {
     ? ['push']
     : ['push', '--set-upstream', 'origin', status.branch]
 
-  const r = await execGit(args, { cwd: repoPath, timeoutMs: 120_000 })
+  let r: GitExecResult
+  try {
+    r = await execGit(args, { cwd: repoPath, timeoutMs: 120_000 })
+  } catch (err) {
+    // A push rejected because the remote moved ahead has a one-click
+    // recovery (pull, then push again), so replace git's raw output — whose
+    // first line is just "To <remote>" — with the message the renderer keys
+    // its "Pull first" toast buttons on. Other rejections (protected
+    // branches, hooks) stay raw errors.
+    if (err instanceof GitExecError && isRemoteMovedAhead(err.result.stderr)) {
+      throw new Error(PUSH_NEEDS_PULL_MESSAGE)
+    }
+    throw err
+  }
   return (r.stderr + r.stdout).trim()
 }
 

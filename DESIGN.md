@@ -211,7 +211,7 @@ components:
 
 The discipline is not imitation for its own sake. A clone earns trust by being legible in the same grammar as its reference: the same quiet ground, the same 6px controls, the same blue that means "this is the app's action." The personality of GitDesk is that it gets out of git's way — and where it departs, it departs in GitHub's own vocabulary (the agent's purple is Primer's `done` accent, not an invention).
 
-Motion is GitHub Desktop's register: nearly silent. Controls answer with color, never position — no lift, no press-scale, no travelling indicator, no staggered rows. Floated layers fade in with a hair of scale; the desk swap fades the incoming pane in; a running operation gets a spinner; and a commit or push that lands gets confetti. Everything else is already where it belongs.
+Motion is GitHub Desktop's register: nearly silent. Controls answer with color, never position — no lift, no travelling indicator, no staggered rows. The two completing verbs are the sole exception, and they move on state, never on place: Commit and Push press on a hair of scale and throw one short arm ring in their own hue the instant they flip from cannot to can — checking the first file arms Commit; a landed commit arms Push, the baton pass of the compose → commit → push story. Floated layers fade in with a hair of scale; the desk swap fades the incoming pane in; a running operation gets a spinner; and a commit or push that lands gets confetti. Everything else is already where it belongs.
 
 The type system is a two-voice arrangement: the platform-native UI stack (Segoe UI on Windows — the same family GitHub Desktop ships) for human text at 13px, and a programmer's monospace (Cascadia Code) for machine truth — paths, diffs, commit messages, `code` chips, counts. Wherever mono appears, it says "this text is verbatim from your repository." Light and dark are first-class equals through one custom-property contract; dark is Primer's `#0d1117` desk, not an inversion of the light one.
 
@@ -312,7 +312,7 @@ Flat by default, in fill and in height. Every structural boundary is a 1px borde
 ### Shadow Vocabulary
 - **Float** (`0 12px 28px rgba(140, 149, 159, 0.3), 0 2px 4px rgba(140, 149, 159, 0.1)`; dark `0 12px 28px rgba(1, 4, 9, 0.6), 0 2px 4px rgba(1, 4, 9, 0.4)`): Primer's overlay shadow, carried by popovers, context menus, and dialogs. Two layers, always together.
 - **Rest lift** (`0 1px 0 rgba(31, 35, 40, 0.04)`; `0 0 transparent` in dark): the 1px shadow every bordered button and the active tab chip carries at rest. It is GitHub's, it never grows on hover, and it is the only shadow on an in-flow control.
-- **Focus ring** (`0 0 0 3px rgba(9, 105, 218, 0.3)`; dark `rgba(31, 111, 235, 0.4)`): the only halo in the system, and it appears only on `:focus-visible`, always with the border taken to the accent.
+- **Focus ring** (`0 0 0 3px rgba(9, 105, 218, 0.3)`; dark `rgba(31, 111, 235, 0.4)`): the halo for keyboard state, appearing only on `:focus-visible`, always with the border taken to the accent. Ring-shaped glows in this system always name state — the celebration pop's green ring and the verbs' arm ring are its event-bound cousins — never decoration.
 - **Scrim** (`rgba(31, 35, 40, 0.5)`; dark `rgba(1, 4, 9, 0.68)`): the dialog overlay, unblurred.
 
 ### Named Rules
@@ -326,14 +326,14 @@ Gently softened rectangles on GitHub's scale: 2px for word-level diff marks, 4px
 
 ## Motion
 
-Three tiers, on color and opacity plus a hair of scale on entrances — `--motion-instant` 90ms (cursor answers: background, border, text color), `--motion-fast` 140ms (floated-layer fades, the desk-swap fade, the diff fade-in), `--motion-layer` 200ms (dialog and toast entrances). Arrival curve `cubic-bezier(0.16, 1, 0.3, 1)`; everything else is `ease-out`. The commit/push celebration (a 500ms button pop, a 680ms confetti flight, dismissed after 900ms) is the single long moment.
+Three tiers, on color and opacity plus a hair of scale on entrances — `--motion-instant` 90ms (cursor answers: background, border, text color), `--motion-fast` 140ms (floated-layer fades, the desk-swap fade, the diff fade-in), `--motion-layer` 200ms (dialog and toast entrances). Arrival curve `cubic-bezier(0.16, 1, 0.3, 1)`; everything else is `ease-out`. The commit/push celebration (a 500ms button pop, a 680ms confetti flight, dismissed after 900ms) is the single long moment; its counterpart on the same two verbs is the 400ms arm ring, fired once when the button becomes able to act.
 
-What moves: buttons change face color on hover and press without moving a pixel; icon buttons gain a hover ground; rows change ground; the active tab's chip appears at its new position (opacity only — it jumps, it does not travel); popovers, menus, dialogs, and toasts fade in at `scale(0.98)`; the desk swap is one keyed `.pane-enter` fade on the queue and the main pane — the strip, tab rail, tray, and status bar are the same faces in every desk, so they are never snapshotted or faded; the busy item grows a spinner; a landed commit or push throws confetti. Nothing staggers in, nothing lifts, nothing rotates, and no number pops. `prefers-reduced-motion: reduce` drops the scale from the entrances and keeps the fades; the spinner and the confetti's fade-in-place remain.
+What moves: buttons change face color on hover and press without moving a pixel, except the two completing verbs — `.btn.commit` and `.btn.push` press on a `scale(0.97)` hair of commitment and bloom one arm ring (`btn-arm`, 400ms, the verb's own face color at 55%, spreading to 9px and fading) when the repository makes them true; icon buttons gain a hover ground; rows change ground; the active tab's chip appears at its new position (opacity only — it jumps, it does not travel); popovers, menus, dialogs, and toasts fade in at `scale(0.98)`; the desk swap is one keyed `.pane-enter` fade on the queue and the main pane — the strip, tab rail, tray, and status bar are the same faces in every desk, so they are never snapshotted or faded; the busy item grows a spinner; a landed commit or push throws confetti. Nothing staggers in, nothing lifts, nothing rotates, and no number pops. `prefers-reduced-motion: reduce` drops the scale from the entrances, the arm bloom, and the verb press — keeping every fade, the ring, and the spinner, so state feedback stays legible.
 
 ### Named Rules
-**The Motion-Tiers Rule.** 90/140/200ms plus the one 900ms celebration. Every motion acknowledges an event — hover, press, arrival of a layer, a swap, a running operation, a success. Looping motion is reserved for spinners. Each animation ships its `prefers-reduced-motion` path.
+**The Motion-Tiers Rule.** 90/140/200ms, the one 400ms arm ring, and the one 900ms celebration. Every motion acknowledges an event — hover, press, arrival of a layer, a swap, a running operation, a verb becoming possible, a success. Looping motion is reserved for spinners. Each animation ships its `prefers-reduced-motion` path.
 
-**The Nothing-Travel Rule.** No element translates as feedback. A hover changes color; a selection changes ground; a tab change changes which chip is lit. If a proposed animation moves something along an axis, it is the old world talking.
+**The Nothing-Travel Rule.** No element translates as feedback. A hover changes color; a selection changes ground; a tab change changes which chip is lit. The two completing verbs may scale on press and ring on state — a hair of commitment, never a journey. If a proposed animation moves something along an axis, it is the old world talking.
 
 ## Components
 
@@ -343,7 +343,8 @@ What moves: buttons change face color on hover and press without moving a pixel;
 - **Primary (`.btn.primary`):** Commit Blue face with a white label — the app's one loud action, and the commit button stretches full-width and centered. Hover `#0860ca`, active `#0550ae`. No `overflow: clip`, so the celebration's confetti flies free.
 - **Primary, destructive (`.btn.primary.destructive`):** the same face in Alarm Red (`#da3633` dark) for confirmations that throw work away — Discard, Delete, Drop, Abort.
 - **AI (`.btn.ai`):** solid `#8250df` with a white label and a text-presented sparkle (a gold emoji would be a color with no role); hover deepens to `#6639ba`. The only purple object on the desk.
-- **Hover / focus:** hover and press change color alone — no lift, no scale. Keyboard focus removes the outline and draws the accent border plus the 3px ring; pointer clicks never draw it.
+- **Hover / focus:** hover changes color alone. Keyboard focus removes the outline and draws the accent border plus the 3px ring; pointer clicks never draw it.
+- **The completing verbs (`.btn.commit`, `.btn.push`):** press answers with a `scale(0.97)` hair of commitment (the only controls in the app that move), and the instant git makes one able to act — first file checked, ahead count turned nonzero — it blooms one 400ms arm ring in its own face color (`btn-arm`, `useJustArmed`). Never on first paint, never on its own schedule.
 - **Quiet variants:** `.mini` and `.link` (accent-blue text, underline on hover), `.icon-btn` (transparent, 16px glyph, hover takes `--bg-hover`).
 
 ### Badges & Status Glyphs

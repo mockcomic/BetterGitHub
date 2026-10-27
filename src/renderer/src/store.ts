@@ -25,6 +25,7 @@ import type { MenuAction } from '../../shared/ipc'
 import type { ThemeId } from '../../shared/themes'
 import { themeBase } from '../../shared/themes'
 import { DONATE_URL } from '../../shared/links'
+import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
 import { call, onMenuAction, onRepoChanged } from './api'
 
 export interface ToastAction {
@@ -1559,9 +1560,9 @@ export class AppStore {
 
   // ----------------------------------------------------------------- sync
 
-  async doSync(op: 'fetch' | 'pull' | 'push'): Promise<void> {
+  async doSync(op: 'fetch' | 'pull' | 'push'): Promise<boolean> {
     const repo = this.state.selectedRepo
-    if (repo === null) return
+    if (repo === null) return false
     this.update({ busy: op })
     try {
       const output = await call(op, repo.path)
@@ -1580,14 +1581,38 @@ export class AppStore {
       void this.refreshBranches()
       void this.refreshStashes()
       if (this.state.view === 'history') void this.loadLog(false)
+      return true
     } catch (err) {
       this.update({ busy: null })
       const message = err instanceof Error ? err.message : String(err)
-      this.toast('error', message)
+      if (op === 'push' && isNeedsPullRejectionMessage(message)) {
+        // The push was rejected only because the remote moved ahead — the
+        // recovery is one click away, so the toast carries it.
+        this.toast('error', message, [
+          { label: 'Pull first', onClick: () => void this.doSync('pull') },
+          {
+            label: 'Pull and push again',
+            onClick: () => void this.pullThenPush()
+          }
+        ])
+      } else {
+        this.toast('error', message)
+      }
       // A pull that stopped on conflicts leaves the repo mid-merge: make the
       // banner show up instead of only reporting the raw failure.
       await this.refresh()
+      return false
     }
+  }
+
+  /**
+   * The recovery for a push rejected as non-fast-forward: pull, and only if
+   * that lands cleanly (no conflict stopping it, no new failure) retry the
+   * push. A conflicted pull leaves the merge banner up instead.
+   */
+  async pullThenPush(): Promise<void> {
+    if (!(await this.doSync('pull'))) return
+    await this.doSync('push')
   }
 
   // --------------------------------------------------------------- branches

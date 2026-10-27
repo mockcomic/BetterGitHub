@@ -10,6 +10,7 @@ import {
   type ContextMenuState
 } from './ContextMenu'
 import { ConfettiBurst, useCelebration } from './Celebration'
+import { useJustArmed } from '../motion'
 
 function matches(path: string, filter: string): boolean {
   const needle = filter.trim().toLowerCase()
@@ -695,6 +696,17 @@ export function CommitTray(): JSX.Element {
     checked.size === 0
       ? 'No files selected — Commit ships nothing until you check a file.'
       : `This commit will contain exactly:\n${[...checked].join('\n')}`
+  // Both verbs arm with a ring the instant git makes them true: checking the
+  // first file arms Commit; a landed commit turns ahead 0 → n and arms Push.
+  const commitEnabled = !(busy || state.aiBusy || (checked.size === 0 && !amending))
+  const pushEnabled = !(
+    busy ||
+    state.aiBusy ||
+    state.status === null ||
+    (ahead === 0 && hasUpstream)
+  )
+  const commitArmed = useJustArmed(commitEnabled)
+  const pushArmed = useJustArmed(pushEnabled)
 
   return (
     <>
@@ -770,8 +782,8 @@ export function CommitTray(): JSX.Element {
           </button>
         )}
         <button
-          className={`btn primary commit${celebrating ? ' celebrating' : ''}`}
-          disabled={busy || state.aiBusy || (checked.size === 0 && !amending)}
+          className={`btn primary commit${celebrating ? ' celebrating' : ''}${commitArmed ? ' arming' : ''}`}
+          disabled={!commitEnabled}
           onClick={() => void store.commit()}
           title={
             checked.size === 0 && !amending
@@ -791,13 +803,8 @@ export function CommitTray(): JSX.Element {
           {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
         </button>
         <button
-          className="btn push"
-          disabled={
-            busy ||
-            state.aiBusy ||
-            state.status === null ||
-            (ahead === 0 && hasUpstream)
-          }
+          className={`btn push${pushArmed ? ' arming' : ''}`}
+          disabled={!pushEnabled}
           onClick={() => void store.doSync('push')}
           title={pushTitle(state)}
         >

@@ -425,7 +425,17 @@ export function openDetected(detected: DetectedApp, repoPath: string): Promise<v
     case 'exec':
       return launchDetached(spec.command, [repoPath])
     case 'cmdShim':
-      return launchDetached('cmd.exe', ['/d', '/s', '/c', spec.shim, repoPath])
+      // cmd's /s rule strips the first and last quote of everything after
+      // /c, so a bare quoted shim path loses its quote: "C:\Program" is not
+      // recognized — the dead click behind a VS Code user install (the shim
+      // lives under …\Programs\Microsoft VS Code\bin). The canonical form
+      // wraps the whole /c string once more and quotes each part inside:
+      // ""shim" "repoPath"". (A repoPath with a trailing "\" or literal %
+      // text can still trip cmd's own parsing; both are rare in Windows
+      // path names and outside what quoting can fix.)
+      return launchDetached('cmd.exe', ['/d', '/s', '/c', `""${spec.shim}" "${repoPath}""`], {
+        verbatimArgs: true
+      })
     case 'macFolder':
       return runUntilExit('open', [repoPath], 'the Finder')
     case 'macOpen':
@@ -436,14 +446,21 @@ export function openDetected(detected: DetectedApp, repoPath: string): Promise<v
 /**
  * Starts a detached helper and resolves on `spawn`. A real failure — a
  * binary that cannot be started at all (removed since detection) — arrives
- * through the `error` event, not the exit code.
+ * through the `error` event, not the exit code. `verbatimArgs` hands the
+ * argument list to CreateProcess unquoted, which the cmd.exe shim form needs
+ * so our own quote characters reach cmd intact.
  */
 export function launchDetached(
   command: string,
-  args: ReadonlyArray<string>
+  args: ReadonlyArray<string>,
+  options?: { readonly verbatimArgs?: boolean }
 ): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, { detached: true, stdio: 'ignore' })
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: 'ignore',
+      ...(options?.verbatimArgs === true ? { windowsVerbatimArguments: true } : {})
+    })
     child.once('error', rejectPromise)
     child.once('spawn', () => {
       child.unref()
@@ -538,6 +555,17 @@ export async function getDetectedApps(refresh: boolean): Promise<DetectedApp[]> 
  */
 export async function openRepoInApp(repoPath: string, appId: string): Promise<void> {
   const detected = (await getDetectedApps(false)).find(a => a.app.id === appId)
+  // [dbg-42] temporary probe
+  try {
+    const { appendFileSync } = await import('fs')
+    appendFileSync(
+      process.cwd() + '/_dbg_openin.log',
+      `${new Date().toISOString()} appId=${appId} repoPath=${JSON.stringify(repoPath)} ` +
+        `detected=${detected ? JSON.stringify(detected.launch) : 'NONE'}\n`
+    )
+  } catch {
+    /* probe must not break the launch */
+  }
   if (detected === undefined) {
     throw new Error('That application is not available on this machine.')
   }

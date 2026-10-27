@@ -1786,6 +1786,9 @@ body.desk-resizing .main-pane {
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
+  /* Rows are position: relative and later in the DOM, so without a z-index
+     they paint over this bar while it sticks during scroll. */
+  z-index: 1;
   background: var(--bg-panel);
 }
 
@@ -2160,12 +2163,82 @@ body.desk-resizing .main-pane {
   }
 }
 
+/* ----------------------------------------------- the verbs arm themselves */
+/* The desk's story is compose → commit → push, and the story advances at the
+   moment a verb flips from “cannot” to “can”: checking the first file arms
+   Commit; a landed commit turns ahead 0 → n and arms Push — the baton pass at
+   the far end of the celebration, where the green ring on the verb below the
+   confetti reads as “and now, the next move”. That flip is the app pointing at
+   the user's action, so the button throws exactly one short ring in its own
+   hue (the focus-ring family, per-verb colored like its face). Bound to state
+   transitions; it never loops and never fires on first paint. */
+
+.btn.commit.arming,
+.btn.push.arming {
+  animation: btn-arm 400ms var(--ease-arrive);
+}
+
+.btn.commit.arming {
+  --arm-ring: var(--primary);
+}
+
+.btn.push.arming {
+  --arm-ring: var(--push-face);
+}
+
+@keyframes btn-arm {
+  0% {
+    transform: scale(0.99);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--arm-ring) 55%, transparent);
+  }
+  40% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--arm-ring) 0%, transparent);
+  }
+}
+
+/* Press: the two completing verbs answer the click with a hair of scale —
+   commitment, the same family as their celebration pop, a quarter of its
+   size. Every other control in the app still darkens one step and stays put. */
+.btn.commit:active:not(:disabled),
+.btn.push:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The arm ring is state feedback, so it keeps its bloom and loses only the
+     swell; the press commit loses its scale and keeps its color step. */
+  .btn.commit.arming,
+  .btn.push.arming {
+    animation: btn-arm-quiet 400ms ease-out;
+  }
+
+  @keyframes btn-arm-quiet {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--arm-ring) 55%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 7px color-mix(in srgb, var(--arm-ring) 0%, transparent);
+    }
+  }
+
+  .btn.commit:active:not(:disabled),
+  .btn.push:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* ---------------------------------------------------------------- motion */
 /* GitDesk moves the way GitHub Desktop moves: almost not at all. Controls
-   answer the cursor with color alone, floated layers fade in at a hair of
-   scale, the desk swap fades the incoming pane in, a running operation spins, and a commit or
-   push that lands throws confetti. Nothing lifts, travels, staggers or pops.
-   Three tiers — 90/140/200 ms — and the one long celebration. */
+   answer the cursor with color alone — the two completing verbs alone aside,
+   which press on a hair of scale and arm on a ring — floated layers fade in at
+   a hair of scale, the desk swap fades the incoming pane in, a running
+   operation spins, and a commit or push that lands throws confetti. Nothing
+   lifts, travels, staggers or pops. Three tiers — 90/140/200 ms — and the one
+   long celebration. */
 
 :root {
   --motion-instant: 90ms;
@@ -2181,11 +2254,14 @@ body.desk-resizing .main-pane {
     background-color var(--motion-instant) ease-out,
     border-color var(--motion-instant) ease-out,
     color var(--motion-instant) ease-out,
-    box-shadow var(--motion-instant) ease-out;
+    box-shadow var(--motion-instant) ease-out,
+    transform var(--motion-instant) ease-out;
 }
 
 /* Hover and press answer with color alone, the way GitHub Desktop's buttons
-   do: a control in a toolbar never moves out of its row. */
+   do: a control in a toolbar never moves out of its row. The two completing
+   verbs are the one exception below — press is the desk's most repeated
+   gesture, and they answer it with a hair of commitment. */
 
 .icon-btn,
 .mini,
@@ -2690,6 +2766,7 @@ select {
   color: var(--text-muted);
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   font-size: 12px;

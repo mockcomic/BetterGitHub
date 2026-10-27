@@ -1,15 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { EventEmitter } from 'events'
 import { delimiter, join } from 'path'
+import { spawn } from 'child_process'
 import {
   detectExternalApps,
   findCommand,
   getDetectedApps,
   LINUX_FILE_MANAGERS,
+  openDetected,
   resetDetectedAppsCache,
   type CommandRules,
   type DetectedApp,
   type DetectDeps
 } from '../src/main/external-apps'
+
+vi.mock('child_process', () => ({ spawn: vi.fn() }))
 
 /**
  * Detection is pure over injected probes: commands resolve from a fixed
@@ -176,6 +181,63 @@ describe('detectExternalApps — linux', () => {
     )
     const ids = apps.map(a => a.app.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('openDetected — cmdShim launch', () => {
+  const spawnMock = vi.mocked(spawn)
+
+  /** A child that "spawns" on the next microtask, like a real detached helper. */
+  function fakeChild(): EventEmitter {
+    const child = new EventEmitter() as EventEmitter & { unref(): void }
+    child.unref = () => undefined
+    queueMicrotask(() => child.emit('spawn'))
+    return child
+  }
+
+  afterEach(() => spawnMock.mockReset())
+
+  it('sends cmd a command line that survives a shim path with spaces', async () => {
+    spawnMock.mockReturnValueOnce(fakeChild() as never)
+    await openDetected(
+      {
+        app: { id: 'code', label: 'Visual Studio Code', kind: 'editor' },
+        launch: {
+          kind: 'cmdShim',
+          shim: 'C:\\Users\\t\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code.cmd'
+        }
+      },
+      'C:\\Users\\t\\My Repo'
+    )
+    // cmd's /s rule strips the first and last quote after /c, so the whole
+    // command is wrapped once more with each part quoted; verbatim args stop
+    // Node from escaping those quotes away.
+    expect(spawnMock).toHaveBeenCalledWith(
+      'cmd.exe',
+      [
+        '/d',
+        '/s',
+        '/c',
+        '""C:\\Users\\t\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code.cmd" "C:\\Users\\t\\My Repo""'
+      ],
+      expect.objectContaining({ detached: true, windowsVerbatimArguments: true })
+    )
+  })
+
+  it('launches exec specs directly, with Node quoting the path', async () => {
+    spawnMock.mockReturnValueOnce(fakeChild() as never)
+    await openDetected(
+      {
+        app: { id: 'zed', label: 'Zed', kind: 'editor' },
+        launch: { kind: 'exec', command: 'C:\\x\\zed.exe' }
+      },
+      'C:\\x\\repo'
+    )
+    expect(spawnMock).toHaveBeenCalledWith(
+      'C:\\x\\zed.exe',
+      ['C:\\x\\repo'],
+      expect.not.objectContaining({ windowsVerbatimArguments: true })
+    )
   })
 })
 

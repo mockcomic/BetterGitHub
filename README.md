@@ -50,7 +50,9 @@ parsing → cancellable request).
   per-commit changed files and diffs, and commit actions: copy SHA, create
   branch from commit, cherry-pick, revert, open on GitHub.
 - **Sync** — fetch / pull / push with ahead-behind badges and in-button
-  spinners; first push sets upstream on `origin`. Remotes authenticate through
+  spinners; first push sets upstream on `origin`. A push rejected because the
+  remote moved ahead answers with a **Pull first / Pull and push again** toast
+  instead of raw git output. Remotes authenticate through
   your system git credential helper (Git Credential Manager). Add an `origin`
   from the header when a repo has none.
 - **Git identity** — warns and blocks the commit until `user.name` /
