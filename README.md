@@ -12,8 +12,16 @@ parsing → cancellable request).
 
 ## Features
 
-- **Repository manager** — add local repos, clone from URL (folder name and
-  destination suggested by main), recent list, remove from the app.
+- **Repository manager** — add local repos, clone from URL or **from your
+  GitHub/GitLab account** (sign in, browse and search your repositories, pick
+  one and clone; folder name and destination suggested by main), recent list,
+  remove from the app.
+- **Hosted accounts** — sign in with **GitHub** (browser device flow or
+  personal access token) and **GitLab** (OAuth PKCE for gitlab.com, token for
+  self-hosted instances too); the Clone dialog grows a tab per account
+  listing every repository you own, collaborate on, or see through an
+  organization. Tokens are stored encrypted (Electron `safeStorage`) and
+  never enter the renderer.
 - **Branch picker** — filter, switch, create, rename and delete branches;
   remote-tracking branches listed separately and checked out as tracking
   branches; delete on the remote too.
@@ -53,8 +61,10 @@ parsing → cancellable request).
   spinners; first push sets upstream on `origin`. A push rejected because the
   remote moved ahead answers with a **Pull first / Pull and push again** toast
   instead of raw git output. Remotes authenticate through
-  your system git credential helper (Git Credential Manager). Add an `origin`
-  from the header when a repo has none.
+  your system git credential helper (Git Credential Manager) — and when it
+  declines, GitDesk silently reruns the command once with the signed-in
+  account's token for that host (never in the command line or `.git/config`).
+  Add an `origin` from the header when a repo has none.
 - **Git identity** — warns and blocks the commit until `user.name` /
   `user.email` are set, with inline fields that write the repo-local config.
 - **GitHub web links** — repo, branch, commit and compare URLs derived from
@@ -64,6 +74,14 @@ parsing → cancellable request).
   fetch/pull/push, Ctrl+Shift+G view on GitHub, Ctrl+R refresh,
   Ctrl+, preferences, plus a History menu for commit operations and an About
   dialog.
+- **Newcomer-friendly defaults** — progressive disclosure instead of a mode
+  switch: one context-aware **Sync** verb whose caret always lists Fetch, Pull
+  and Push; Conflicts and Stash tabs appear when there are conflicts or
+  stashes; staged badges appear once anything is staged; a one-time three-step
+  coaching banner retires itself at your first commit (Preferences ▸ Behavior
+  ▸ *Show tips for getting started*); and copy that says "not on the remote
+  yet" instead of "no upstream". Every shortcut, menu and tooltip power users
+  rely on is unchanged.
 - Toasts with actions (e.g. **Undo** after a commit) and manual dismiss.
 - Light / dark / system theme.
 
@@ -72,8 +90,9 @@ parsing → cancellable request).
 - Windows (works on macOS/Linux with minor menu tweaks)
 - [Node.js](https://nodejs.org) 20+
 - `git` on `PATH` (any recent version; Git Credential Manager recommended)
-- An AI endpoint: an OpenAI (or compatible) API key, or a local server such
-  as `http://localhost:11434/v1` (Ollama).
+- An AI endpoint for ✨ Generate only (an OpenAI-compatible API key, or a
+  local server such as `http://localhost:11434/v1` — Ollama). Everything
+  else works without one.
 
 ## Run
 
@@ -151,6 +170,42 @@ is simply never consulted.
    validated strictly; a typed message triggers a replace confirmation first.
 5. The request is cancellable (the button turns into **Cancel**).
 
+## Signing in to GitHub/GitLab
+
+Open **Clone a repository → Accounts** (or Preferences → Accounts).
+
+- **GitHub — browser sign-in (device flow).** The same dance `gh` and GitHub
+  Desktop do: GitDesk shows a short code, you type it at
+  github.com/login/device, and GitDesk picks up the token when you approve.
+  No localhost port, no password on this machine, and the token never
+  expires until you sign out.
+- **GitLab — browser sign-in (OAuth + PKCE).** The browser opens your
+  instance's authorize page; GitDesk catches the redirect on a one-shot
+  server at `http://127.0.0.1:8765/callback`. PKCE means no client secret
+  travels. Access tokens expire after GitLab's two hours — GitDesk refreshes
+  them silently.
+- **Token sign-in — works for everything.** A GitHub classic PAT with the
+  `repo` scope (or a fine-grained token with repository contents: read), or
+  a GitLab PAT with `read_api` + `read_user`. Fill in the optional instance
+  URL to sign a **GitHub Enterprise** or **self-hosted GitLab** server; that
+  is the only way to use a server whose OAuth app you cannot register from
+  the app. The token is validated against `/user` before anything is stored,
+  then kept encrypted next to the settings file.
+
+Browser sign-in needs an OAuth application you register once and paste into
+**Preferences → Accounts → Browser sign-in apps** (GitHub: an OAuth App with
+*Enable Device Flow* ticked; GitLab: an application, confidential **off**,
+redirect URI exactly `http://127.0.0.1:8765/callback`, scope `api`). The ids
+are public, so they ship empty: without them the browser buttons stay hidden
+and the token path works everywhere.
+
+Once signed in, the Clone dialog gets one tab per account listing your
+repositories (owner, visibility, last push) with GitLab-side/loaded-item
+filtering and paging. Clones, fetches, pulls and pushes still prefer your
+system credential helper; your account token is the automatic one-shot
+fallback that host rejects without — so a token-only private-repo setup
+works end to end, and an existing Git Credential Manager setup is untouched.
+
 ## Project layout
 
 ```
@@ -161,15 +216,20 @@ src/main/        Electron main process
   watcher.ts     debounced recursive working-tree watcher (watch-filter.ts
                  holds the pure ignore logic)
   ai/            commit-agent (system prompt, tags, parser, fetch call)
+  providers/     GitHub & GitLab REST clients (pure mappers), device flow /
+                 PKCE sign-in, token refresh, client-id config
+  accounts.ts    signed-account store (encrypted per-account token sidecars)
   settings.ts    JSON settings + safeStorage-encrypted API key
   windows.ts/menu.ts/ipc.ts  window, app menu, typed handle() registrar
 src/preload/     contextBridge surface (window.gitdesk)
 src/renderer/    React UI: Header, ChangesSidebar (+CommitBox, stash panel),
                  DiffView (unified/split, word-diff), HistoryView, Dialogs,
+                 AccountsUi (sign-in panel, account rows, remote-repo pane),
                  ContextMenu, Toasts, AppStore (store.ts)
 tests/           Vitest suites: porcelain / diff parsers, stash & log parsing,
-                 github URLs, watcher filter, word-diff, plus an integration
-                 suite that drives the real `git` binary in a temp repo
+                 github URLs, watcher filter, word-diff, provider mappers,
+                 git auth-retry classifier, plus an integration suite that
+                 drives the real `git` binary in a temp repo
 ```
 
 ## Support

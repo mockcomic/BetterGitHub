@@ -1,11 +1,13 @@
 import type { JSX } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { call } from '../api'
 import { useStore, useStoreState } from '../store'
+import type { AccountInfo } from '../../../shared/models'
 import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field } from './Dialog'
 import { BranchDivergence, divergenceTitleSuffix } from './BranchBadges'
+import { AccountList, EMPTY_PANE, RemoteRepoPane, SignInPanel, type RepoPaneState } from './AccountsUi'
 
 import { DONATE_URL } from '../../../shared/links'
 
@@ -22,6 +24,8 @@ export function SettingsDialog(): JSX.Element | null {
   const [model, setModel] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [customInstructions, setCustomInstructions] = useState('')
+  const [githubClientId, setGitHubClientId] = useState('')
+  const [gitlabClientId, setGitLabClientId] = useState('')
   const [confirmOverride, setConfirmOverride] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [theme, setTheme] = useState<ThemeId>('system')
@@ -37,6 +41,8 @@ export function SettingsDialog(): JSX.Element | null {
       setAutoRefresh(settings.autoRefresh)
       setTheme(settings.theme)
       setApiKey('')
+      setGitHubClientId('')
+      setGitLabClientId('')
       setTestResult(null)
     }
   }, [settings, state.showSettings])
@@ -63,6 +69,16 @@ export function SettingsDialog(): JSX.Element | null {
                     model,
                     customInstructions,
                     ...(apiKey.length > 0 ? { apiKey } : {})
+                  },
+                  accounts: {
+                    // Same leave-unchanged rule as the AI key: empty boxes
+                    // mean "keep what's stored".
+                    ...(githubClientId.trim().length > 0
+                      ? { githubClientId: githubClientId.trim() }
+                      : {}),
+                    ...(gitlabClientId.trim().length > 0
+                      ? { gitlabClientId: gitlabClientId.trim() }
+                      : {})
                   },
                   confirmOverrideWithGeneratedMessage: confirmOverride,
                   autoRefresh,
@@ -144,6 +160,48 @@ export function SettingsDialog(): JSX.Element | null {
       </section>
 
       <section className="settings-section">
+        <h3>Accounts</h3>
+        <AccountList />
+        <SignInPanel />
+        <details className="signin-apps">
+          <summary>Browser sign-in apps</summary>
+          <p className="field-hint">
+            The browser buttons need an OAuth application you register once, then paste
+            here — GitDesk ships no shared id so your sign-ins never ride on someone
+            else's rate limits.
+          </p>
+          <Field
+            label="GitHub OAuth App client id"
+            hint="github.com/settings/developers → new OAuth App → tick “Enable Device Flow”. Public by design; leave empty to hide the button."
+          >
+            <input
+              placeholder={
+                settings.accounts.hasGitHubClientId
+                  ? '•••••••• configured — paste a new id to replace'
+                  : 'Iv23li…'
+              }
+              value={githubClientId}
+              onChange={e => setGitHubClientId(e.target.value)}
+            />
+          </Field>
+          <Field
+            label="GitLab application id"
+            hint="gitlab.com Profile → Applications → confidential OFF, redirect URI exactly http://127.0.0.1:8765/callback, scope api."
+          >
+            <input
+              placeholder={
+                settings.accounts.hasGitLabClientId
+                  ? '•••••••• configured — paste a new id to replace'
+                  : 'app id…'
+              }
+              value={gitlabClientId}
+              onChange={e => setGitLabClientId(e.target.value)}
+            />
+          </Field>
+        </details>
+      </section>
+
+      <section className="settings-section">
         <h3>Behavior</h3>
         <label className="check-row">
           <input
@@ -199,6 +257,12 @@ export function SettingsDialog(): JSX.Element | null {
   )
 }
 
+/** Per-account clone-pane cache entry; survives tab switches, not close. */
+interface PaneEntry {
+  readonly state: RepoPaneState
+  readonly search: string
+}
+
 export function CloneDialog(): JSX.Element | null {
   const state = useStoreState()
   const store = useStore()
@@ -207,6 +271,12 @@ export function CloneDialog(): JSX.Element | null {
   const [suggested, setSuggested] = useState('')
   const [baseDir, setBaseDir] = useState('')
   const [folderTouched, setFolderTouched] = useState(false)
+  const [tab, setTab] = useState<string>('url')
+  const [panes, setPanes] = useState<Record<string, PaneEntry>>({})
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const accounts = state.accounts
+  const activeAccount = accounts.find(a => a.id === tab) ?? null
 
   useEffect(() => {
     if (!state.showClone) {
@@ -215,10 +285,19 @@ export function CloneDialog(): JSX.Element | null {
       setSuggested('')
       setBaseDir('')
       setFolderTouched(false)
+      setTab('url')
+      setPanes({})
       return
     }
+    // The tab list must reflect accounts added since the app booted — and
+    // sign-ins completed from inside this very dialog.
+    void store.refreshAccounts()
+  }, [state.showClone, store])
+
+  useEffect(() => {
+    if (!state.showClone) return
     // Ask main for the folder name so the clone dialog and `git clone`
-    // agree on one rule.
+    // agree on one rule (picking a hosted row routes through the same path).
     const timer = setTimeout(() => {
       if (url.trim().length === 0) return
       void call('suggestCloneFolder', url)
@@ -228,14 +307,98 @@ export function CloneDialog(): JSX.Element | null {
     return () => clearTimeout(timer)
   }, [state.showClone, url])
 
+  // A signed-out or vanished tab never stays selected; empty account lists
+  // own the Accounts (sign-in) tab, signed-in users land on their first.
+  useEffect(() => {
+    if (!state.showClone) return
+    if (tab === 'url') return
+    if (activeAccount === null && (tab === 'signin' || accounts.length === 0)) return
+    if (activeAccount === null) setTab(accounts[0]?.id ?? 'signin')
+  }, [state.showClone, tab, activeAccount, accounts])
+
   if (!state.showClone) return null
+
+  const pane = activeAccount === null ? null : panes[activeAccount.id] ?? null
+
+  const loadPane = async (
+    account: AccountInfo,
+    search: string,
+    more: boolean
+  ): Promise<void> => {
+    const cursor = more ? panes[account.id]?.state.nextCursor ?? null : null
+    setPanes(prev => ({
+      ...prev,
+      [account.id]: {
+        search,
+        state: {
+          ...(prev[account.id]?.state ?? EMPTY_PANE),
+          loading: true,
+          error: null
+        }
+      }
+    }))
+    try {
+      const page = await store.listRemoteRepos(account.id, search, cursor)
+      setPanes(prev => ({
+        ...prev,
+        [account.id]: {
+          search,
+          state: {
+            // 'more' appends to whatever was loaded for the same search.
+            items: more ? [...(prev[account.id]?.state.items ?? []), ...page.items] : page.items,
+            nextCursor: page.nextCursor,
+            loading: false,
+            error: null
+          }
+        }
+      }))
+    } catch (err) {
+      setPanes(prev => ({
+        ...prev,
+        [account.id]: {
+          search,
+          state: {
+            ...(prev[account.id]?.state ?? EMPTY_PANE),
+            loading: false,
+            error: err instanceof Error ? err.message : String(err)
+          }
+        }
+      }))
+    }
+  }
+
+  // First view of an account tab fetches its first page automatically.
+  useEffect(() => {
+    if (activeAccount !== null && panes[activeAccount.id] === undefined) {
+      void loadPane(activeAccount, '', false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.showClone, activeAccount?.id])
+
+  const onSearch = (value: string): void => {
+    if (activeAccount === null) return
+    const account = activeAccount
+    setPanes(prev => ({
+      ...prev,
+      [account.id]: {
+        search: value,
+        state: prev[account.id]?.state ?? EMPTY_PANE
+      }
+    }))
+    // GitLab filters server-side; GitHub's client-side filter (in the pane)
+    // needs no refetch. Debounced so typing does not chase the API.
+    if (account.provider !== 'gitlab') return
+    if (searchDebounce.current !== null) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => void loadPane(account, value, false), 400)
+  }
 
   const derivedName = folderTouched ? folderName : suggested
 
   return (
     <Dialog
       title="Clone a repository"
-      width={540}
+      width={620}
+      maxWidth={620}
       onClose={() => store.setCloneOpen(false)}
       footer={
         <>
@@ -258,17 +421,73 @@ export function CloneDialog(): JSX.Element | null {
         </>
       }
     >
-      <Field
-        label="Repository URL"
-        hint="https://github.com/owner/repo.git or git@github.com:owner/repo.git — authentication uses your git credential helper."
-      >
-        <input
-          autoFocus
-          placeholder="https://github.com/owner/repo.git"
-          value={url}
-          onChange={e => setUrl(e.target.value)}
+      <div className="clone-tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={tab === 'url'}
+          className={`clone-tab${tab === 'url' ? ' active' : ''}`}
+          onClick={() => setTab('url')}
+        >
+          URL
+        </button>
+        {accounts.map(a => (
+          <button
+            key={a.id}
+            role="tab"
+            aria-selected={tab === a.id}
+            className={`clone-tab${tab === a.id ? ' active' : ''}`}
+            onClick={() => setTab(a.id)}
+            title={`Repositories for ${a.login}`}
+          >
+            {a.provider === 'github' ? 'GitHub' : 'GitLab'} · {a.login}
+          </button>
+        ))}
+        {accounts.length === 0 && (
+          <button
+            role="tab"
+            aria-selected={tab === 'signin'}
+            className={`clone-tab${tab === 'signin' ? ' active' : ''}`}
+            onClick={() => setTab('signin')}
+          >
+            Accounts
+          </button>
+        )}
+      </div>
+
+      {tab === 'url' && (
+        <Field
+          label="Repository URL"
+          hint="https://github.com/owner/repo.git or git@github.com:owner/repo.git — authentication uses your git credential helper, falling back to your signed-in account's token."
+        >
+          <input
+            autoFocus
+            placeholder="https://github.com/owner/repo.git"
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+          />
+        </Field>
+      )}
+      {activeAccount !== null && (
+        <RemoteRepoPane
+          account={activeAccount}
+          pane={pane?.state ?? EMPTY_PANE}
+          search={pane?.search ?? ''}
+          onSearch={onSearch}
+          onRefresh={() => void loadPane(activeAccount, pane?.search ?? '', false)}
+          onLoadMore={() => void loadPane(activeAccount, pane?.search ?? '', true)}
+          onPick={repo => {
+            // Choosing a row fills the URL through the same suggestion
+            // pipeline as typing one — the footer Clone then works unchanged.
+            setUrl(repo.cloneUrl)
+            setFolderTouched(false)
+          }}
+          pickedCloneUrl={url.trim()}
         />
-      </Field>
+      )}
+      {tab === 'signin' && activeAccount === null && (
+        <SignInPanel onSuccess={account => setTab(account.id)} />
+      )}
+
       <Field label="Name">
         <input
           placeholder={suggested || 'repository'}

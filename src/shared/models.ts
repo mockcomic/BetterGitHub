@@ -259,13 +259,22 @@ export interface ExternalApp {
   readonly kind: 'files' | 'editor'
 }
 
-/** Public (renderer-visible) settings. The API key never leaves main. */
+/** Public (renderer-visible) settings. Tokens (AI + accounts) never leave main. */
 export interface PublicSettings {
   readonly ai: {
     readonly baseUrl: string
     readonly model: string
     readonly customInstructions: string
     readonly hasApiKey: boolean
+  }
+  /**
+   * Whether browser sign-in can be offered per provider. Device flow and
+   * OAuth PKCE need an app client id (see providers/config.ts); without one
+   * the UI offers token sign-in only.
+   */
+  readonly accounts: {
+    readonly hasGitHubClientId: boolean
+    readonly hasGitLabClientId: boolean
   }
   readonly confirmOverrideWithGeneratedMessage: boolean
   readonly autoRefresh: boolean
@@ -280,10 +289,90 @@ export interface SettingsPatch {
     /** undefined = leave unchanged, '' = clear. */
     readonly apiKey?: string
   }
+  readonly accounts?: {
+    /** undefined = leave unchanged, '' = clear. */
+    readonly githubClientId?: string
+    /** undefined = leave unchanged, '' = clear. */
+    readonly gitlabClientId?: string
+  }
   readonly confirmOverrideWithGeneratedMessage?: boolean
   readonly autoRefresh?: boolean
   readonly theme?: ThemeId
 }
+
+// ---------------------------------------------------------------------------
+// Hosted accounts (GitHub / GitLab) — sign in, browse, clone.
+
+export type AccountProvider = 'github' | 'gitlab'
+
+/** How the account's token authenticates API calls and git retries. */
+export type AccountAuthKind = 'oauth' | 'pat'
+
+/** One signed-in account as the renderer sees it — never carries a token. */
+export interface AccountInfo {
+  readonly id: string
+  readonly provider: AccountProvider
+  /** API root, e.g. https://api.github.com or https://gitlab.example.com. */
+  readonly apiBase: string
+  readonly login: string
+  readonly displayName: string
+  readonly avatarUrl: string | null
+  readonly authKind: AccountAuthKind
+}
+
+/** A repository on a hosted account, shaped identically for both providers. */
+export interface RemoteRepository {
+  readonly accountId: string
+  /** `owner/repo` (GitHub) or `group/sub/project` (GitLab). */
+  readonly fullName: string
+  readonly name: string
+  readonly isPrivate: boolean
+  /** HTTPS clone URL — what the Clone verb passes to `git clone`. */
+  readonly cloneUrl: string
+  readonly sshUrl: string | null
+  readonly webUrl: string
+  readonly defaultBranch: string | null
+  /** ISO 8601 last-push date; null when the provider reports none. */
+  readonly pushedAt: string | null
+  readonly description: string | null
+}
+
+export interface RemoteRepoPage {
+  readonly items: ReadonlyArray<RemoteRepository>
+  /** Opaque cursor for the next page (provider page number); null at the end. */
+  readonly nextCursor: string | null
+}
+
+export interface RemoteRepoQuery {
+  /** Provider-side text filter where supported; always re-filtered client-side. */
+  readonly search?: string
+  readonly cursor?: string | null
+  readonly perPage?: number
+}
+
+/** Kick-off data for a browser sign-in; the renderer decides when to open it. */
+export type SignInChallenge =
+  | {
+      readonly kind: 'github-device'
+      readonly requestId: string
+      /** The XXXX-XXXX code the user types at verificationUrl. */
+      readonly userCode: string
+      readonly verificationUrl: string
+      /** Unix ms when the device code expires. */
+      readonly expiresAt: number
+      readonly intervalMs: number
+    }
+  | {
+      readonly kind: 'gitlab-browser'
+      readonly requestId: string
+      readonly authorizeUrl: string
+    }
+
+/** Result of polling a pending sign-in. */
+export type SignInStatus =
+  | { readonly status: 'pending' }
+  | { readonly status: 'signed-in'; readonly account: AccountInfo }
+  | { readonly status: 'failed'; readonly message: string }
 
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: string }
 

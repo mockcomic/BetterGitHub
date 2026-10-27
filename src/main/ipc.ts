@@ -6,6 +6,7 @@ import type {
   GitHubTarget,
   IgnoreRequest,
   IpcResult,
+  RemoteRepoQuery,
   RepoSummaryEntry,
   Repository
 } from '../shared/models'
@@ -84,6 +85,18 @@ import {
   removeRepositoriesByIds,
   saveSettings
 } from './settings'
+import {
+  addAccount,
+  getAccount,
+  getAccountToken,
+  listAccounts,
+  removeAccount as forgetAccount
+} from './accounts'
+import { beginSignIn, cancelSignIn, pollSignIn } from './providers/oauth'
+import { githubClient, normalizeGitHubApiBase } from './providers/github'
+import { gitlabClient, normalizeGitLabApiBase } from './providers/gitlab'
+import { ProviderHttpError } from './providers/http'
+import type { AccountProvider } from '../shared/models'
 import { generateCommitMessage, testConnection } from './ai/commit-agent'
 import { dispatchMenuAction, getMenuBarSpec, runMenuRole } from './menu'
 import { applyTheme, getMainWindow, isTrustedSender } from './windows'
@@ -266,6 +279,76 @@ const handlers: Handlers = {
   },
   async suggestCloneFolder(url: string) {
     return suggestedCloneDirectory(url)
+  },
+
+  // ---------------------------------------------------------- hosted accounts
+  async listAccounts() {
+    return listAccounts()
+  },
+  async signInWithToken(provider: AccountProvider, token: string, apiBase?: string) {
+    const trimmed = token.trim()
+    if (trimmed.length === 0) {
+      throw new Error('Paste a token — GitHub classic needs the `repo` scope, GitLab `read_api` + `read_user`.')
+    }
+    const base =
+      provider === 'github'
+        ? normalizeGitHubApiBase(apiBase)
+        : normalizeGitLabApiBase(apiBase)
+    const client = provider === 'github' ? githubClient : gitlabClient
+    // Validate before persisting: a wrong token must not half-sign-in.
+    const identity = await client.validate(base, trimmed, 'pat')
+    return addAccount({
+      provider,
+      apiBase: base,
+      authKind: 'pat',
+      identity,
+      credential: { token: trimmed, refreshToken: null, expiresAt: null }
+    })
+  },
+  async beginSignIn(provider: AccountProvider, apiBase?: string) {
+    return beginSignIn(provider, apiBase)
+  },
+  async pollSignIn(requestId: string) {
+    return pollSignIn(requestId)
+  },
+  async cancelSignIn(requestId: string) {
+    cancelSignIn(requestId)
+  },
+  async removeAccount(id: string) {
+    await forgetAccount(id)
+  },
+  async listRemoteRepositories(accountId: string, query?: RemoteRepoQuery) {
+    const account = await getAccount(accountId)
+    if (account === null) {
+      throw new Error('That account is no longer signed in — sign in again.')
+    }
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    const request = {
+      search: query?.search?.trim() ?? '',
+      cursor: query?.cursor ?? null,
+      perPage: query?.perPage ?? 50
+    }
+    const token = await getAccountToken(account)
+    if (token === null) {
+      throw new Error(`GitDesk could not read ${account.login}'s stored token — sign in again.`)
+    }
+    try {
+      return await client.listRepos(account.apiBase, account, token, account.authKind, request)
+    } catch (err) {
+      // An expired GitLab oauth token refreshes once, on the failure itself,
+      // before the error reaches the list view.
+      if (
+        err instanceof ProviderHttpError &&
+        err.status === 401 &&
+        account.authKind === 'oauth'
+      ) {
+        const fresh = await getAccountToken(account, { forceRefresh: true })
+        if (fresh !== null && fresh !== token) {
+          return client.listRepos(account.apiBase, account, fresh, account.authKind, request)
+        }
+      }
+      throw err
+    }
   },
 
   async startWatching(repoPath: string) {

@@ -4,6 +4,8 @@ import {
   useSyncExternalStore
 } from 'react'
 import type {
+  AccountInfo,
+  AccountProvider,
   BranchInfo,
   CommitInfo,
   ExternalApp,
@@ -15,9 +17,11 @@ import type {
   IgnoreRequest,
   ManagedRepository,
   PublicSettings,
+  RemoteRepoPage,
   Repository,
   RepositoryStatus,
   SettingsPatch,
+  SignInChallenge,
   StashEntry,
   WorkflowKind
 } from '../../shared/models'
@@ -135,6 +139,12 @@ export interface AppState {
   /** Last completing-verb success, so the button that did it can celebrate. */
   readonly celebration: CelebrationPulse | null
   readonly settings: PublicSettings | null
+  /** Signed-in hosted accounts (GitHub/GitLab); tokens never cross the bridge. */
+  readonly accounts: ReadonlyArray<AccountInfo>
+  /** An in-flight browser sign-in (device code / PKCE redirect), if any. */
+  readonly signIn: SignInChallenge | null
+  /** Last sign-in failure, shown inline by the sign-in panel. */
+  readonly signInError: string | null
   readonly toasts: ReadonlyArray<Toast>
   readonly showSettings: boolean
   readonly showClone: boolean
@@ -201,6 +211,9 @@ const initialState: AppState = {
   aiBusy: false,
   celebration: null,
   settings: null,
+  accounts: [],
+  signIn: null,
+  signInError: null,
   toasts: [],
   showSettings: false,
   showClone: false,
@@ -343,11 +356,12 @@ export class AppStore {
     if (this.inited) return
     this.inited = true
     try {
-      const [settings, repositories] = await Promise.all([
+      const [settings, repositories, accounts] = await Promise.all([
         call('getSettings'),
-        call('listRepositories')
+        call('listRepositories'),
+        call('listAccounts')
       ])
-      this.update({ settings, repositories, initError: null })
+      this.update({ settings, repositories, accounts, initError: null })
       this.applyTheme(settings.theme)
 
       const lastPath = localStorage.getItem('gitdesk.lastRepo')
@@ -767,6 +781,145 @@ export class AppStore {
       this.update({ busy: null })
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
+  }
+
+  // ------------------------------------------------------ hosted accounts
+
+  private signInTimer: ReturnType<typeof setTimeout> | null = null
+
+  async refreshAccounts(): Promise<void> {
+    try {
+      this.update({ accounts: await call('listAccounts') })
+    } catch {
+      /* Account lists are best-effort; the next dialog open retries. */
+    }
+  }
+
+  /**
+   * Token sign-in (works for every provider and every instance). Returns an
+   * inline-friendly outcome — the panel renders it next to the token field.
+   */
+  async signInWithToken(
+    provider: AccountProvider,
+    token: string,
+    apiBase?: string
+  ): Promise<{ ok: boolean; message: string; account: AccountInfo | null }> {
+    try {
+      const account = await call(
+        'signInWithToken',
+        provider,
+        token,
+        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined
+      )
+      await this.refreshAccounts()
+      this.update({ signIn: null, signInError: null })
+      return { ok: true, message: `Signed in as ${account.login}.`, account }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.update({ signInError: message })
+      return { ok: false, message, account: null }
+    }
+  }
+
+  /**
+   * Browser sign-in: device flow for GitHub, PKCE redirect for GitLab. The
+   * main process owns the token exchange; this loop only asks "is it done"
+   * at the provider's own cadence, so closing the dialog never strands the
+   * sign-in — it completes on the next poll wherever the UI happens to be.
+   */
+  async startBrowserSignIn(
+    provider: AccountProvider,
+    apiBase?: string
+  ): Promise<{ ok: boolean; message: string }> {
+    try {
+      const challenge = await call(
+        'beginSignIn',
+        provider,
+        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined
+      )
+      this.update({ signIn: challenge, signInError: null })
+      const openUrl =
+        challenge.kind === 'github-device'
+          ? challenge.verificationUrl
+          : challenge.authorizeUrl
+      try {
+        await call('openExternal', openUrl)
+      } catch {
+        /* The panel always offers the link again manually. */
+      }
+      this.scheduleSignInPoll(challenge)
+      return { ok: true, message: '' }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.update({ signIn: null, signInError: message })
+      return { ok: false, message }
+    }
+  }
+
+  private scheduleSignInPoll(challenge: SignInChallenge): void {
+    this.stopSignInPoll()
+    const every =
+      challenge.kind === 'github-device'
+        ? Math.max(1_000, challenge.intervalMs)
+        : 1_000
+    const tick = async (): Promise<void> => {
+      try {
+        const status = await call('pollSignIn', challenge.requestId)
+        if (status.status === 'pending') {
+          this.signInTimer = setTimeout(() => void tick(), every)
+          return
+        }
+        this.stopSignInPoll()
+        if (status.status === 'signed-in') {
+          this.update({ signIn: null, signInError: null })
+          await this.refreshAccounts()
+          this.toast('success', `Signed in to ${status.account.login}.`)
+        } else {
+          this.update({ signIn: null, signInError: status.message })
+        }
+      } catch (err) {
+        this.stopSignInPoll()
+        this.update({
+          signIn: null,
+          signInError: err instanceof Error ? err.message : String(err)
+        })
+      }
+    }
+    this.signInTimer = setTimeout(() => void tick(), every)
+  }
+
+  private stopSignInPoll(): void {
+    if (this.signInTimer !== null) clearTimeout(this.signInTimer)
+    this.signInTimer = null
+  }
+
+  cancelBrowserSignIn(): void {
+    const challenge = this.state.signIn
+    this.stopSignInPoll()
+    this.update({ signIn: null, signInError: null })
+    if (challenge !== null) void call('cancelSignIn', challenge.requestId).catch(() => undefined)
+  }
+
+  async signOut(accountId: string): Promise<void> {
+    try {
+      await call('removeAccount', accountId)
+      await this.refreshAccounts()
+      this.toast('info', 'Signed out — the stored token was deleted.')
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /**
+   * One page of an account's hosted repositories (main applies the provider
+   * search where the API supports it; the pane re-filters loaded items).
+   */
+  async listRemoteRepos(
+    accountId: string,
+    search: string,
+    cursor: string | null
+  ): Promise<RemoteRepoPage> {
+    return call('listRemoteRepositories', accountId, { search, cursor, perPage: 50 })
   }
 
   // ---------------------------------------------------------------- refresh
