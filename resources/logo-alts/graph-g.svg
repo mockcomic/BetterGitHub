@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 7 — "Graph G". The other typographic route: the letter G drawn the way
+    git history is — commit nodes joined by edges. One open bowl arc, a spur
+    running up from the lower lip and turning into the counter, and the head
+    commit blue at the bar end. Printed on the cut-corner card like the
+    current mark.
+  -->
+  <path
+    d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z"
+    fill="#e9e2cf"
+  />
+  <path
+    d="M391.9 208.6 A150 150 0 1 0 391.9 335.4 V272 H318"
+    fill="none"
+    stroke="#0b1120"
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <g fill="#0b1120">
+    <circle cx="391.9" cy="208.6" r="16" />
+    <circle cx="256" cy="122" r="16" />
+    <circle cx="106" cy="272" r="16" />
+    <circle cx="256" cy="422" r="16" />
+  </g>
+  <circle cx="318" cy="272" r="22" fill="#0969da" />
+</svg>

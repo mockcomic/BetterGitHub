@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 5 — "Field". The whole card as data: a strict 4x4 punch field (grid
+    pitch 96 at x/y = 112/208/304/400, dots r 14). Five cells are promoted to
+    the record's real story — a mainline of three punched holes with a ring
+    rim up the left column, a branch hole lifting off it, and the head commit
+    inked blue at the newest cell. The rest stays printed noise.
+  -->
+  <path
+    d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z"
+    fill="#e9e2cf"
+  />
+  <g fill="#0b1120">
+    <circle cx="208" cy="144" r="14" />
+    <circle cx="400" cy="144" r="14" />
+    <circle cx="112" cy="144" r="14" />
+    <circle cx="304" cy="240" r="14" />
+    <circle cx="400" cy="240" r="14" />
+    <circle cx="208" cy="336" r="14" />
+    <circle cx="304" cy="336" r="14" />
+    <circle cx="400" cy="336" r="14" />
+    <circle cx="208" cy="432" r="14" />
+    <circle cx="304" cy="432" r="14" />
+    <circle cx="400" cy="432" r="14" />
+  </g>
+  <!-- punched holes: paper knockouts with printed ink rims -->
+  <g fill="#e9e2cf" stroke="#0b1120" stroke-width="8">
+    <circle cx="112" cy="432" r="26" />
+    <circle cx="112" cy="336" r="26" />
+    <circle cx="112" cy="240" r="26" />
+    <circle cx="208" cy="240" r="26" />
+  </g>
+  <!-- head commit punched and inked -->
+  <circle cx="304" cy="144" r="26" fill="#0969da" />
+</svg>

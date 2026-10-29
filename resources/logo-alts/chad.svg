@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 4 — "Chad". The moment of committing: the punched hole's rim printed
+    in ink, and the disc it released — the commit — inked blue and leaving
+    the card at 45 degrees, toward the corner cut. Two shapes, one gesture,
+    unmistakable even at 16 px.
+  -->
+  <path
+    d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z"
+    fill="#e9e2cf"
+  />
+  <circle
+    cx="208" cy="304" r="140"
+    fill="none"
+    stroke="#0b1120"
+    stroke-width="44"
+  />
+  <circle cx="355" cy="157" r="46" fill="#0969da" />
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 2 — "Punched G". A typographic route: a geometric G printed on the
+    card itself. The tile keeps the 45-degree corner cut of the current mark;
+    a column of punched holes rides the G's bowl; the crossbar is the one blue
+    element — the head commit closing the letter.
+  -->
+  <path
+    d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z"
+    fill="#e9e2cf"
+  />
+  <path
+    d="M406 272 A150 150 0 1 0 378.9 358"
+    fill="none"
+    stroke="#0b1120"
+    stroke-width="64"
+    stroke-linecap="round"
+  />
+  <!-- punch column riding the bowl -->
+  <g fill="#e9e2cf">
+    <circle cx="256" cy="122" r="13" />
+    <circle cx="150" cy="166" r="13" />
+    <circle cx="106" cy="272" r="13" />
+    <circle cx="150" cy="378" r="13" />
+  </g>
+  <!-- the crossbar: blue, exactly once -->
+  <rect x="256" y="240" width="182" height="64" fill="#0969da" />
+</svg>

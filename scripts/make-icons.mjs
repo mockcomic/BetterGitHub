@@ -7,16 +7,17 @@
  * The geometry is redrawn here (see MARK below — keep the two in step) and
  * rasterized with signed-distance fields at supersampled coverage, so the
  * build needs no image library, no Chromium and no network: `node` alone
- * produces PNG, ICO and the macOS source. The card is a union-free CSG
- * composition of exact primitives — a rounded box, a straight 45° corner
- * cut, one edge notch and three circle holes — which an SDF covers better
- * than any bitmap scaler would.
+ * produces PNG, ICO and the macOS source. The tape is an exact-primitives
+ * composition — a rounded box for the deck, a convex band with two rounded
+ * corners and a straight chamfer at the leaving edge, rounded-square
+ * sprockets, circle punches — which an SDF covers better than any bitmap
+ * scaler would.
  *
- * The color model, like the SVG: card-stock paper everywhere the card is;
- * a printed keyline in deep ink along every rim (outer edge, cut, notch,
- * hole rims), erased inside the two empty holes; and commit blue in exactly
- * one place, the head-commit hole. The empty holes are true alpha knockouts
- * — the desktop shows through the record.
+ * The color model, like the SVG: deck ink everywhere the tile is; a band of
+ * card stock paper over it; every sprocket and empty hole printed in deck
+ * ink (the record was never anywhere else); and commit blue in exactly one
+ * place, the head-commit hole at the leading edge. The tile is opaque —
+ * on tape, nothing knocks out.
  *
  * Outputs (all under resources/icons/):
  *   png/{size}x{size}.png   — 16…1024, also the linux.icon directory
@@ -38,24 +39,42 @@ const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 /** Mirror of resources/gitdesk-icon.svg, in that file's 512-unit space. */
 const MARK = {
   canvas: 512,
-  cornerRadius: 64,
+  tileRadius: 64,
   paper: '#e9e2cf',
   ink: '#0b1120',
   accent: '#0969da',
-  keyline: 8,
-  /** The 45° corner cut keeps the side x − y ≤ CUT_LEG (chord from
-   *  (344, 0) to (512, 168) — legs of 168). */
-  cutLeg: 344,
-  /** Semicircular timing notch: circle at (256, 0), cut from the top edge. */
-  notch: { cx: 256, cy: 0, radius: 36 },
-  /** The hole row on a strict 128-unit module grid. r = 52 leaves a 24-unit
-   *  paper gap between hole rims; with the keyline's 4-unit outer reach each
-   *  ring reads 56 in radius, leaving a 16-unit bridge between visible rings
-   *  (~1 px at 32 px) that AA softens rather than fuses outright. The holes
-   *  stay readable discs at the 16 px cut. */
-  holeRadius: 52,
-  holes: { x: [128, 256, 384], y: 280 },
-  /** The right-most hole is not knocked out — it is punched and inked. */
+  /** The paper tape: the clockwise-on-screen convex quad below; the r 20
+   *  left corners live at arc centers (84,188) and (84,340), and the right
+   *  edge is the 45-unit chamfer (464,168)→(412,360) — the tape leaving
+   *  the printer. Prints clip to this shape. */
+  band: {
+    verts: [
+      [64, 168],
+      [464, 168],
+      [412, 360],
+      [64, 360]
+    ],
+    rounds: [
+      { cx: 84, cy: 188, r: 20 },
+      { cx: 84, cy: 340, r: 20 }
+    ]
+  },
+  /** Sprockets: 16-unit squares, rx 3, on 52-unit centers. The top row
+   *  carries seven (y = 192, x = 100…412); the bottom six (y = 348,
+   *  x = 100…360) — the seventh would fall off the chamfer. */
+  sprockets: {
+    half: 8,
+    radius: 3,
+    rows: [
+      { y: 192, xs: [100, 152, 204, 256, 308, 360, 412] },
+      { y: 348, xs: [100, 152, 204, 256, 308, 360] }
+    ]
+  },
+  /** The data row on a 104-unit pitch: two empty holes and, at the leading
+   *  edge, the head commit. r = 26 keeps the holes readable discs at the
+   *  16 px cut, where the sprocket rows fuse into track lines instead. */
+  holes: { x: [148, 252, 356], y: 264, radius: 26 },
+  /** The right-most hole is not an empty print — it is punched and inked. */
   headIndex: 2
 }
 
@@ -63,45 +82,88 @@ const CRC_TABLE = buildCrcTable()
 
 /* ------------------------------------------------------------------ geometry */
 
-/** Signed distance to the card body (tile minus cut minus notch), negative
- *  inside. The empty holes are subtracted separately so the keyline can read
- *  their rims. */
-function distanceToCardBody(x, y) {
+/** Signed distance to the deck tile (rounded square), negative inside. */
+function distanceToTile(x, y) {
   const half = MARK.canvas / 2
-  const r = MARK.cornerRadius
+  const r = MARK.tileRadius
   const qx = Math.abs(x - half) - (half - r)
   const qy = Math.abs(y - half) - (half - r)
-  let d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r
-  // Corner cut: keep the side x − y ≤ cutLeg.
-  const cut = (x - y - MARK.cutLeg) / Math.SQRT2
-  if (cut > d) d = cut
-  // Timing notch: a punched half-circle on the top edge.
-  const notch = Math.hypot(x - MARK.notch.cx, y - MARK.notch.cy) - MARK.notch.radius
-  const knocked = -notch
-  if (knocked > d) d = knocked
-  return d
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r
+}
+
+/** Convex-band containment: clockwise-on-screen quad, interior to the
+ *  cross-product left of every directed edge. */
+function insideBand(x, y) {
+  const v = MARK.band.verts
+  for (let i = 0; i < v.length; i++) {
+    const [vx, vy] = v[i]
+    const [nx, ny] = v[(i + 1) % v.length]
+    if ((nx - vx) * (y - vy) - (ny - vy) * (x - vx) <= 0) return false
+  }
+  return true
+}
+
+/** Signed distance to the paper tape. Inside, the distance is the nearest
+ *  edge half-plane; outside, the nearest real edge segment or corner arc —
+ *  exact for a convex shape with rounded convex corners. */
+function distanceToBand(x, y) {
+  const { verts, rounds } = MARK.band
+  if (insideBand(x, y)) {
+    let nearest = Infinity
+    for (let i = 0; i < verts.length; i++) {
+      const [vx, vy] = verts[i]
+      const [nx, ny] = verts[(i + 1) % verts.length]
+      nearest = Math.min(
+        nearest,
+        ((nx - vx) * (y - vy) - (ny - vy) * (x - vx)) / Math.hypot(nx - vx, ny - vy)
+      )
+    }
+    return -nearest
+  }
+  let nearest = Infinity
+  for (let i = 0; i < verts.length; i++) {
+    nearest = Math.min(nearest, distanceToSegment(x, y, verts[i], verts[(i + 1) % verts.length]))
+  }
+  for (const { cx, cy, r } of rounds) {
+    nearest = Math.min(nearest, Math.hypot(x - cx, y - cy) - r)
+  }
+  return nearest
+}
+
+function distanceToSegment(x, y, [ax, ay], [bx, by]) {
+  const abx = bx - ax
+  const aby = by - ay
+  const t = Math.max(0, Math.min(1, ((x - ax) * abx + (y - ay) * aby) / (abx * abx + aby * aby)))
+  return Math.hypot(x - (ax + t * abx), y - (ay + t * aby))
+}
+
+/** Distance to a sprocket: an rx-3 square of half-extent 8. */
+function distanceToSprocket(x, y, cx, cy) {
+  const h = MARK.sprockets.half - MARK.sprockets.radius
+  const qx = Math.abs(x - cx) - h
+  const qy = Math.abs(y - cy) - h
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - MARK.sprockets.radius
 }
 
 function distanceToHole(x, y, index) {
-  return Math.hypot(x - MARK.holes.x[index], y - MARK.holes.y) - MARK.holeRadius
+  return Math.hypot(x - MARK.holes.x[index], y - MARK.holes.y) - MARK.holes.radius
 }
 
 /** Distance fields the rasterizer needs at one sample point. */
 function sampleDistances(x, y) {
-  const body = distanceToCardBody(x, y)
-  const holes = MARK.holes.x.map((_, i) => distanceToHole(x, y, i))
-  // The card as printed: the body with the empty holes knocked out; the head
-  // hole stays card material and only carries ink.
-  let card = body
-  let rim = body
-  for (let i = 0; i < holes.length; i++) {
-    if (i === MARK.headIndex) continue
-    const knocked = -holes[i]
-    if (knocked > card) card = knocked
-    if (Math.abs(holes[i]) < Math.abs(rim)) rim = holes[i]
+  const prints = []
+  for (const row of MARK.sprockets.rows) {
+    for (const cx of row.xs) prints.push(distanceToSprocket(x, y, cx, row.y))
   }
-  if (Math.abs(holes[MARK.headIndex]) < Math.abs(rim)) rim = holes[MARK.headIndex]
-  return { card, rim, head: holes[MARK.headIndex] }
+  for (let i = 0; i < MARK.holes.x.length; i++) {
+    if (i !== MARK.headIndex) prints.push(distanceToHole(x, y, i))
+  }
+  return {
+    tile: distanceToTile(x, y),
+    band: distanceToBand(x, y),
+    prints,
+    head: distanceToHole(x, y, MARK.headIndex)
+  }
 }
 
 /* ----------------------------------------------------------------- rasterize */
@@ -119,45 +181,54 @@ function rasterize(size, samples) {
   const scale = MARK.canvas / size
   // One target pixel of edge falloff, expressed in 512-space.
   const softness = scale
-  const halfKey = MARK.keyline / 2
 
   for (let py = 0; py < size; py++) {
     for (let px = 0; px < size; px++) {
-      let cardCoverage = 0
-      let keyCoverage = 0
-      let accentCoverage = 0
+      let tileCoverage = 0
+      let paperCoverage = 0
+      let printCoverage = 0
+      let headCoverage = 0
       for (let sy = 0; sy < samples; sy++) {
         for (let sx = 0; sx < samples; sx++) {
           const x = (px + (sx + 0.5) / samples) * scale
           const y = (py + (sy + 0.5) / samples) * scale
-          const { card, rim, head } = sampleDistances(x, y)
-          const onCard = coverage(card, softness)
-          if (onCard === 0) continue
-          cardCoverage += onCard
-          // The printed keyline hugs every rim of the finished card; it is
-          // punched away wherever the card itself is gone.
-          keyCoverage += coverage(Math.abs(rim) - halfKey, softness) * onCard
-          accentCoverage += coverage(head, softness) * onCard
+          const { tile, band, prints, head } = sampleDistances(x, y)
+          const onTile = coverage(tile, softness)
+          if (onTile === 0) continue
+          // The tape lies on the deck; the record's prints lie on the tape.
+          const onBand = coverage(band, softness) * onTile
+          // The empty prints are a disjoint union of sprockets and empty
+          // holes; product coverage keeps AA honest where rims near-touch.
+          let punched = 1
+          for (const d of prints) punched *= 1 - coverage(d, softness)
+          tileCoverage += onTile
+          paperCoverage += onBand
+          printCoverage += (1 - punched) * onBand
+          headCoverage += coverage(head, softness) * onBand
         }
       }
       const samplesTotal = samples * samples
-      const aCard = cardCoverage / samplesTotal
-      // Every layer sits on the card: un-premultiply by the card's coverage
+      const aTile = tileCoverage / samplesTotal
+      // Every layer sits on the deck: un-premultiply by the tile's coverage
       // so the shared edges stay one alpha value.
-      const aKey = aCard === 0 ? 0 : keyCoverage / samplesTotal / aCard
-      const aInk = aCard === 0 ? 0 : accentCoverage / samplesTotal / aCard
-      let [r, g, b] = paper
-      r = blend(r, ink[0], aKey)
-      g = blend(g, ink[1], aKey)
-      b = blend(b, ink[2], aKey)
-      r = blend(r, accent[0], aInk)
-      g = blend(g, accent[1], aInk)
-      b = blend(b, accent[2], aInk)
+      const aPaper = aTile === 0 ? 0 : paperCoverage / samplesTotal / aTile
+      const aPrint = aTile === 0 ? 0 : printCoverage / samplesTotal / aTile
+      const aHead = aTile === 0 ? 0 : headCoverage / samplesTotal / aTile
+      let [r, g, b] = ink
+      r = blend(r, paper[0], aPaper)
+      g = blend(g, paper[1], aPaper)
+      b = blend(b, paper[2], aPaper)
+      r = blend(r, ink[0], aPrint)
+      g = blend(g, ink[1], aPrint)
+      b = blend(b, ink[2], aPrint)
+      r = blend(r, accent[0], aHead)
+      g = blend(g, accent[1], aHead)
+      b = blend(b, accent[2], aHead)
       const at = (py * size + px) * 4
       buffer[at] = r
       buffer[at + 1] = g
       buffer[at + 2] = b
-      buffer[at + 3] = Math.round(aCard * 255)
+      buffer[at + 3] = Math.round(aTile * 255)
     }
   }
   return buffer

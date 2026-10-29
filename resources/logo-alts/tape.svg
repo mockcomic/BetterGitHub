@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 1 — "Tape". The record still travels: a punched-paper tape fed across
+    a dark deck. Sprocket squares along both rims, one row of holes, and the
+    head commit punched and inked blue at the leading edge. The chamfered right
+    end is the tape leaving the printer. Same palette, flat, no gradient.
+  -->
+  <defs>
+    <clipPath id="band">
+      <path d="M84 168 H464 L412 360 H84 A20 20 0 0 1 64 340 V188 A20 20 0 0 1 84 168 Z" />
+    </clipPath>
+  </defs>
+  <rect width="512" height="512" rx="64" fill="#0b1120" />
+  <path
+    d="M84 168 H464 L412 360 H84 A20 20 0 0 1 64 340 V188 A20 20 0 0 1 84 168 Z"
+    fill="#e9e2cf"
+  />
+  <g clip-path="url(#band)" fill="#0b1120">
+    <!-- sprocket holes, top rim -->
+    <rect x="92" y="184" width="16" height="16" rx="3" />
+    <rect x="144" y="184" width="16" height="16" rx="3" />
+    <rect x="196" y="184" width="16" height="16" rx="3" />
+    <rect x="248" y="184" width="16" height="16" rx="3" />
+    <rect x="300" y="184" width="16" height="16" rx="3" />
+    <rect x="352" y="184" width="16" height="16" rx="3" />
+    <rect x="404" y="184" width="16" height="16" rx="3" />
+    <!-- sprocket holes, bottom rim -->
+    <rect x="92" y="340" width="16" height="16" rx="3" />
+    <rect x="144" y="340" width="16" height="16" rx="3" />
+    <rect x="196" y="340" width="16" height="16" rx="3" />
+    <rect x="248" y="340" width="16" height="16" rx="3" />
+    <rect x="300" y="340" width="16" height="16" rx="3" />
+    <rect x="352" y="340" width="16" height="16" rx="3" />
+    <!-- data row: two empty holes, the head commit inked -->
+    <circle cx="148" cy="264" r="26" />
+    <circle cx="252" cy="264" r="26" />
+  </g>
+  <g clip-path="url(#band)">
+    <circle cx="356" cy="264" r="26" fill="#0969da" />
+  </g>
+</svg>

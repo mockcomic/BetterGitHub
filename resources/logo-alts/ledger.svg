@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 8 — "Ledger". History as a physical deck: three punched-card edges
+    stacked and squared off on the dark desk, each with its column holes
+    printed. The top card carries the head commit, punched and inked blue at
+    the right end of its row — newest record on top, which is exactly what
+    the app shows you.
+  -->
+  <rect width="512" height="512" rx="64" fill="#0b1120" />
+  <rect x="104" y="324" width="304" height="60" rx="22" fill="#e9e2cf" />
+  <circle cx="150" cy="354" r="12" fill="#0b1120" />
+  <circle cx="196" cy="354" r="12" fill="#0b1120" />
+  <rect x="120" y="226" width="304" height="60" rx="22" fill="#e9e2cf" />
+  <circle cx="166" cy="256" r="12" fill="#0b1120" />
+  <circle cx="212" cy="256" r="12" fill="#0b1120" />
+  <rect x="136" y="128" width="304" height="60" rx="22" fill="#e9e2cf" />
+  <circle cx="182" cy="158" r="13" fill="#0b1120" />
+  <circle cx="394" cy="158" r="20" fill="#0969da" />
+</svg>

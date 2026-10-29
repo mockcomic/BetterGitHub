@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 3 — "Branch deck". The pun made literal: cards on a desk. A back card
+    waits while the front card carries a printed commit graph — mainline in
+    ink, and the branch line lifting the blue head commit off the row.
+  -->
+  <rect width="512" height="512" rx="64" fill="#0b1120" />
+  <rect
+    x="116" y="196" width="256" height="196" rx="32"
+    fill="#e9e2cf"
+    transform="rotate(-8 244 294)"
+  />
+  <g transform="rotate(4 280 268)">
+    <rect
+      x="152" y="170" width="256" height="196" rx="32"
+      fill="#e9e2cf"
+      stroke="#0b1120"
+      stroke-width="10"
+    />
+    <!-- printed commit graph -->
+    <path
+      d="M188 306 H372 M272 306 V236 H348"
+      fill="none"
+      stroke="#0b1120"
+      stroke-width="12"
+      stroke-linecap="round"
+    />
+    <circle cx="188" cy="306" r="15" fill="#0b1120" />
+    <circle cx="272" cy="306" r="15" fill="#0b1120" />
+    <circle cx="348" cy="236" r="19" fill="#0969da" />
+  </g>
+</svg>

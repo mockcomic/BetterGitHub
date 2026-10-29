@@ -1,70 +1,66 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <!--
-    GitDesk app mark — the record itself: one punched card.
+    GitDesk app mark — the record still travels: one punched tape.
 
-    A commit is a hole punched permanently into a record, so the mark IS that
-    record: card-stock paper (#e9e2cf) as the tile, a printed keyline in deep
-    ink (#0b1120) drawing every rim — outer edge, corner cut, notch, hole —
-    and commit blue (#0969da) used exactly once, as the head-commit hole
-    punched and inked. The two empty holes are true alpha knockouts: the
-    desktop ground shows through the record. Two-value purity: flat fills,
-    no gradient, no gray.
+    A commit is a hole punched permanently into a record, and the record is
+    still being read: so the mark is a paper tape fed across the deck. The
+    deck (deep ink, #0b1120) is the tile; a band of card stock (#e9e2cf)
+    crosses it, sprocketed along both rims; the data row carries two empty
+    holes and — exactly once — the head commit punched and inked commit blue
+    (#0969da) at the leading edge. Two-value purity: flat fills, no gradient,
+    no gray, no stroke. The knockouts print in deck ink, not alpha: on tape
+    the holes were never anything the machine could read.
 
-    Identity marks: the 45° corner cut at the top right (the branch leaving
-    the deck), the semicircular timing notch on the top edge, and three
-    oversized holes on a strict 128-unit grid (x = 128/256/384, y = 280,
-    r = 52) so the row still separates at 16 px. Corner radius 64, cut legs
-    168, notch r = 36, keyline stroke 8. Keep scripts/make-icons.mjs (the
-    SDF rasterizer) in step with this file.
+    Geometry in 512-unit space. Tile corner radius 64. The band is the convex
+    quad (64,168) (464,168) (412,360) (64,360): top and bottom edges at
+    y = 168/360, left edge x = 64 rounded r 20 at both corners, right edge the
+    45-unit chamfer (464,168)→(412,360) — the tape leaving the printer.
+    Sprockets: 16-unit squares, rx 3, on 52-unit centers at y = 192 and
+    y = 348 — seven from x = 100 on top (the eighth is left of the chamfer
+    cut), six on the bottom. The data row: holes r 26 at y = 264, on
+    104-unit pitch x = 148/252/356, the last one blue. Keep
+    scripts/make-icons.mjs (the SDF rasterizer) in step with this file.
   -->
   <defs>
-    <!-- The card body: rounded square, straight 45° corner cut top-right,
-         semicircular notch on the top edge. Used to clip the keyline so the
-    	rim stays inside the card. -->
-    <clipPath id="card">
-      <path
-        clip-rule="evenodd"
-        d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z
-           M220 0 A36 36 0 0 1 292 0 Z"
-      />
+    <!-- The band: used to clip the prints, so nothing of the tape's record
+         survives the chamfer cut at the leaving edge. -->
+    <clipPath id="band">
+      <path d="M84 168 H464 L412 360 H84 A20 20 0 0 1 64 340 V188 A20 20 0 0 1 84 168 Z" />
     </clipPath>
-    <!-- The two empty holes erase paper and keyline alike: punched after
-         printing, so nothing survives inside their rims. -->
-    <mask id="punched">
-      <rect width="512" height="512" fill="#fff" />
-      <circle cx="128" cy="280" r="52" fill="#000" />
-      <circle cx="256" cy="280" r="52" fill="#000" />
-    </mask>
   </defs>
 
-  <!-- Card stock: the outline minus the notch and the two punched holes. -->
+  <!-- The deck. -->
+  <rect width="512" height="512" rx="64" fill="#0b1120" />
+
+  <!-- The tape. -->
   <path
+    d="M84 168 H464 L412 360 H84 A20 20 0 0 1 64 340 V188 A20 20 0 0 1 84 168 Z"
     fill="#e9e2cf"
-    fill-rule="evenodd"
-    d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z
-       M220 0 A36 36 0 0 1 292 0 Z
-       M76 280 a52 52 0 1 0 104 0 a52 52 0 1 0 -104 0 Z
-       M204 280 a52 52 0 1 0 104 0 a52 52 0 1 0 -104 0 Z"
   />
 
-  <!-- The head commit: punched and inked, the one place blue appears. -->
-  <circle cx="384" cy="280" r="52" fill="#0969da" />
+  <g clip-path="url(#band)" fill="#0b1120">
+    <!-- sprocket holes, top rim -->
+    <rect x="92" y="184" width="16" height="16" rx="3" />
+    <rect x="144" y="184" width="16" height="16" rx="3" />
+    <rect x="196" y="184" width="16" height="16" rx="3" />
+    <rect x="248" y="184" width="16" height="16" rx="3" />
+    <rect x="300" y="184" width="16" height="16" rx="3" />
+    <rect x="352" y="184" width="16" height="16" rx="3" />
+    <rect x="404" y="184" width="16" height="16" rx="3" />
+    <!-- sprocket holes, bottom rim -->
+    <rect x="92" y="340" width="16" height="16" rx="3" />
+    <rect x="144" y="340" width="16" height="16" rx="3" />
+    <rect x="196" y="340" width="16" height="16" rx="3" />
+    <rect x="248" y="340" width="16" height="16" rx="3" />
+    <rect x="300" y="340" width="16" height="16" rx="3" />
+    <rect x="352" y="340" width="16" height="16" rx="3" />
+    <!-- data row: two empty holes -->
+    <circle cx="148" cy="264" r="26" />
+    <circle cx="252" cy="264" r="26" />
+  </g>
 
-  <!-- Printed keyline: every rim, clipped to the card, erased where the two
-       empty holes were punched. -->
-  <g
-    clip-path="url(#card)"
-    mask="url(#punched)"
-    fill="none"
-    stroke="#0b1120"
-    stroke-width="8"
-  >
-    <path
-      d="M64 0 H344 L512 168 V448 A64 64 0 0 1 448 512 H64 A64 64 0 0 1 0 448 V64 A64 64 0 0 1 64 0 Z"
-    />
-    <path d="M220 0 A36 36 0 0 1 292 0" />
-    <circle cx="128" cy="280" r="52" />
-    <circle cx="256" cy="280" r="52" />
-    <circle cx="384" cy="280" r="52" />
+  <!-- The head commit: punched and inked, the one place blue appears. -->
+  <g clip-path="url(#band)">
+    <circle cx="356" cy="264" r="26" fill="#0969da" />
   </g>
 </svg>

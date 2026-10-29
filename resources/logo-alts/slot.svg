@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    ALT 6 — "Slot". The desk is the reader: a card fed half-way into the
+    machine, its still-unread holes printed in ink, and one commit blue at the
+    reader mouth — the record being read. The slot bar spans the full tile so
+    the mark keeps a strong horizontal at every size.
+  -->
+  <rect width="512" height="512" rx="64" fill="#0b1120" />
+  <rect x="152" y="72" width="208" height="168" rx="28" fill="#e9e2cf" />
+  <circle cx="216" cy="140" r="22" fill="#0b1120" />
+  <circle cx="296" cy="140" r="22" fill="#0b1120" />
+  <rect x="48" y="236" width="416" height="28" rx="14" fill="#e9e2cf" />
+  <circle cx="256" cy="250" r="26" fill="#0969da" />
+</svg>
