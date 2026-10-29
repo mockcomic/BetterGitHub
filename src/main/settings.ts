@@ -35,6 +35,7 @@ interface StoredSettings {
   confirmOverrideWithGeneratedMessage: boolean
   autoRefresh: boolean
   theme: ThemeId
+  hintsEnabled: boolean
 }
 
 const DEFAULTS: StoredSettings = {
@@ -50,7 +51,8 @@ const DEFAULTS: StoredSettings = {
   },
   confirmOverrideWithGeneratedMessage: true,
   autoRefresh: true,
-  theme: 'system'
+  theme: 'system',
+  hintsEnabled: true
 }
 
 let cached: StoredSettings | null = null
@@ -119,7 +121,8 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     },
     confirmOverrideWithGeneratedMessage: s.confirmOverrideWithGeneratedMessage,
     autoRefresh: s.autoRefresh,
-    theme: s.theme
+    theme: s.theme,
+    hintsEnabled: s.hintsEnabled
   }
 }
 
@@ -170,6 +173,7 @@ export async function saveSettings(patch: SettingsPatch): Promise<PublicSettings
       patch.confirmOverrideWithGeneratedMessage
   }
   if (patch.autoRefresh !== undefined) s.autoRefresh = patch.autoRefresh
+  if (patch.hintsEnabled !== undefined) s.hintsEnabled = patch.hintsEnabled
   if (patch.theme !== undefined && isThemeId(patch.theme)) s.theme = patch.theme
   await persist()
   return getPublicSettings()

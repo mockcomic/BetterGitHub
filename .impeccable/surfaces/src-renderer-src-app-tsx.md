@@ -31,3 +31,15 @@ This round's scope, stated by the user: styling and animation only. Motion is re
 
 Open: whether the AI verb should stay filled purple or drop to a purple-bordered default button once the commit verb's contrast is measured against it.
 Should the AI verb stay filled purple, or drop to a purple-bordered default button once the commit verb was measured against it? — RESOLVED: it stays a filled button, and its face is now #8250df in BOTH themes (a white label on the dark #a371f7 measured 3.35:1 and failed AA), with #a371f7 kept only for the agent's readout text and spinner. The commit verb's blue carries the same white label at 5.19:1 (light) / 4.63:1 (dark), so the two verbs read at equal weight and the desk still has exactly one purple object.
+
+## Newcomer pass (progressive disclosure)
+
+The strip and desk keep their composition; what changes is *when* complexity appears:
+
+- **Strip:** Fetch / ↓ Pull / ↑ Push collapse into one context-aware **Sync split button** (behind → Pull, ahead/no-upstream → Push, else Fetch origin) whose caret menu always lists all three with their accelerators; `GitHub`, `Open in ▾` and `Add remote…` fold into a `⋯` overflow popover (the remote form expands inline). The push arm-ring moves with the Push verb. The "no upstream" mono hint retires — the route readout's tooltip says it whole.
+- **Desk switch:** Review and History are permanent; Conflicts appears when anything waits (or an operation is mid-flight) and Stash when a stash exists; the desk falls back to Review when the tab under it retires.
+- **Queue:** staged/unstaged badges render only once the staging area holds something (`progressive.ts`); a one-time three-step coach banner (workflow-banner hunk wash) rides above the list until the first commit, dismissible, gated by Preferences ▸ "Show tips for getting started" (`hintsEnabled`, main-process setting).
+- **Tray:** the Push verb renders when it can act; a muted hint line appears under the scope line while a pre-first-commit user has nothing checked. ✨ Generate on an unconfigured agent opens Preferences with a pointer note instead of firing a doomed request.
+- **First run:** entry verbs gain captions, and the four-step story appears under them with the same counter pills. Copy pass retires "worktree"/"no upstream" phrasing in visible prose.
+
+Motion register untouched; no new tokens (hunk wash, counter pills, muted text only). Rules live in `src/renderer/src/progressive.ts` (unit-tested in `tests/progressive.test.ts`); dismissal flags ride in renderer localStorage (`gitdesk.hints.*`) like the layout widths.

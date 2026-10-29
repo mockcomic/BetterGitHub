@@ -232,6 +232,38 @@ export interface GeneratedCommitMessage {
   readonly description: string
 }
 
+// ---------------------------------------------------------------------------
+// AI merge agent — resolving a conflicted file, asking when unsure.
+
+/** One clarifying question the merge agent asks before it will decide. */
+export interface MergeQuestion {
+  readonly id: string
+  readonly prompt: string
+  /** Optional suggested answers the dialog offers as one-click choices. */
+  readonly options?: ReadonlyArray<string>
+}
+
+/** The user's reply to one {@link MergeQuestion}. */
+export interface MergeAnswer {
+  readonly questionId: string
+  readonly answer: string
+}
+
+/** One completed ask/answer round, replayed to the model on follow-up calls. */
+export interface MergeExchange {
+  readonly questions: ReadonlyArray<MergeQuestion>
+  readonly answers: ReadonlyArray<MergeAnswer>
+}
+
+/**
+ * What one `aiResolveConflict` call produced: either the agent is still
+ * unsure and returns its questions, or it merged — in which case main has
+ * already written the merged file to disk and staged it.
+ */
+export type AiMergeOutcome =
+  | { readonly kind: 'ask'; readonly questions: ReadonlyArray<MergeQuestion> }
+  | { readonly kind: 'resolved'; readonly summary: string }
+
 export interface GitConfigInfo {
   readonly name: string | null
   readonly email: string | null
@@ -279,6 +311,13 @@ export interface PublicSettings {
   readonly confirmOverrideWithGeneratedMessage: boolean
   readonly autoRefresh: boolean
   readonly theme: ThemeId
+  /**
+   * One-time coaching affordances for people new to git (the queue's
+   * 3-step banner, the tray's tick-a-file hint, the Generate → Preferences
+   * redirect). Dismissed states live in renderer localStorage; this switch
+   * turns the whole class of hints on and off.
+   */
+  readonly hintsEnabled: boolean
 }
 
 export interface SettingsPatch {
@@ -298,6 +337,7 @@ export interface SettingsPatch {
   readonly confirmOverrideWithGeneratedMessage?: boolean
   readonly autoRefresh?: boolean
   readonly theme?: ThemeId
+  readonly hintsEnabled?: boolean
 }
 
 // ---------------------------------------------------------------------------

@@ -3685,6 +3685,79 @@ select {
   font-size: 12.5px;
 }
 
+/* ------------------------------------------------------- AI merge agent */
+
+/* The same machine as ✨ Generate, speaking in Agent Violet from the row. */
+.mini.ai {
+  color: var(--ai);
+  font-variant-emoji: text;
+}
+
+.mini.ai:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+.mini.ai:disabled:hover {
+  text-decoration: none;
+}
+
+.merge-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.merge-questions .field-label {
+  color: var(--text);
+}
+
+/* One-click suggested answers; picking one only fills the box below it, so
+   a short answer stays a tap and a long one stays a sentence. */
+.merge-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.merge-option {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.merge-option:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ai) 45%, var(--border));
+  color: var(--text);
+  text-decoration: none;
+}
+
+.merge-option.active {
+  background: var(--ai);
+  border-color: var(--ai);
+  color: var(--on-accent);
+}
+
+.merge-option.active:hover:not(:disabled) {
+  text-decoration: none;
+}
+
+.merge-thinking {
+  align-items: center;
+  color: var(--ai);
+  display: inline-flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.merge-error {
+  color: var(--danger);
+}
+
 .stash-message {
   flex: 1 1 auto;
   min-width: 0;
@@ -4439,6 +4512,166 @@ select {
     flex-shrink: 1;
     resize: vertical;
   }
+}
+
+/* ------------------------------------------------- progressive disclosure */
+/* The newcomer pass adds no new visual language: the split Sync verb is
+   Primer's joined-button pair, the coaching banner reuses the workflow
+   banner's hunk wash, the step chips are counter pills, and the tray hint
+   is muted status text. Every rule below reuses existing tokens only. */
+
+/* Split Sync: one verb button and its caret, joined by a single hairline. */
+.sync-split {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.sync-split .btn.sync {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sync-split .btn.sync-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+  padding: 5px 8px;
+}
+
+/* A caret on a filled verb face keeps the verb's own foreground. */
+.sync-split .btn.sync-caret.pull .caret,
+.sync-split .btn.sync-caret.push .caret {
+  color: var(--on-accent);
+  opacity: 0.8;
+}
+
+/* Strip menus (the sync caret, the ⋯ overflow): label left, accelerator
+   chip right — the band dropdown's own row layout. */
+.strip-menu .popover-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.strip-menu .popover-item:disabled {
+  color: var(--btn-disabled-ink);
+  cursor: default;
+}
+
+.strip-menu .popover-item:disabled:hover {
+  background: transparent;
+}
+
+/* The add-remote form, expanded inline inside the overflow menu. */
+.popover-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+/* Coaching banner: workflow-banner's hunk wash, with a dismiss verb on the
+   heading row and numbered steps — a sequence the reader genuinely needs. */
+.coach-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.coach-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: coach;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coach-steps li {
+  counter-increment: coach;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.coach-steps li::before {
+  content: counter(coach);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--hunk-text);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* The tray's one honest nudge while the commit box cannot act. */
+.scope-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* First-run desk: captions under the two entry verbs, and the four-step
+   story under them. */
+.onboarding-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.onboarding-action small {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  max-width: 190px;
+}
+
+.onboarding-steps {
+  margin: 4px auto 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: steps;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.onboarding-steps li {
+  counter-increment: steps;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.onboarding-steps li::before {
+  content: counter(steps);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--hunk-text);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The Preferences pointer note: same banner family, dialog spacing. */
+.settings-note {
+  margin: 0 0 4px;
+  font-size: 12px;
 }
 
 

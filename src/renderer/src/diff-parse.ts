@@ -136,9 +136,9 @@ export function parseDiff(text: string): DiffLine[] {
 
 /**
  * Walks the parsed lines and, for each run of deletions immediately followed
- * by a run of additions, pairs them up index-wise and records the character
- * runs that differ. Lines beyond a token budget are left unannotated (the LCS
- * is quadratic) — they still render normally.
+ * by a run of additions, pairs the two sides through `alignRuns` and records
+ * the character runs that differ. Lines beyond a token budget are left
+ * unannotated (the LCS is quadratic) — they still render normally.
  */
 export function annotateWordDiff(lines: MutableDiffLine[]): void {
   let i = 0
@@ -154,21 +154,26 @@ export function annotateWordDiff(lines: MutableDiffLine[]): void {
 
     const dels = lines.slice(i, delEnd)
     const adds = lines.slice(delEnd, addEnd)
-    const pairs = Math.min(dels.length, adds.length)
-    for (let p = 0; p < pairs; p++) {
-      const left = dels[p].text
-      const right = adds[p].text
+    for (const pair of alignRuns(dels, adds)) {
+      const left = pair.del
+      const right = pair.add
+      // A single-sided row, or a pair whose lines already match, has nothing
+      // to highlight word by word.
+      if (left === undefined || right === undefined) continue
+      if (left.text === right.text) continue
       if (
-        left.length > MAX_WORD_DIFF_CHARS ||
-        right.length > MAX_WORD_DIFF_CHARS
+        left.text.length > MAX_WORD_DIFF_CHARS ||
+        right.text.length > MAX_WORD_DIFF_CHARS
       ) {
         continue
       }
-      const parts = charDiff(left, right)
-      dels[p].segments = parts
+      const parts = charDiff(left.text, right.text)
+      // `del`/`add` are readonly references, but the lines they point at are
+      // the very objects in `lines`, so the annotation lands on the row.
+      left.segments = parts
         .filter(part => !part.inserted)
         .map(part => ({ text: part.text, changed: part.changed }))
-      adds[p].segments = parts
+      right.segments = parts
         .filter(part => !part.deleted)
         .map(part => ({ text: part.text, changed: part.changed }))
     }
@@ -177,6 +182,158 @@ export function annotateWordDiff(lines: MutableDiffLine[]): void {
 }
 
 const MAX_WORD_DIFF_CHARS = 2000
+
+/** One row of an aligned change block: at most one removed and one added line. */
+export interface AlignedPair<Line> {
+  readonly del?: Line
+  readonly add?: Line
+}
+
+/**
+ * Ceiling for the alignment table (del count x add count). Past it the block
+ * falls back to positional pairing: a moved few-thousand-line block must not
+ * freeze the diff pane while it is being laid out.
+ */
+const MAX_ALIGN_CELLS = 250_000
+
+/** Pairs the two sides index-wise, with the longer side's surplus single-row. */
+function positionalPairs<Line>(
+  dels: ReadonlyArray<Line>,
+  adds: ReadonlyArray<Line>
+): AlignedPair<Line>[] {
+  const rows: AlignedPair<Line>[] = []
+  const pairs = Math.min(dels.length, adds.length)
+  for (let p = 0; p < pairs; p++) rows.push({ del: dels[p], add: adds[p] })
+  for (let p = pairs; p < dels.length; p++) rows.push({ del: dels[p] })
+  for (let p = pairs; p < adds.length; p++) rows.push({ add: adds[p] })
+  return rows
+}
+
+/**
+ * Aligns a deletion run with the addition run that follows it so identical
+ * lines face each other, which is what both the split view and the word-level
+ * highlight need in order to compare lines that really do pair up.
+ *
+ * A plain modification shares no lines between the two sides, so its del block
+ * and add block pair index-wise exactly as before. The alignment earns its keep
+ * where the sides only partially overlap — conflicted files above all, since
+ * with `diff3`/`zdiff3` markers the added side carries the whole `<<<<<<<` /
+ * `|||||||` / `=======` / `>>>>>>>` scaffolding around unchanged lines. Pairing
+ * that block by position alone puts every old line opposite a marker line, so
+ * the split view's two windows stop lining up with the file they describe.
+ */
+export function alignRuns<Line extends { readonly text: string }>(
+  dels: ReadonlyArray<Line>,
+  adds: ReadonlyArray<Line>
+): ReadonlyArray<AlignedPair<Line>> {
+  const n = dels.length
+  const m = adds.length
+  if (n === 0 || m === 0 || n * m > MAX_ALIGN_CELLS) {
+    return positionalPairs(dels, adds)
+  }
+
+  // Longest-common-subsequence table over exact line text.
+  const table = new Uint32Array((n + 1) * (m + 1))
+  const width = m + 1
+  const at = (i: number, j: number): number => table[i * width + j]
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      table[i * width + j] =
+        dels[i].text === adds[j].text
+          ? at(i + 1, j + 1) + 1
+          : Math.max(at(i + 1, j), at(i, j + 1))
+    }
+  }
+
+  // Backtrack. Lines that match face each other; runs that do not are held
+  // back and then paired positionally, so a real modification still lines up
+  // side by side instead of drifting into two single-sided stacks.
+  const rows: AlignedPair<Line>[] = []
+  let pendingDels: Line[] = []
+  let pendingAdds: Line[] = []
+  const flush = (): void => {
+    if (pendingDels.length === 0 && pendingAdds.length === 0) return
+    rows.push(...positionalPairs(pendingDels, pendingAdds))
+    pendingDels = []
+    pendingAdds = []
+  }
+
+  let i = 0
+  let j = 0
+  while (i < n && j < m) {
+    if (dels[i].text === adds[j].text) {
+      flush()
+      rows.push({ del: dels[i], add: adds[j] })
+      i++
+      j++
+    } else if (at(i + 1, j) >= at(i, j + 1)) {
+      pendingDels.push(dels[i])
+      i++
+    } else {
+      pendingAdds.push(adds[j])
+      j++
+    }
+  }
+  while (i < n) {
+    pendingDels.push(dels[i])
+    i++
+  }
+  while (j < m) {
+    pendingAdds.push(adds[j])
+    j++
+  }
+  flush()
+  return rows
+}
+
+/** One row of the side-by-side table: a banner, or the two facing lines. */
+export interface SplitRow {
+  readonly hunk?: string
+  readonly left?: DiffLine
+  readonly right?: DiffLine
+}
+
+/**
+ * Lays parsed diff text out as side-by-side rows: context and file headers are
+ * mirrored onto both windows, and every change block goes through `alignRuns`
+ * so the left window shows what a line was and the right window the line it
+ * actually became.
+ */
+export function buildSplitRows(lines: ReadonlyArray<DiffLine>): SplitRow[] {
+  const rows: SplitRow[] = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.kind === 'hunk') {
+      rows.push({ hunk: line.text })
+      i++
+      continue
+    }
+    if (line.kind === 'meta' || line.kind === 'warning') {
+      rows.push({ hunk: line.text })
+      i++
+      continue
+    }
+    if (line.kind === 'ctx') {
+      rows.push({ left: line, right: line })
+      i++
+      continue
+    }
+    // A del run, optionally followed by an add run.
+    let delEnd = i
+    while (delEnd < lines.length && lines[delEnd].kind === 'del') delEnd++
+    let addEnd = delEnd
+    while (addEnd < lines.length && lines[addEnd].kind === 'add') addEnd++
+    for (const pair of alignRuns(
+      lines.slice(i, delEnd),
+      lines.slice(delEnd, addEnd)
+    )) {
+      rows.push({ left: pair.del, right: pair.add })
+    }
+    i = addEnd > i ? addEnd : i + 1
+  }
+  return rows
+}
 
 interface CharPart {
   readonly text: string

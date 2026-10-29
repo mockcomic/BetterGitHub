@@ -28,6 +28,7 @@ export function SettingsDialog(): JSX.Element | null {
   const [gitlabClientId, setGitLabClientId] = useState('')
   const [confirmOverride, setConfirmOverride] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [hintsEnabled, setHintsEnabled] = useState(true)
   const [theme, setTheme] = useState<ThemeId>('system')
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
@@ -39,6 +40,7 @@ export function SettingsDialog(): JSX.Element | null {
       setCustomInstructions(settings.ai.customInstructions)
       setConfirmOverride(settings.confirmOverrideWithGeneratedMessage)
       setAutoRefresh(settings.autoRefresh)
+      setHintsEnabled(settings.hintsEnabled)
       setTheme(settings.theme)
       setApiKey('')
       setGitHubClientId('')
@@ -82,6 +84,7 @@ export function SettingsDialog(): JSX.Element | null {
                   },
                   confirmOverrideWithGeneratedMessage: confirmOverride,
                   autoRefresh,
+                  hintsEnabled,
                   theme
                 })
                 .then(s => {
@@ -95,7 +98,22 @@ export function SettingsDialog(): JSX.Element | null {
       }
     >
       <section className="settings-section">
-        <h3>AI commit agent</h3>
+        <h3>AI agent</h3>
+        <p className="field-hint">
+          Optional — this is what powers ✨ Generate in the commit tray and
+          ✨ AI on conflicted files. The rest of GitDesk works without any of
+          it.
+        </p>
+        {state.settingsAiNote && (
+          <div className="workflow-banner settings-note">
+            <strong>The AI agent needs an endpoint first.</strong>
+            <span>
+              Point Base URL at any OpenAI-compatible server — OpenAI,
+              OpenRouter, or a local Ollama or LM Studio — add an API key if
+              your server asks for one, then press Test connection.
+            </span>
+          </div>
+        )}
         <Field
           label="Base URL"
           hint="Any OpenAI-compatible server: https://api.openai.com/v1, https://openrouter.ai/api/v1, http://localhost:11434/v1 …"
@@ -218,6 +236,14 @@ export function SettingsDialog(): JSX.Element | null {
             onChange={e => setAutoRefresh(e.target.checked)}
           />
           Refresh the changes list automatically when files change on disk
+        </label>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={hintsEnabled}
+            onChange={e => setHintsEnabled(e.target.checked)}
+          />
+          Show tips for getting started
         </label>
       </section>
 
@@ -785,7 +811,7 @@ export function AboutDialog(): JSX.Element | null {
     >
       <p className="confirm-message">
         <strong>GitDesk</strong> — a GitHub Desktop-style git client with an
-        AI commit-message agent.
+        AI commit-message and merge agent.
       </p>
       <p className="confirm-message">
         Version 0.1.0 · git operations run through your system{' '}
@@ -870,6 +896,131 @@ export function ConfirmDialog(): JSX.Element | null {
       }
     >
       <p className="confirm-message">{message}</p>
+    </Dialog>
+  )
+}
+
+/**
+ * The AI merge agent's side of one conflicted file: it thinks, possibly
+ * asks, and the answers given here decide the merge. Closing aborts an
+ * in-flight turn; a failed turn keeps the typed exchanges and offers a retry.
+ */
+export function AiMergeDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  const merge = state.aiMerge
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+
+  // A new question round starts the answer boxes fresh.
+  useEffect(() => {
+    if (merge !== null && !merge.busy && merge.error === null) setAnswers({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [merge?.questions])
+
+  if (merge === null) return null
+
+  const questions = merge.questions
+  const allAnswered =
+    questions !== null &&
+    questions.length > 0 &&
+    questions.every(q => (answers[q.id] ?? '').trim().length > 0)
+
+  const submit = (): void => {
+    if (questions === null || !allAnswered) return
+    store.submitAiMerge(
+      questions.map(q => ({
+        questionId: q.id,
+        answer: (answers[q.id] ?? '').trim()
+      }))
+    )
+  }
+
+  return (
+    <Dialog
+      title="✨ AI merge agent"
+      width={540}
+      onClose={() => store.closeAiMerge()}
+      footer={
+        <>
+          <button className="btn" onClick={() => store.closeAiMerge()}>
+            {merge.busy ? 'Cancel' : 'Close'}
+          </button>
+          {merge.error !== null && !merge.busy && (
+            <button className="btn" onClick={() => store.retryAiMerge()}>
+              Try again
+            </button>
+          )}
+          {questions !== null && (
+            <button
+              className="btn primary"
+              disabled={!allAnswered || merge.busy}
+              onClick={submit}
+            >
+              {merge.busy ? <span className="spinner" /> : null} Send answers
+            </button>
+          )}
+        </>
+      }
+    >
+      <p className="confirm-message">
+        Merging <code>{merge.path}</code>
+        {questions === null && merge.busy && (
+          <span className="merge-thinking">
+            {' '}
+            <span className="spinner" /> thinking…
+          </span>
+        )}
+      </p>
+
+      {questions !== null && (
+        <div className="merge-questions">
+          {questions.map((q, i) => (
+            <div className="field" key={q.id}>
+              <span className="field-label">
+                {questions.length > 1 ? `${i + 1}. ` : ''}
+                {q.prompt}
+              </span>
+              {q.options !== undefined && q.options.length > 0 && (
+                <div className="merge-options">
+                  {q.options.map(opt => (
+                    <button
+                      type="button"
+                      key={opt}
+                      className={`mini merge-option${
+                        (answers[q.id] ?? '') === opt ? ' active' : ''
+                      }`}
+                      disabled={merge.busy}
+                      onClick={() => setAnswers(a => ({ ...a, [q.id]: opt }))}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <textarea
+                rows={2}
+                placeholder="Your answer"
+                aria-label={`Answer to: ${q.prompt}`}
+                disabled={merge.busy}
+                value={answers[q.id] ?? ''}
+                onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit()
+                }}
+              />
+            </div>
+          ))}
+          {merge.busy && (
+            <p className="merge-thinking">
+              <span className="spinner" /> thinking…
+            </p>
+          )}
+        </div>
+      )}
+
+      {merge.error !== null && (
+        <p className="field-hint merge-error">{merge.error}</p>
+      )}
     </Dialog>
   )
 }

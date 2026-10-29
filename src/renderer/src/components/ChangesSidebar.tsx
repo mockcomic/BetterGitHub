@@ -11,6 +11,7 @@ import {
 } from './ContextMenu'
 import { ConfettiBurst, useCelebration } from './Celebration'
 import { useJustArmed } from '../motion'
+import { showStagedBadges } from '../progressive'
 
 function matches(path: string, filter: string): boolean {
   const needle = filter.trim().toLowerCase()
@@ -140,6 +141,45 @@ function ignoreSubmenu(
   return items
 }
 
+// ------------------------------------------------------------- coach banner
+
+/**
+ * The one-time three-step story of a commit, shown while the install has not
+ * produced a commit yet and there is something to commit. It is a rail, not
+ * a gate: dismissible, retired forever by the first commit, and switchable
+ * off entirely in Preferences.
+ */
+function CoachBanner(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  if (
+    state.settings?.hintsEnabled !== true ||
+    state.hints.firstCommitDone ||
+    state.hints.coachingDismissed
+  ) {
+    return null
+  }
+  return (
+    <div className="workflow-banner coach-banner">
+      <div className="coach-head">
+        <strong>Committing in three steps</strong>
+        <button
+          className="mini"
+          title="Hide this banner for good"
+          onClick={() => store.dismissCoaching()}
+        >
+          Dismiss
+        </button>
+      </div>
+      <ol className="coach-steps">
+        <li>Check the files you want to include</li>
+        <li>Write a summary — or press ✨ Generate</li>
+        <li>Commit, then Push sends it to GitHub</li>
+      </ol>
+    </div>
+  )
+}
+
 // ------------------------------------------------------------------ review
 
 export function ChangesQueue(): JSX.Element {
@@ -175,6 +215,10 @@ export function ChangesQueue(): JSX.Element {
   const identity = state.identity
   const needsIdentity =
     identity !== null && (identity.name === null || identity.email === null)
+  // Badges appear only once the staging area actually holds something;
+  // before that every row would carry an identical "unstaged" chip and the
+  // include-checkbox is the whole story. See progressive.ts.
+  const showBadges = showStagedBadges(state.status)
 
   return (
     <div className="changes-list">
@@ -209,6 +253,8 @@ export function ChangesQueue(): JSX.Element {
         </div>
       )}
 
+      {files.length > 0 && <CoachBanner />}
+
       <div className="changes-toolbar">
         <label className="select-all">
           <input
@@ -240,7 +286,7 @@ export function ChangesQueue(): JSX.Element {
           </button>
           <button
             className="mini"
-            title="Discard every change in the working tree"
+            title="Throw away every uncommitted change — this cannot be undone"
             disabled={state.busy !== null || files.length === 0}
             onClick={() => store.discardAllChanges()}
           >
@@ -248,7 +294,7 @@ export function ChangesQueue(): JSX.Element {
           </button>
           <button
             className="mini"
-            title="Move all changes to the stash (Ctrl+Shift+S)"
+            title="Park these changes for later (Ctrl+Shift+S)"
             disabled={state.busy !== null || files.length === 0}
             onClick={() => store.stashAllChanges()}
           >
@@ -260,7 +306,7 @@ export function ChangesQueue(): JSX.Element {
       {files.length === 0 && (
         <div className="sidebar-message">
           <strong>No changes</strong>
-          <p>Your working directory is clean.</p>
+          <p>Nothing has changed since your last commit.</p>
         </div>
       )}
 
@@ -277,6 +323,7 @@ export function ChangesQueue(): JSX.Element {
           file={f}
           checked={draftData?.checked.has(f.path) ?? false}
           selected={state.selectedFilePath === f.path}
+          showBadges={showBadges}
           onContextMenu={e => {
             e.preventDefault()
             e.stopPropagation()
@@ -459,7 +506,7 @@ export function ConflictsQueue(): JSX.Element {
     return (
       <div className="sidebar-message">
         <strong>No conflicts</strong>
-        <p>Nothing in the working tree is waiting to be resolved.</p>
+        <p>Nothing is waiting to be resolved.</p>
       </div>
     )
   }
@@ -481,6 +528,7 @@ export function ConflictsQueue(): JSX.Element {
           file={f}
           checked={false}
           showCheck={false}
+          showBadges={false}
           selected={state.selectedFilePath === f.path}
         />
       ))}
@@ -504,9 +552,11 @@ export function ResolveHelp(): JSX.Element {
             {conflicted} conflicted file{conflicted === 1 ? '' : 's'}
           </strong>
           <p>
-            Choose <b>ours</b> to keep your branch's version, <b>theirs</b> to
-            take the incoming one, or <b>done</b> after editing the markers by
-            hand. The diff shows the conflict markers as they sit on disk.
+            Press <b>✨ AI</b> to let the merge agent combine both sides (it
+            asks you when unsure), <b>ours</b> to keep your branch&apos;s
+            version, <b>theirs</b> to take the incoming one, or <b>done</b>{' '}
+            after editing the markers by hand. The diff shows the conflict
+            markers as they sit on disk.
           </p>
           {workflow !== null && (
             <>
@@ -692,13 +742,19 @@ export function CommitTray(): JSX.Element {
   const ahead = state.status?.ahead ?? 0
   const hasUpstream = state.status?.upstream !== undefined
   const checked = draft?.checked ?? new Set<string>()
+  // Staged files are the commit baseline; ticking only adds to it.
+  const staged = new Set(
+    (state.status?.files ?? []).filter(f => f.staged).map(f => f.path)
+  )
+  const scope = new Set([...checked, ...staged])
   const scopeTitle =
-    checked.size === 0
-      ? 'No files selected — Commit ships nothing until you check a file.'
-      : `This commit will contain exactly:\n${[...checked].join('\n')}`
-  // Both verbs arm with a ring the instant git makes them true: checking the
-  // first file arms Commit; a landed commit turns ahead 0 → n and arms Push.
-  const commitEnabled = !(busy || state.aiBusy || (checked.size === 0 && !amending))
+    scope.size === 0
+      ? 'Nothing to commit — stage a file or tick one to include it.'
+      : `This commit will contain exactly:\n${[...scope].join('\n')}`
+  // Both verbs arm with a ring the instant git makes them true: staging or
+  // checking the first file arms Commit; a landed commit turns ahead 0 → n
+  // and arms Push.
+  const commitEnabled = !(busy || state.aiBusy || (scope.size === 0 && !amending))
   const pushEnabled = !(
     busy ||
     state.aiBusy ||
@@ -749,7 +805,7 @@ export function CommitTray(): JSX.Element {
         onChange={e => store.setDescription(e.target.value)}
       />
       <div className="scope-line" title={scopeTitle}>
-        <b>{checked.size} of {total}</b> files ·{' '}
+        <b>{scope.size} of {total}</b> files ·{' '}
         {state.scopeLoading ? (
           <>
             <span className="scope-adds">+…</span>{' '}
@@ -762,6 +818,15 @@ export function CommitTray(): JSX.Element {
           </>
         )}
       </div>
+      {state.settings?.hintsEnabled === true &&
+        !state.hints.firstCommitDone &&
+        scope.size === 0 &&
+        !amending &&
+        total > 0 && (
+          <div className="scope-hint">
+            Stage a file or tick one to include it in this commit.
+          </div>
+        )}
       <div className="commit-actions">
         {state.aiBusy ? (
           <button
@@ -776,7 +841,7 @@ export function CommitTray(): JSX.Element {
             className="btn ai"
             disabled={busy}
             onClick={() => void store.generateCommitMessage()}
-            title="Generate a commit message with AI for the selected files"
+            title="Generate a commit message with AI for the staged and selected files"
           >
             ✨ Generate
           </button>
@@ -786,9 +851,9 @@ export function CommitTray(): JSX.Element {
           disabled={!commitEnabled}
           onClick={() => void store.commit()}
           title={
-            checked.size === 0 && !amending
-              ? 'Select at least one file to commit'
-              : 'Commit selected files (Ctrl+Enter)'
+            scope.size === 0 && !amending
+              ? 'Nothing to commit — stage some files or tick at least one'
+              : 'Commit staged and selected files (Ctrl+Enter)'
           }
         >
           {state.busy === 'commit' ? (
@@ -802,29 +867,33 @@ export function CommitTray(): JSX.Element {
           )}
           {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
         </button>
-        <button
-          className={`btn push${pushArmed ? ' arming' : ''}`}
-          disabled={!pushEnabled}
-          onClick={() => void store.doSync('push')}
-          title={pushTitle(state)}
-        >
-          {state.busy === 'push' ? (
-            <>
-              <span className="spinner" /> Pushing…
-            </>
-          ) : (
-            <>
-              ↑ Push
-              {ahead > 0 ? (
-                <span className="count-pop" key={`tray-push-count-${ahead}`}>
-                  {' '}{ahead}
-                </span>
-              ) : (
-                ''
-              )}
-            </>
-          )}
-        </button>
+        {/* The tray's Push joins the desk when it can act — it appears at the
+            moment a commit lands ahead of the remote (or a branch is ready to
+            publish), instead of sitting permanently dead next to Commit. */}
+        {pushEnabled && (
+          <button
+            className={`btn push${pushArmed ? ' arming' : ''}`}
+            onClick={() => void store.doSync('push')}
+            title={pushTitle(state)}
+          >
+            {state.busy === 'push' ? (
+              <>
+                <span className="spinner" /> Pushing…
+              </>
+            ) : (
+              <>
+                ↑ Push
+                {ahead > 0 ? (
+                  <span className="count-pop" key={`tray-push-count-${ahead}`}>
+                    {' '}{ahead}
+                  </span>
+                ) : (
+                  ''
+                )}
+              </>
+            )}
+          </button>
+        )}
       </div>
     </>
   )
@@ -908,15 +977,19 @@ function FileRow({
   checked,
   selected,
   showCheck = true,
+  showBadges = true,
   onContextMenu
 }: {
   file: FileStatus
   checked: boolean
   selected: boolean
   showCheck?: boolean
+  /** Staged/unstaged chips; hidden until the staging area holds anything. */
+  showBadges?: boolean
   onContextMenu?: (e: React.MouseEvent<HTMLDivElement>) => void
 }): JSX.Element {
   const store = useStore()
+  const state = useStoreState()
   const dir = file.path.includes('/')
     ? file.path.slice(0, file.path.lastIndexOf('/') + 1)
     : ''
@@ -972,6 +1045,20 @@ function FileRow({
       {file.kind === 'conflicted' ? (
         <span className="conflict-actions" onClick={e => e.stopPropagation()}>
           <button
+            className={`mini ai${
+              state.aiMerge?.path === file.path && state.aiMerge.busy
+                ? ' thinking'
+                : ''
+            }`}
+            title="Ask the AI merge agent to combine both sides — it asks you when unsure"
+            disabled={state.aiMerge !== null}
+            onClick={() => store.startAiMerge(file.path)}
+          >
+            {state.aiMerge?.path === file.path && state.aiMerge.busy
+              ? '…'
+              : '✨ AI'}
+          </button>
+          <button
             className="mini"
             title="Keep the version from your branch"
             onClick={() => store.resolveConflict(file.path, 'ours')}
@@ -995,22 +1082,23 @@ function FileRow({
         </span>
       ) : (
         <>
-          {file.staged ? (
-            <button
-              className="badge staged"
-              title="Staged — click to unstage"
-              onClick={e => {
-                e.stopPropagation()
-                store.toggleStaged(file.path)
-              }}
-            >
-              staged
-            </button>
-          ) : (
-            file.hasWorktreeChanges && (
-              <span className="badge unstaged">unstaged</span>
-            )
-          )}
+          {showBadges &&
+            (file.staged ? (
+              <button
+                className="badge staged"
+                title="Staged — click to unstage"
+                onClick={e => {
+                  e.stopPropagation()
+                  store.toggleStaged(file.path)
+                }}
+              >
+                staged
+              </button>
+            ) : (
+              file.hasWorktreeChanges && (
+                <span className="badge unstaged">unstaged</span>
+              )
+            ))}
           <button
             className="discard"
             title="Discard changes"

@@ -23,7 +23,7 @@ import 'prismjs/components/prism-csharp'
 import 'prismjs/components/prism-ini'
 import 'prismjs/components/prism-toml'
 import type { DiffLine } from '../diff-parse'
-import { isBinaryDiff, parseDiff } from '../diff-parse'
+import { buildSplitRows, isBinaryDiff, parseDiff } from '../diff-parse'
 
 const EXT_LANGUAGES = new Map<string, string>([
   ['ts', 'typescript'],
@@ -366,49 +366,6 @@ function MediaPreview({
       </div>
     </div>
   )
-}
-
-interface SplitRow {
-  readonly hunk?: string
-  readonly left?: DiffLine
-  readonly right?: DiffLine
-}
-
-/** Aligns a deletion run with the addition run that follows it, row by row. */
-export function buildSplitRows(lines: ReadonlyArray<DiffLine>): SplitRow[] {
-  const rows: SplitRow[] = []
-  let i = 0
-  while (i < lines.length) {
-    const line = lines[i]
-    if (line.kind === 'hunk') {
-      rows.push({ hunk: line.text })
-      i++
-      continue
-    }
-    if (line.kind === 'meta' || line.kind === 'warning') {
-      rows.push({ hunk: line.text })
-      i++
-      continue
-    }
-    if (line.kind === 'ctx') {
-      rows.push({ left: line, right: line })
-      i++
-      continue
-    }
-    // A del run, optionally followed by an add run.
-    let delEnd = i
-    while (delEnd < lines.length && lines[delEnd].kind === 'del') delEnd++
-    let addEnd = delEnd
-    while (addEnd < lines.length && lines[addEnd].kind === 'add') addEnd++
-    const dels = lines.slice(i, delEnd)
-    const adds = lines.slice(delEnd, addEnd)
-    const count = Math.max(dels.length, adds.length)
-    for (let p = 0; p < count; p++) {
-      rows.push({ left: dels[p], right: adds[p] })
-    }
-    i = addEnd > i ? addEnd : i + 1
-  }
-  return rows
 }
 
 function SplitTable({

@@ -2,6 +2,7 @@ import type {
   AccountInfo,
   AccountProvider,
   AddRepositoriesResult,
+  AiMergeOutcome,
   BranchList,
   CommitInfo,
   ExternalApp,
@@ -15,6 +16,7 @@ import type {
   IpcResult,
   LogQuery,
   ManagedRepository,
+  MergeExchange,
   PublicSettings,
   RemoteRepoPage,
   RemoteRepoQuery,
@@ -143,11 +145,18 @@ export interface RequestResponseChannels {
   getPreview: (repoPath: string, path: string, sha?: string) => FilePreview | null
 
   // committing
+  /**
+   * Commits the staged baseline plus the full content of `selectedPaths`.
+   * Selection is additive: the ticked files are staged first, then the whole
+   * index ships — staged-but-unselected files are included, and partially
+   * staged files contribute only their staged portion.
+   */
   commitPaths: (
     repoPath: string,
     summary: string,
     description: string,
-    paths: ReadonlyArray<string>
+    selectedPaths: ReadonlyArray<string>,
+    stagedPaths?: ReadonlyArray<string>
   ) => string
   amendCommit: (
     repoPath: string,
@@ -225,6 +234,20 @@ export interface RequestResponseChannels {
     paths: ReadonlyArray<string>
   ) => GeneratedCommitMessage
   cancelGenerateCommitMessage: (repoPath: string) => void
+
+  // AI merge agent
+  /**
+   * Ask the agent to merge one conflicted file. `exchanges` replays the
+   * earlier question rounds; on a `resolved` outcome main has already
+   * written the merged content to disk and staged the path.
+   */
+  aiResolveConflict: (
+    repoPath: string,
+    path: string,
+    exchanges: ReadonlyArray<MergeExchange>
+  ) => AiMergeOutcome
+  /** Abort an in-flight merge request for one path. */
+  cancelAiResolve: (repoPath: string, path: string) => void
 }
 
 export type RequestResponseChannel = keyof RequestResponseChannels

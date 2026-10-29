@@ -195,3 +195,29 @@ export async function resolveConflict(
     timeoutMs: 20_000
   })
 }
+
+/**
+ * Which index stages (1=base, 2=ours, 3=theirs) currently exist for a
+ * conflicted path — enough to tell both-modified apart from modify/delete and
+ * add/add. Empty set means the path is no longer unmerged at all.
+ */
+export async function getConflictStages(
+  repoPath: string,
+  path: string
+): Promise<Set<number>> {
+  const result = await execGit(
+    ['ls-files', '--unmerged', '--end-of-options', path],
+    { cwd: repoPath, timeoutMs: 10_000 }
+  )
+  const stages = new Set<number>()
+  for (const line of result.stdout.split('\n')) {
+    // One record: `<mode> <sha> <stage>\t<path>` — the stage is the last
+    // field before the tab. Quoted paths never affect the metadata half.
+    const meta = line.split('\t')[0]
+    if (meta === undefined) continue
+    const parts = meta.trim().split(/\s+/)
+    const stage = Number(parts[parts.length - 1])
+    if (stage === 1 || stage === 2 || stage === 3) stages.add(stage)
+  }
+  return stages
+}

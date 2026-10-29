@@ -2,7 +2,16 @@ import { execGit, GitExecError } from './exec'
 import { addPaths } from './staging'
 
 /**
- * Commits exactly the given paths with a summary/description message.
+ * Commits the staged baseline — everything already in the index — plus the
+ * full working-tree content of the files the user ticked, with a
+ * summary/description message.
+ *
+ * Selection is purely additive: `selectedPaths` are `git add`-ed and then a
+ * plain `git commit` ships the whole index. That means staged-but-unselected
+ * files are always in the commit, and a partially staged file contributes
+ * exactly its staged portion (the unstaged remainder survives the commit).
+ * Nothing outside `stagedPaths ∪ selectedPaths` can slip in, because a
+ * non-empty scope is required up front and the index is precisely that set.
  *
  * Two `-m` flags produce the classic
  *   summary
@@ -14,28 +23,44 @@ export async function commitPaths(
   repoPath: string,
   summary: string,
   description: string,
-  paths: ReadonlyArray<string>
+  selectedPaths: ReadonlyArray<string>,
+  stagedPaths: ReadonlyArray<string> = []
 ): Promise<string> {
   const trimmed = summary.trim()
   if (trimmed.length === 0) {
     throw new Error('A commit summary is required.')
   }
-  if (paths.length === 0) {
-    throw new Error('Select at least one file to commit.')
+  if (selectedPaths.length === 0 && stagedPaths.length === 0) {
+    throw new Error('Nothing to commit — stage some files or tick at least one.')
   }
 
-  // Make sure everything selected is present in the index (add covers
-  // deletions and new files; `commit --only` below still restricts the
-  // commit to the selected paths). Paths already fully staged (including
-  // deletions) are skipped by addPaths rather than failing the add.
-  await addPaths(repoPath, paths)
+  // Make sure every ticked file is present in the index (add covers
+  // deletions and new files). Paths already fully staged (including
+  // deletions) are skipped by addPaths rather than failing the add; a
+  // staged-and-modified file gets its whole content staged because the
+  // user explicitly selected it.
+  await addPaths(repoPath, selectedPaths)
 
-  const args = ['commit', '--only', '-m', trimmed]
+  const args = ['commit', '-m', trimmed]
   const body = description.trim()
   if (body.length > 0) args.push('-m', body)
-  args.push('--end-of-options', ...paths)
 
-  await execGit(args, { cwd: repoPath, timeoutMs: 30_000 })
+  try {
+    await execGit(args, { cwd: repoPath, timeoutMs: 30_000 })
+  } catch (err) {
+    // The renderer's staged list can be stale (another app moved the index
+    // while the box was open): turn git's empty-index refusal into the same
+    // guidance an empty scope gets.
+    if (
+      err instanceof GitExecError &&
+      /no changes added to commit|nothing added to commit|nothing to commit/i.test(
+        err.result.stderr
+      )
+    ) {
+      throw new Error('Nothing to commit — stage some files or tick at least one.')
+    }
+    throw err
+  }
 
   return (await execGit(['rev-parse', 'HEAD'], { cwd: repoPath, timeoutMs: 10_000 }))
     .stdout.trim()

@@ -6,6 +6,8 @@ import type { ExternalApp } from '../../../shared/models'
 import { ConfettiBurst, useCelebration } from './Celebration'
 import { BranchDivergence } from './BranchBadges'
 import { useJustArmed } from '../motion'
+import { syncVerb } from '../progressive'
+import type { SyncVerb } from '../progressive'
 
 /** Placeholder for the command strip's filter, per desk view. */
 const FILTER_LABELS: Record<DeskView, string> = {
@@ -52,17 +54,7 @@ export function Header(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [state.selectedRepo])
 
-  const { status } = state
-  const ahead = status?.ahead ?? 0
-  const behind = status?.behind ?? 0
-  const hasUpstream = status?.upstream !== undefined
   const busy = state.busy
-  const { nonce: celebrateNonce, celebrating } = useCelebration('push')
-  // The strip's Push arms with a ring the moment git makes it true — a commit
-  // landing elsewhere in the app turns ahead 0 → n and lights the verb.
-  const pushEnabled =
-    busy === null && status !== null && (ahead > 0 || !hasUpstream)
-  const pushArmed = useJustArmed(pushEnabled)
 
   return (
     <header className="header">
@@ -124,71 +116,307 @@ export function Header(): JSX.Element {
           >
             ⟳
           </button>
-          <button
-            className="btn"
-            disabled={busy !== null}
-            onClick={() => void store.doSync('fetch')}
-            title="Fetch from origin"
-          >
-            {busy === 'fetch' ? <span className="spinner" /> : null} Fetch
-          </button>
-          <button
-            className="btn pull"
-            disabled={busy !== null}
-            onClick={() => void store.doSync('pull')}
-            title="Pull from upstream"
-          >
-            {busy === 'pull' ? <span className="spinner" /> : null} ↓ Pull
-            {behind > 0 ? (
-              <span className="count-pop" key={`pull-count-${behind}`}>
-                {' '}{behind}
-              </span>
-            ) : (
-              ''
-            )}
-          </button>
-          <button
-            className={`btn push${celebrating ? ' celebrating' : ''}${pushArmed ? ' arming' : ''}`}
-            disabled={!pushEnabled}
-            onClick={() => void store.doSync('push')}
-            title={
-              ahead === 0 && hasUpstream
-                ? 'Nothing to push — the branch is up to date with its upstream'
-                : 'Push to origin'
-            }
-          >
-            {busy === 'push' ? <span className="spinner" /> : null} ↑ Push
-            {ahead > 0 ? (
-              <span className="count-pop" key={`push-count-${ahead}`}>
-                {' '}{ahead}
-              </span>
-            ) : (
-              ''
-            )}
-            {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
-          </button>
-          {!hasUpstream && status !== null && (
-            <span className="hint" title="No upstream branch — Push will set one on origin">
-              no upstream
-            </span>
-          )}
-          <OpenInButton disabled={busy !== null} />
-          {state.remoteUrl === null && status !== null && (
-            <AddRemoteButton disabled={busy !== null} />
-          )}
-          {state.remoteUrl !== null && (
-            <button
-              className="btn"
-              disabled={busy !== null}
-              title="Open this repository in the browser (Ctrl+Shift+G)"
-              onClick={() => void store.viewOnGitHub({ kind: 'repo' })}
-            >
-              GitHub
-            </button>
-          )}
+          <SyncButton />
+          <OverflowButton />
         </div>
       )}
     </header>
+  )
+}
+
+/**
+ * The strip's single sync verb. One button runs the verb git currently calls
+ * for — catch up when behind, publish when ahead or unpublished, otherwise
+ * look — and a caret next to it always offers all three by name, with their
+ * accelerators. The context-aware label is GitHub Desktop's own pattern; the
+ * caret keeps every verb a first-class click, so nothing is hidden, only
+ * prioritised.
+ */
+function SyncButton(): JSX.Element {
+  const state = useStoreState()
+  const store = useStore()
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const [open, setOpen] = useState(false)
+  const { status } = state
+  const ahead = status?.ahead ?? 0
+  const behind = status?.behind ?? 0
+  const hasUpstream = status?.upstream !== undefined
+  const busy = state.busy
+  const { nonce: celebrateNonce, celebrating } = useCelebration('push')
+  // The Push story still arms with a ring the moment git makes it true — a
+  // commit landing elsewhere in the app turns ahead 0 → n and lights the verb.
+  const pushEnabled =
+    busy === null && status !== null && (ahead > 0 || !hasUpstream)
+  const pushArmed = useJustArmed(pushEnabled)
+  const verb = syncVerb(status)
+  const verbClass = verb === 'pull' ? ' pull' : verb === 'push' ? ' push' : ''
+  const armed = verb === 'push' && pushArmed ? ' arming' : ''
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent): void => {
+      if (wrapRef.current !== null && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const run = (op: SyncVerb): void => {
+    setOpen(false)
+    void store.doSync(op)
+  }
+
+  const title =
+    verb === 'pull'
+      ? `The remote has ${behind} new commit${behind === 1 ? '' : 's'} — Pull brings them in (the ▾ menu also has Fetch and Push)`
+      : verb === 'push'
+        ? ahead > 0
+          ? `Push ${ahead} commit${ahead === 1 ? '' : 's'} to ${status?.upstream ?? 'origin'}`
+          : 'Publish this branch — the first push sets upstream on origin'
+        : 'Check the remote for new work. Nothing on your machine changes.'
+
+  const item = (op: SyncVerb, label: string, accel: string, enabled: boolean): JSX.Element => (
+    <button
+      className="popover-item"
+      disabled={!enabled}
+      title={`Run ${label.toLowerCase()} on its own`}
+      onClick={() => run(op)}
+    >
+      {label}
+      <span className="menu-accel">{accel}</span>
+    </button>
+  )
+
+  return (
+    <div className="menu-wrap" ref={wrapRef}>
+      <div className="sync-split">
+        <button
+          className={`btn sync${verbClass}${celebrating ? ' celebrating' : ''}${armed}`}
+          disabled={busy !== null}
+          onClick={() => run(verb)}
+          title={title}
+        >
+          {busy === verb ? <span className="spinner" /> : null}
+          {verb === 'pull' ? (
+            <>
+              ↓ Pull
+              {behind > 0 && (
+                <span className="count-pop" key={`sync-behind-${behind}`}>
+                  {' '}{behind}
+                </span>
+              )}
+            </>
+          ) : verb === 'push' ? (
+            <>
+              ↑ Push
+              {ahead > 0 && (
+                <span className="count-pop" key={`sync-ahead-${ahead}`}>
+                  {' '}{ahead}
+                </span>
+              )}
+            </>
+          ) : (
+            <>Fetch origin</>
+          )}
+          {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
+        </button>
+        <button
+          className={`btn sync-caret${verbClass}`}
+          disabled={busy !== null}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Sync options"
+          title="Fetch, Pull or Push — pick one"
+          onClick={() => setOpen(o => !o)}
+        >
+          <span className="caret">▾</span>
+        </button>
+      </div>
+      {open && (
+        <div className="popover strip-menu" role="menu">
+          {item('fetch', 'Fetch', 'Ctrl+Shift+F', busy === null)}
+          {item('pull', 'Pull', 'Ctrl+Shift+P', busy === null)}
+          {item('push', 'Push', 'Ctrl+Shift+U', pushEnabled)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The strip's overflow: everything that is not the everyday story. The
+ * GitHub link (or the add-remote form on repos without an origin) and the
+ * gateway out of the desk — the OS file manager plus every source editor
+ * main actually detected on this machine (see src/main/external-apps.ts).
+ * Detection is re-run whenever the menu opens, so installing an editor takes
+ * effect without an app restart; results are swapped in as they arrive.
+ */
+function OverflowButton(): JSX.Element {
+  const store = useStore()
+  const state = useStoreState()
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [open, setOpen] = useState(false)
+  const [addingRemote, setAddingRemote] = useState(false)
+  const [url, setUrl] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    void store.refreshExternalApps(true)
+    const onDown = (e: MouseEvent): void => {
+      if (wrapRef.current !== null && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setAddingRemote(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        setAddingRemote(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open, store])
+
+  // First paint of the menu before any probe ever ran: warm the list once so
+  // the very first click already shows the cached machine inventory.
+  useEffect(() => {
+    void store.refreshExternalApps()
+  }, [store])
+
+  useEffect(() => {
+    if (addingRemote) inputRef.current?.focus()
+  }, [addingRemote])
+
+  const managers: ReadonlyArray<ExternalApp> = state.externalApps.filter(a => a.kind === 'files')
+  const editors: ReadonlyArray<ExternalApp> = state.externalApps.filter(a => a.kind === 'editor')
+  const firstProbePending = state.externalApps.length === 0
+
+  const closeAll = (): void => {
+    setOpen(false)
+    setAddingRemote(false)
+  }
+
+  const save = (): void => {
+    if (url.trim().length > 0) void store.addRemote(url.trim())
+    closeAll()
+    setUrl('')
+  }
+
+  const openRow = (app: ExternalApp): JSX.Element => (
+    <button
+      key={app.id}
+      className="popover-item"
+      title={`Open this repository in ${app.label}`}
+      onClick={() => {
+        closeAll()
+        void store.openInApp(app.id)
+      }}
+    >
+      {app.label}
+    </button>
+  )
+
+  return (
+    <div className="menu-wrap" ref={wrapRef}>
+      <button
+        className="btn"
+        disabled={state.busy !== null}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="More — GitHub page, add remote, open in…"
+        onClick={() => setOpen(o => !o)}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div className="popover strip-menu" role="menu">
+          {state.remoteUrl !== null ? (
+            <button
+              className="popover-item"
+              title="Open this repository in the browser (Ctrl+Shift+G)"
+              onClick={() => {
+                closeAll()
+                void store.viewOnGitHub({ kind: 'repo' })
+              }}
+            >
+              View repository on GitHub
+              <span className="menu-accel">Ctrl+Shift+G</span>
+            </button>
+          ) : state.status !== null ? (
+            addingRemote ? (
+              <div className="popover-form">
+                <input
+                  ref={inputRef}
+                  className="popover-filter"
+                  placeholder="Origin remote URL (https or ssh git URL)"
+                  value={url}
+                  onChange={e => setUrl(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') save()
+                    if (e.key === 'Escape') setAddingRemote(false)
+                  }}
+                />
+                <div className="popover-item-row">
+                  <button
+                    className="btn"
+                    disabled={url.trim().length === 0}
+                    onClick={save}
+                  >
+                    Save remote
+                  </button>
+                  <span className="popover-item-actions">
+                    <button className="mini" onClick={() => setAddingRemote(false)}>
+                      Cancel
+                    </button>
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="popover-item"
+                title="This repository has no origin remote yet — add one to push"
+                onClick={() => setAddingRemote(true)}
+              >
+                Add remote…
+              </button>
+            )
+          ) : null}
+          <div className="popover-sep" />
+          <div className="popover-heading">Open in</div>
+          {firstProbePending ? (
+            <div className="popover-empty">Checking this machine…</div>
+          ) : (
+            managers.map(openRow)
+          )}
+          {!firstProbePending && (
+            <>
+              <div className="popover-sep" />
+              <div className="popover-heading">Editors</div>
+              {editors.length === 0 ? (
+                <div className="popover-empty">No supported editors detected</div>
+              ) : (
+                editors.map(openRow)
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -208,7 +436,7 @@ function RouteReadout(): JSX.Element | null {
   const title =
     status.upstream !== undefined
       ? `Push and pull route: ${status.branch} ⇄ ${status.upstream}`
-      : `No upstream branch yet — the first push sets one on origin`
+      : `This branch isn't on the remote yet — the first push publishes it`
   return (
     <span className="route-readout" title={title} aria-label={title}>
       {status.branch} <span className="route-arrow">⇄</span>{' '}
@@ -230,171 +458,6 @@ function RouteReadout(): JSX.Element | null {
         </>
       )}
     </span>
-  )
-}
-
-/**
- * In-world replacement for the old native prompt: a small popover form on
- * the strip itself, styled like the rest of the desk.
- */
-function AddRemoteButton({ disabled }: { disabled: boolean }): JSX.Element {
-  const store = useStore()
-  const [open, setOpen] = useState(false)
-  const [url, setUrl] = useState('')
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    inputRef.current?.focus()
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current !== null && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  const save = (): void => {
-    if (url.trim().length > 0) void store.addRemote(url.trim())
-    setOpen(false)
-    setUrl('')
-  }
-
-  return (
-    <div className="menu-wrap" ref={wrapRef}>
-      <button
-        className="btn"
-        disabled={disabled}
-        title="This repository has no origin remote — add one to push"
-        onClick={() => setOpen(o => !o)}
-      >
-        Add remote…
-      </button>
-      {open && (
-        <div className="popover">
-          <input
-            ref={inputRef}
-            className="popover-filter"
-            placeholder="Origin remote URL (https or ssh git URL)"
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') setOpen(false)
-            }}
-          />
-          <div className="popover-sep" />
-          <div className="popover-item-row">
-            <button
-              className="btn"
-              disabled={url.trim().length === 0}
-              onClick={save}
-            >
-              Save remote
-            </button>
-            <span className="popover-item-actions">
-              <button className="mini" onClick={() => setOpen(false)}>
-                Cancel
-              </button>
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * "Open in ▾": the strip's gateway out of the desk — the OS file manager plus
- * every source editor main actually detected on this machine (see
- * src/main/external-apps.ts). Detection is re-run whenever the menu opens, so
- * installing an editor takes effect without an app restart; results are
- * swapped in as they arrive, keeping the menu instant on reopen.
- */
-function OpenInButton({ disabled }: { disabled: boolean }): JSX.Element {
-  const store = useStore()
-  const state = useStoreState()
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    void store.refreshExternalApps(true)
-    const onDown = (e: MouseEvent): void => {
-      if (wrapRef.current !== null && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open, store])
-
-  // First paint of the menu before any probe ever ran: warm the list once so
-  // the very first click already shows the cached machine inventory.
-  useEffect(() => {
-    void store.refreshExternalApps()
-  }, [store])
-
-  const managers: ReadonlyArray<ExternalApp> = state.externalApps.filter(a => a.kind === 'files')
-  const editors: ReadonlyArray<ExternalApp> = state.externalApps.filter(a => a.kind === 'editor')
-  const firstProbePending = state.externalApps.length === 0
-
-  const openRow = (app: ExternalApp): JSX.Element => (
-    <button
-      key={app.id}
-      className="popover-item"
-      title={`Open this repository in ${app.label}`}
-      onClick={() => {
-        setOpen(false)
-        void store.openInApp(app.id)
-      }}
-    >
-      {app.label}
-    </button>
-  )
-
-  return (
-    <div className="menu-wrap" ref={wrapRef}>
-      <button
-        className="btn"
-        disabled={disabled}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title="Open this repository in a file manager or editor"
-        onClick={() => setOpen(o => !o)}
-      >
-        Open in <span className="caret">▾</span>
-      </button>
-      {open && (
-        <div className="popover" role="menu">
-          {firstProbePending ? (
-            <div className="popover-empty">Checking this machine…</div>
-          ) : (
-            managers.map(openRow)
-          )}
-          {!firstProbePending && (
-            <>
-              <div className="popover-sep" />
-              <div className="popover-heading">Editors</div>
-              {editors.length === 0 ? (
-                <div className="popover-empty">No supported editors detected</div>
-              ) : (
-                editors.map(openRow)
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
   )
 }
 

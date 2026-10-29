@@ -19,6 +19,7 @@ import type { WidthRange } from './components/ResizeHandle'
 import { Toasts } from './components/Toasts'
 import {
   AboutDialog,
+  AiMergeDialog,
   CloneDialog,
   ConfirmDialog,
   MergeBranchDialog,
@@ -29,14 +30,38 @@ import {
 import { RepoManagerDialog } from './components/RepoManagerDialog'
 import { EmptyState } from './components/EmptyState'
 import { useStore, useStoreState } from './store'
-import type { DeskView } from './store'
+import type { AppState, DeskView } from './store'
 
-const DESK_TABS: ReadonlyArray<{ id: DeskView; label: string }> = [
-  { id: 'review', label: 'Review' },
-  { id: 'history', label: 'History' },
-  { id: 'conflicts', label: 'Conflicts' },
-  { id: 'stash', label: 'Stash' }
-]
+interface DeskTab {
+  readonly id: DeskView
+  readonly label: string
+}
+
+/**
+ * The desk switch shows the tabs that have something to say. Review and
+ * History are the desk's two permanent modes; Conflicts appears the moment
+ * anything waits to be resolved (or an operation is mid-flight), and Stash
+ * appears when there is a stash to restore. Power is not hidden — Resolve
+ * and the stash toolbar verbs create the tabs by acting — but a newcomer
+ * never has to wonder what two always-empty advanced desks are for.
+ */
+function visibleDeskTabs(state: AppState): ReadonlyArray<DeskTab> {
+  const tabs: DeskTab[] = [
+    { id: 'review', label: 'Review' },
+    { id: 'history', label: 'History' }
+  ]
+  const conflicts = state.status?.conflictCount ?? 0
+  const wf = state.status?.inProgress
+  const workflowActive =
+    wf !== undefined && (wf.merge || wf.rebase || wf.cherryPick || wf.revert)
+  if (conflicts > 0 || workflowActive) {
+    tabs.push({ id: 'conflicts', label: 'Conflicts' })
+  }
+  if (state.stashes.length > 0) {
+    tabs.push({ id: 'stash', label: 'Stash' })
+  }
+  return tabs
+}
 
 /* The docked panels are drag-resizable within these bounds; `def` is the
    DESIGN.md measure the responsive defaults fall back to. */
@@ -105,6 +130,17 @@ export function App(): JSX.Element {
     writeStoredWidth(TRAY_KEY, value)
   }
 
+  // Progressive desks: when the tab a visitor sits on loses its reason to
+  // exist — the last conflict resolved, the last stash restored — the desk
+  // returns to Review instead of stranding them on a retired tab.
+  const deskTabs = useMemo(
+    () => visibleDeskTabs(state),
+    [state.status, state.stashes]
+  )
+  useEffect(() => {
+    if (!deskTabs.some(t => t.id === state.view)) store.setView('review')
+  }, [deskTabs, state.view, store])
+
   if (state.selectedRepo === null) {
     return (
       <div className="app" data-view="empty">
@@ -120,6 +156,7 @@ export function App(): JSX.Element {
         <RenameBranchDialog />
         <AboutDialog />
         <ConfirmDialog />
+        <AiMergeDialog />
       </div>
     )
   }
@@ -201,8 +238,8 @@ export function App(): JSX.Element {
               emptyTitle={conflictCount === 0 ? 'Nothing is conflicted' : 'Select a conflicted file'}
               emptyHint={
                 conflictCount === 0
-                  ? 'The worktree is clear — resolve nothing, and commit when you are ready.'
-                  : 'Pick a conflicted file to see the markers as they sit on disk.'
+                  ? 'Nothing is waiting to be resolved. Back to Review to commit when you are ready.'
+                  : 'Pick a conflicted file to see the conflict markers as they sit on disk.'
               }
             />
           )}
@@ -250,6 +287,7 @@ export function App(): JSX.Element {
       <RenameBranchDialog />
       <AboutDialog />
       <ConfirmDialog />
+      <AiMergeDialog />
     </div>
   )
 }
@@ -299,7 +337,7 @@ function SegmentedSwitch(): JSX.Element {
   const onKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
     e.preventDefault()
-    const order = DESK_TABS.map(t => t.id)
+    const order = visibleDeskTabs(state).map(t => t.id)
     const at = order.indexOf(state.view)
     const next =
       order[
@@ -325,7 +363,7 @@ function SegmentedSwitch(): JSX.Element {
           } as CSSProperties
         }
       />
-      {DESK_TABS.map(tab => {
+      {visibleDeskTabs(state).map(tab => {
         const active = state.view === tab.id
         const count =
           tab.id === 'review'

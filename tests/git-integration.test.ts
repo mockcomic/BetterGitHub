@@ -113,7 +113,7 @@ describe('git integration', () => {
     await resetClean()
   })
 
-  it('commits only the selected paths', async () => {
+  it('commits exactly the selected files when nothing is staged', async () => {
     write('README.md', '# hello world\n')
     write('notes.txt', 'unrelated\n')
     const sha = await commitPaths(repo, 'Update readme', 'More detail.', [
@@ -129,6 +129,56 @@ describe('git integration', () => {
 
     // The unselected file is still dirty.
     expect((await getStatus(repo)).files.map(f => f.path)).toContain('notes.txt')
+    await resetClean()
+  })
+
+  it('commits the staged baseline even when nothing is selected', async () => {
+    write('base.txt', 'staged baseline\n')
+    write('passenger.txt', 'not in this commit\n')
+    await stagePaths(repo, ['base.txt'])
+    const sha = await commitPaths(repo, 'Baseline commit', '', [], ['base.txt'])
+    const shown = await git(['show', '--name-only', '--format=', sha])
+    expect(shown).toContain('base.txt')
+    expect(shown).not.toContain('passenger.txt')
+    await resetClean()
+  })
+
+  it('merges the staged baseline and the selected files into one commit', async () => {
+    write('basetwo.txt', 'staged baseline two\n')
+    write('ticked.txt', 'checked only\n')
+    await stagePaths(repo, ['basetwo.txt'])
+    const sha = await commitPaths(
+      repo,
+      'Baseline plus selection',
+      '',
+      ['ticked.txt'],
+      ['basetwo.txt']
+    )
+    const shown = await git(['show', '--name-only', '--format=', sha])
+    expect(shown).toContain('basetwo.txt')
+    expect(shown).toContain('ticked.txt')
+    await resetClean()
+  })
+
+  it('keeps the unstaged remainder of a partially staged baseline file', async () => {
+    write('half.txt', 'staged part\n')
+    await stagePaths(repo, ['half.txt'])
+    write('half.txt', 'staged part\nplus an unstaged hunk\n')
+    const sha = await commitPaths(repo, 'Staged content only', '', [], ['half.txt'])
+    const body = await git(['show', '--format=', sha])
+    expect(body).toContain('staged part')
+    expect(body).not.toContain('unstaged hunk')
+    const dirty = (await getStatus(repo)).files.find(f => f.path === 'half.txt')
+    expect(dirty?.staged).toBe(false)
+    expect(dirty?.hasWorktreeChanges).toBe(true)
+    await resetClean()
+  })
+
+  it('refuses to commit when nothing is staged or selected', async () => {
+    write('idle.txt', 'dirty but unmentioned\n')
+    await expect(
+      commitPaths(repo, 'Nothing here', '', [], [])
+    ).rejects.toThrow(/Nothing to commit/)
     await resetClean()
   })
 

@@ -1,11 +1,13 @@
 import { clipboard, dialog, ipcMain, shell } from 'electron'
 import { existsSync, statSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
 import type {
   ExternalApp,
   GitHubTarget,
   IgnoreRequest,
   IpcResult,
+  MergeExchange,
   RemoteRepoQuery,
   RepoSummaryEntry,
   Repository
@@ -16,7 +18,7 @@ import type {
   RequestResponseChannel,
   RequestResponseChannels
 } from '../shared/ipc'
-import { friendlyGitError } from './git/exec'
+import { friendlyGitError, execGit } from './git/exec'
 import { safeJoin } from './git/repo-path'
 import { getDetectedApps, launchDetached, openRepoInApp } from './external-apps'
 import { getStatus } from './git/status'
@@ -40,6 +42,7 @@ import {
 } from './git/commit'
 import {
   discardPaths,
+  getConflictStages,
   resolveConflict,
   stagePaths,
   unstagePaths
@@ -98,6 +101,15 @@ import { gitlabClient, normalizeGitLabApiBase } from './providers/gitlab'
 import { ProviderHttpError } from './providers/http'
 import type { AccountProvider } from '../shared/models'
 import { generateCommitMessage, testConnection } from './ai/commit-agent'
+import {
+  askMergeAgent,
+  buildMergeMessages,
+  describeStages,
+  generateMergePromptTags,
+  hasConflictMarkers,
+  mergeSizeError,
+  restoreEol
+} from './ai/merge-agent'
 import { dispatchMenuAction, getMenuBarSpec, runMenuRole } from './menu'
 import { applyTheme, getMainWindow, isTrustedSender } from './windows'
 import { getWatchedPath, startWatching, stopWatching } from './watcher'
@@ -109,6 +121,9 @@ type Handlers = {
 }
 
 const generationControllers = new Map<string, AbortController>()
+
+/** In-flight AI merge requests, keyed by `repoPath\npath`. */
+const mergeControllers = new Map<string, AbortController>()
 
 async function openUrl(url: string): Promise<void> {
   if (!/^https?:\/\//i.test(url)) {
@@ -125,6 +140,61 @@ async function resolveWebRepo(repoPath: string) {
     )
   }
   return repo
+}
+
+/**
+ * For an unmerged path, the stage contents the working file cannot show: any
+ * of ours/theirs that is not present verbatim in what is on disk (a side
+ * deleted on one hand leaves the other side in the file without markers, so
+ * most ordinary conflicts need nothing extra here). Each added block is
+ * fenced with its own random tag, mirroring the commit agent's trust posture.
+ */
+async function readMissingStages(
+  repoPath: string,
+  path: string,
+  stages: ReadonlySet<number>,
+  workingContent: string
+): Promise<string> {
+  const blocks: string[] = []
+  for (const [n, label] of [
+    [2, 'our side'],
+    [3, 'their incoming side']
+  ] as const) {
+    if (!stages.has(n)) continue
+    let text: string
+    try {
+      text = (
+        await execGit(['show', `:${n}:${path}`], {
+          cwd: repoPath,
+          timeoutMs: 10_000
+        })
+      ).stdout
+    } catch {
+      // Stage vanished under a concurrent change; the description still
+      // tells the agent what kind of conflict this is.
+      continue
+    }
+    // Compare against the working text with CRLF folded to LF: repo blobs
+    // are LF-normalized while a Windows working tree may be CRLF, so a raw
+    // substring test would re-send every side as an extra block.
+    if (workingContent.replace(/\r\n/g, '\n').includes(text)) continue
+    if (text.includes('\u0000')) {
+      throw new Error(
+        `The ${label} version is binary — the AI merge agent only merges text. Resolve it by hand.`
+      )
+    }
+    const tooBig = mergeSizeError(text)
+    if (tooBig !== null) {
+      throw new Error(
+        `The ${label} version is too large for the AI merge agent. Resolve it by hand.`
+      )
+    }
+    const tag = Math.random().toString(36).slice(2, 10)
+    blocks.push(
+      `\nContent missing from the working file — ${label}:\n<stage-${tag}>\n${text}\n</stage-${tag}>`
+    )
+  }
+  return blocks.join('\n')
 }
 
 const handlers: Handlers = {
@@ -467,9 +537,16 @@ const handlers: Handlers = {
     repoPath: string,
     summary: string,
     description: string,
-    paths: ReadonlyArray<string>
+    selectedPaths: ReadonlyArray<string>,
+    stagedPaths?: ReadonlyArray<string>
   ) {
-    return commitPaths(repoPath, summary, description, paths)
+    return commitPaths(
+      repoPath,
+      summary,
+      description,
+      selectedPaths,
+      stagedPaths ?? []
+    )
   },
   async amendCommit(
     repoPath: string,
@@ -670,7 +747,7 @@ const handlers: Handlers = {
     const cfg = await getAiConfig()
     if (cfg.apiKey === null || cfg.apiKey.length === 0) {
       throw new Error(
-        'No API key configured. Open Preferences → AI commit agent and add one.'
+        'No API key configured. Open Preferences → AI agent and add one.'
       )
     }
 
@@ -713,6 +790,101 @@ const handlers: Handlers = {
   async cancelGenerateCommitMessage(repoPath: string) {
     generationControllers.get(repoPath)?.abort()
     generationControllers.delete(repoPath)
+  },
+
+  async aiResolveConflict(
+    repoPath: string,
+    path: string,
+    exchanges: ReadonlyArray<MergeExchange>
+  ) {
+    const cfg = await getAiConfig()
+    if (cfg.apiKey === null || cfg.apiKey.length === 0) {
+      throw new Error(
+        'No API key configured. Open Preferences → AI agent and add one.'
+      )
+    }
+
+    // The file must still be unmerged in the index — the renderer's idea of
+    // a conflict can be stale after a watcher push.
+    const stages = await getConflictStages(repoPath, path)
+    if (stages.size === 0) {
+      throw new Error(`"${path}" is not conflicted anymore.`)
+    }
+
+    const filePath = safeJoin(repoPath, path)
+    let content: string
+    try {
+      content = await readFile(filePath, 'utf8')
+    } catch {
+      // Deleted on one side of the conflict: the agent still merges from the
+      // index stages, so an absent working file is not fatal.
+      content = ''
+    }
+    const tooBig = mergeSizeError(content)
+    if (tooBig !== null) throw new Error(tooBig)
+
+    // The working file already carries both sides inside the markers; only
+    // the stages the file cannot show (a side that has no working presence)
+    // are added, each in its own random-tagged block.
+    const stageBlocks = await readMissingStages(repoPath, path, stages, content)
+
+    const controller = new AbortController()
+    const key = `${repoPath}\n${path}`
+    mergeControllers.get(key)?.abort()
+    mergeControllers.set(key, controller)
+
+    try {
+      const decision = await askMergeAgent({
+        messages: buildMergeMessages({
+          path,
+          content,
+          stageDescription: describeStages(stages),
+          stageBlocks,
+          exchanges,
+          tags: generateMergePromptTags()
+        }),
+        baseUrl: cfg.baseUrl,
+        model: cfg.model,
+        apiKey: cfg.apiKey,
+        signal: controller.signal
+      })
+
+      if (decision.kind === 'ask') {
+        return { kind: 'ask' as const, questions: decision.questions }
+      }
+
+      if (hasConflictMarkers(decision.content)) {
+        throw new Error(
+          'The proposed resolution still contains conflict markers — nothing was changed. Answer its questions or resolve by hand.'
+        )
+      }
+      await writeFile(filePath, restoreEol(decision.content, content), 'utf8')
+      await resolveConflict(repoPath, path, 'resolved')
+      return {
+        kind: 'resolved' as const,
+        summary:
+          decision.summary.length > 0
+            ? decision.summary
+            : 'The AI agent merged the conflict.'
+      }
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.name === 'AbortError' || controller.signal.aborted)
+      ) {
+        throw new Error('cancelled')
+      }
+      throw err
+    } finally {
+      if (mergeControllers.get(key) === controller) {
+        mergeControllers.delete(key)
+      }
+    }
+  },
+  async cancelAiResolve(repoPath: string, path: string) {
+    const key = `${repoPath}\n${path}`
+    mergeControllers.get(key)?.abort()
+    mergeControllers.delete(key)
   }
 }
 

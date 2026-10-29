@@ -16,6 +16,9 @@ import type {
   GitignoreResult,
   IgnoreRequest,
   ManagedRepository,
+  MergeAnswer,
+  MergeExchange,
+  MergeQuestion,
   PublicSettings,
   RemoteRepoPage,
   Repository,
@@ -30,6 +33,7 @@ import type { ThemeId } from '../../shared/themes'
 import { themeBase } from '../../shared/themes'
 import { DONATE_URL } from '../../shared/links'
 import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
+import { aiLooksUnconfigured } from './progressive'
 import { call, onMenuAction, onRepoChanged } from './api'
 
 export interface ToastAction {
@@ -63,6 +67,61 @@ export interface ConfirmRequest {
 
 /** The four work modes of the command desk. */
 export type DeskView = 'review' | 'history' | 'conflicts' | 'stash'
+
+/**
+ * The AI merge agent's conversation for one conflicted file. While `busy`
+ * the agent is thinking; when `questions` is set it is waiting for answers;
+ * `error` is shown inline in the dialog with a retry.
+ */
+export interface AiMergeState {
+  readonly path: string
+  readonly busy: boolean
+  readonly questions: ReadonlyArray<MergeQuestion> | null
+  /** Completed ask/answer rounds, replayed to the agent on each call. */
+  readonly exchanges: ReadonlyArray<MergeExchange>
+  readonly error: string | null
+}
+
+/**
+ * Which one-time coaching moments this install has already passed. Stored in
+ * renderer localStorage like the layout widths and drafts: they record a
+ * reader's progress, not git state, so they never round-trip through main.
+ */
+export interface HintFlags {
+  readonly firstCommitDone: boolean
+  readonly firstPushDone: boolean
+  readonly coachingDismissed: boolean
+}
+
+const HINT_FLAGS: ReadonlyArray<keyof HintFlags> = [
+  'firstCommitDone',
+  'firstPushDone',
+  'coachingDismissed'
+]
+
+function readHintFlags(): HintFlags {
+  const flags = {
+    firstCommitDone: false,
+    firstPushDone: false,
+    coachingDismissed: false
+  } as Record<keyof HintFlags, boolean>
+  for (const key of HINT_FLAGS) {
+    try {
+      flags[key] = localStorage.getItem(`gitdesk.hints.${key}`) === '1'
+    } catch {
+      /* storage unavailable: the hint just shows again */
+    }
+  }
+  return flags
+}
+
+function writeHintFlag(key: keyof HintFlags, value: boolean): void {
+  try {
+    localStorage.setItem(`gitdesk.hints.${key}`, value ? '1' : '0')
+  } catch {
+    /* best-effort persistence */
+  }
+}
 
 export interface RepoDraft {
   summary: string
@@ -136,6 +195,8 @@ export interface AppState {
   readonly externalApps: ReadonlyArray<ExternalApp>
   readonly busy: string | null
   readonly aiBusy: boolean
+  /** The AI merge agent's live conversation about one conflicted file. */
+  readonly aiMerge: AiMergeState | null
   /** Last completing-verb success, so the button that did it can celebrate. */
   readonly celebration: CelebrationPulse | null
   readonly settings: PublicSettings | null
@@ -147,6 +208,12 @@ export interface AppState {
   readonly signInError: string | null
   readonly toasts: ReadonlyArray<Toast>
   readonly showSettings: boolean
+  /**
+   * The Preferences dialog was opened from ✨ Generate while the AI agent
+   * still reads as unconfigured; the dialog shows the pointer note once.
+   */
+  readonly settingsAiNote: boolean
+  readonly hints: HintFlags
   readonly showClone: boolean
   readonly showRepoManager: boolean
   readonly showNewBranch: boolean
@@ -209,6 +276,7 @@ const initialState: AppState = {
   externalApps: [],
   busy: null,
   aiBusy: false,
+  aiMerge: null,
   celebration: null,
   settings: null,
   accounts: [],
@@ -216,6 +284,12 @@ const initialState: AppState = {
   signInError: null,
   toasts: [],
   showSettings: false,
+  settingsAiNote: false,
+  hints: {
+    firstCommitDone: false,
+    firstPushDone: false,
+    coachingDismissed: false
+  },
   showClone: false,
   showRepoManager: false,
   showNewBranch: false,
@@ -306,7 +380,21 @@ export class AppStore {
 
   /** Fire the one-shot success signal for a completing verb (Commit/Push). */
   celebrate(kind: CelebrationKind): void {
+    // Passing a verb also retires the matching coaching hint, once, globally.
+    const key: keyof HintFlags =
+      kind === 'commit' ? 'firstCommitDone' : 'firstPushDone'
+    if (!this.state.hints[key]) {
+      writeHintFlag(key, true)
+      this.update({ hints: { ...this.state.hints, [key]: true } })
+    }
     this.update({ celebration: { kind, nonce: ++celebrationNonce } })
+  }
+
+  dismissCoaching(): void {
+    writeHintFlag('coachingDismissed', true)
+    this.update({
+      hints: { ...this.state.hints, coachingDismissed: true }
+    })
   }
 
   private draftFor(repoPath: string): RepoDraft {
@@ -361,7 +449,13 @@ export class AppStore {
         call('listRepositories'),
         call('listAccounts')
       ])
-      this.update({ settings, repositories, accounts, initError: null })
+      this.update({
+        settings,
+        repositories,
+        accounts,
+        initError: null,
+        hints: readHintFlags()
+      })
       this.applyTheme(settings.theme)
 
       const lastPath = localStorage.getItem('gitdesk.lastRepo')
@@ -391,7 +485,10 @@ export class AppStore {
         this.state.selectedRepo !== null &&
         this.state.selectedRepo.path === repoPath &&
         this.state.busy === null &&
-        !this.state.aiBusy
+        !this.state.aiBusy &&
+        // While the merge agent holds a file mid-conversation, its
+        // half-written content must not repaint the desk underneath it.
+        this.state.aiMerge === null
       ) {
         void this.refresh({ silent: true })
       }
@@ -568,6 +665,7 @@ export class AppStore {
       amend: null,
       lastCommit: null,
       stashes: [],
+      aiMerge: null,
       view: 'review',
       deskFilter: '',
       mergeBranchOpen: false,
@@ -1196,20 +1294,26 @@ export class AppStore {
 
   /**
    * Refreshes the tray's scope stats: the added/removed line totals across
-   * exactly the checked paths, so "what will ship" is honest before commit.
+   * exactly the commit scope (staged baseline ∪ ticked paths), so "what
+   * will ship" is honest before commit.
    */
   async recomputeScope(): Promise<void> {
     const repo = this.state.selectedRepo
     if (repo === null) return
     const draft = this.state.drafts.get(repo.path)
     const checked = draft?.checked ?? new Set<string>()
-    if (checked.size === 0) {
+    // The scope line must match what Commit ships: staged baseline ∪ ticked.
+    const stagedScope = new Set(
+      (this.state.status?.files ?? []).filter(f => f.staged).map(f => f.path)
+    )
+    const scopeSet = new Set([...checked, ...stagedScope])
+    if (scopeSet.size === 0) {
       this.update({ scopeAdds: 0, scopeDels: 0, scopeLoading: false })
       return
     }
     const token = ++this.scopeToken
     this.update({ scopeLoading: true })
-    const paths = [...checked].slice(0, 40)
+    const paths = [...scopeSet].slice(0, 40)
     try {
       const diffs = await Promise.all(
         paths.map(p =>
@@ -1334,6 +1438,110 @@ export class AppStore {
     void this.runGit(async () => {
       await call('resolveConflict', repo.path, path, side)
     }, 'resolve')
+  }
+
+  // ------------------------------------------------------------ AI merge agent
+
+  /** Ask the agent to merge one conflicted file; it asks back if unsure. */
+  startAiMerge(path: string): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    // Same progressive rule as ✨ Generate: an obviously unconfigured agent
+    // goes to Preferences instead of firing a doomed request.
+    if (aiLooksUnconfigured(this.state.settings)) {
+      this.update({ showSettings: true, settingsAiNote: true })
+      return
+    }
+    this.aiMergeSeq++
+    this.update({
+      aiMerge: { path, busy: true, questions: null, exchanges: [], error: null }
+    })
+    void this.runAiMerge(this.aiMergeSeq, path, [])
+  }
+
+  /** Answer the agent's open questions and let it finish the merge. */
+  submitAiMerge(answers: ReadonlyArray<MergeAnswer>): void {
+    const current = this.state.aiMerge
+    const repo = this.state.selectedRepo
+    if (current === null || repo === null || current.questions === null) return
+    const exchanges: MergeExchange[] = [
+      ...current.exchanges,
+      { questions: current.questions, answers }
+    ]
+    this.aiMergeSeq++
+    this.update({
+      aiMerge: {
+        ...current,
+        busy: true,
+        questions: current.questions,
+        exchanges,
+        error: null
+      }
+    })
+    void this.runAiMerge(this.aiMergeSeq, current.path, exchanges)
+  }
+
+  /** Re-run the current turn after an error; answers already sent are kept. */
+  retryAiMerge(): void {
+    const current = this.state.aiMerge
+    const repo = this.state.selectedRepo
+    if (current === null || repo === null || current.busy) return
+    this.aiMergeSeq++
+    this.update({ aiMerge: { ...current, busy: true, error: null } })
+    void this.runAiMerge(this.aiMergeSeq, current.path, current.exchanges)
+  }
+
+  /** Leave the conversation; an in-flight turn is aborted first. */
+  closeAiMerge(): void {
+    const current = this.state.aiMerge
+    const repo = this.state.selectedRepo
+    this.aiMergeSeq++
+    if (current !== null && repo !== null && current.busy) {
+      void call('cancelAiResolve', repo.path, current.path).catch(
+        () => undefined
+      )
+    }
+    this.update({ aiMerge: null })
+  }
+
+  private aiMergeSeq = 0
+
+  private async runAiMerge(
+    seq: number,
+    path: string,
+    exchanges: ReadonlyArray<MergeExchange>
+  ): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    // A stale turn must not repaint a conversation the user replaced or left.
+    const mine = (): boolean => this.aiMergeSeq === seq
+    try {
+      const outcome = await call('aiResolveConflict', repo.path, path, exchanges)
+      if (!mine()) return
+      if (outcome.kind === 'ask') {
+        this.update({
+          aiMerge: { path, busy: false, questions: outcome.questions, exchanges, error: null }
+        })
+        return
+      }
+      this.update({ aiMerge: null })
+      await this.refresh()
+      if (this.state.selectedFilePath === path) void this.selectFile(path)
+      const note =
+        outcome.summary.length > 160
+          ? outcome.summary.slice(0, 157) + '…'
+          : outcome.summary
+      this.toast('success', `AI merged ${path} — ${note}`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message === 'cancelled' || !mine()) return
+      const current = this.state.aiMerge
+      if (current !== null && current.path === path) {
+        this.update({ aiMerge: { ...current, busy: false, error: message } })
+      } else {
+        this.toast('error', message)
+      }
+    }
   }
 
   continueWorkflow(kind: WorkflowKind): void {
@@ -1498,8 +1706,11 @@ export class AppStore {
       this.toast('error', 'Enter a commit summary first.')
       return
     }
-    if (draft.checked.size === 0 && this.state.amend === null) {
-      this.toast('error', 'Select at least one file to commit.')
+    // Staged files are the commit baseline; ticking only adds to it.
+    const staged = status.files.filter(f => f.staged).map(f => f.path)
+    const selected = [...draft.checked]
+    if (selected.length === 0 && staged.length === 0 && this.state.amend === null) {
+      this.toast('error', 'Nothing to commit — stage some files or tick at least one.')
       return
     }
     if (this.identityMissing()) {
@@ -1520,14 +1731,15 @@ export class AppStore {
               repo.path,
               summary,
               draft.description,
-              [...draft.checked]
+              selected,
+              staged
             )
           : await call(
               'amendCommit',
               repo.path,
               summary,
               draft.description,
-              [...draft.checked],
+              selected,
               this.state.amend?.sha ?? ''
             )
 
@@ -1544,7 +1756,10 @@ export class AppStore {
           sha,
           summary,
           description: draft.description,
-          paths: [...draft.checked]
+          // Undo re-checks the whole shipped scope: after the soft reset
+          // those paths are all staged again, so the ticks just mirror the
+          // baseline they will commit on the next press.
+          paths: wasAmend ? selected : [...new Set([...staged, ...selected])]
         }
       })
       this.toast(
@@ -1648,14 +1863,38 @@ export class AppStore {
     if (repo === null) return
     const draft = this.draftFor(repo.path)
 
-    if (draft.checked.size === 0) {
-      this.toast('error', 'Select the files you want to include first.')
+    // Same scope rules as committing: the message describes the staged
+    // baseline plus the ticked files, never just what is ticked.
+    const genStaged = (this.state.status?.files ?? [])
+      .filter(f => f.staged)
+      .map(f => f.path)
+    const genSelected = [...draft.checked]
+    const scope =
+      genStaged.length === 0
+        ? genSelected
+        : [...new Set([...genStaged, ...genSelected])]
+    if (scope.length === 0) {
+      this.toast('error', 'Stage or select at least one file to describe first.')
+      return
+    }
+
+    // An agent that can only answer 401 should not be asked: route the click
+    // to the dialog that fixes it (with a pointer note) when hints are on.
+    const settings = this.state.settings
+    if (aiLooksUnconfigured(settings)) {
+      if (settings?.hintsEnabled === true) {
+        this.update({ showSettings: true, settingsAiNote: true })
+      } else {
+        this.toast(
+          'error',
+          'The AI agent has no endpoint configured — set one in Preferences first.'
+        )
+      }
       return
     }
 
     const hasUserText =
       draft.summary.trim().length > 0 || draft.description.trim().length > 0
-    const settings = this.state.settings
 
     if (
       hasUserText &&
@@ -1671,14 +1910,14 @@ export class AppStore {
           tone: 'danger',
           onConfirm: () => {
             this.update({ confirm: null })
-            void this.runGeneration(repo.path, [...draft.checked])
+            void this.runGeneration(repo.path, scope)
           }
         }
       })
       return
     }
 
-    await this.runGeneration(repo.path, [...draft.checked])
+    await this.runGeneration(repo.path, scope)
   }
 
   private async runGeneration(
@@ -2195,7 +2434,10 @@ export class AppStore {
   // ------------------------------------------------------ dialogs/settings
 
   setSettingsOpen(open: boolean): void {
-    this.update({ showSettings: open })
+    this.update({
+      showSettings: open,
+      ...(open ? {} : { settingsAiNote: false })
+    })
   }
 
   setCloneOpen(open: boolean): void {
