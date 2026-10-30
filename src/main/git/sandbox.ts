@@ -6,7 +6,7 @@ import type { GitExecOptions, GitExecResult } from './exec'
 /**
  * Windows command-sandbox support.
  *
- * When GitDesk — or `npm run dev` — is started from an agent/command
+ * When Aspen — or `npm run dev` — is started from an agent/command
  * sandbox, the whole process tree runs at Low process integrity and the
  * sandbox manager removes write access to the repository's `.git`
  * directory. The `git` child processes this app spawns then fail with
@@ -70,8 +70,8 @@ export class GitWriteBlockedError extends Error {
         `git ${command} could not write to the repository's .git folder (${firstLine(
           original.stderr || original.stdout
         )}).`,
-        'Windows is blocking .git writes from this process: GitDesk was started inside a restricted agent/command sandbox (Low process integrity), so the git processes it launches can read the repository but cannot create files such as .git/index.lock. Nothing is wrong with the repository itself.',
-        'Fix: start GitDesk outside the sandbox (double-click scripts/dev.cmd or run npm run dev from a normal shell), or install the elevated git broker once from a normal shell: node scripts/git-broker.mjs --install-task'
+        'Windows is blocking .git writes from this process: Aspen was started inside a restricted agent/command sandbox (Low process integrity), so the git processes it launches can read the repository but cannot create files such as .git/index.lock. Nothing is wrong with the repository itself.',
+        'Fix: start Aspen outside the sandbox (double-click scripts/dev.cmd or run npm run dev from a normal shell), or install the elevated git broker once from a normal shell: node scripts/git-broker.mjs --install-task'
       ].join('\n')
     )
     this.name = 'GitWriteBlockedError'
@@ -107,7 +107,7 @@ export function configureGitBroker(patch: Partial<GitBrokerSettings>): void {
 
 /** The env override wins so tests and portable setups need no code change. */
 export function gitBrokerQueueDir(): string | null {
-  const fromEnv = process.env['GITDESK_BROKER_DIR']
+  const fromEnv = process.env['ASPEN_BROKER_DIR'] ?? process.env['GITDESK_BROKER_DIR']
   if (fromEnv !== undefined && fromEnv.trim().length > 0) {
     return fromEnv.trim()
   }

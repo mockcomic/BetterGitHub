@@ -101,7 +101,7 @@ export function SettingsDialog(): JSX.Element | null {
         <h3>AI agent</h3>
         <p className="field-hint">
           Optional — this is what powers ✨ Generate in the commit tray and
-          ✨ AI on conflicted files. The rest of GitDesk works without any of
+          ✨ AI on conflicted files. The rest of Aspen works without any of
           it.
         </p>
         {state.settingsAiNote && (
@@ -185,7 +185,7 @@ export function SettingsDialog(): JSX.Element | null {
           <summary>Browser sign-in apps</summary>
           <p className="field-hint">
             The browser buttons need an OAuth application you register once, then paste
-            here — GitDesk ships no shared id so your sign-ins never ride on someone
+            here — Aspen ships no shared id so your sign-ins never ride on someone
             else's rate limits.
           </p>
           <Field
@@ -800,7 +800,7 @@ export function AboutDialog(): JSX.Element | null {
 
   return (
     <Dialog
-      title="About GitDesk"
+      title="About Aspen"
       width={420}
       onClose={() => store.setAboutOpen(false)}
       footer={
@@ -810,7 +810,7 @@ export function AboutDialog(): JSX.Element | null {
       }
     >
       <p className="confirm-message">
-        <strong>GitDesk</strong> — a GitHub Desktop-style git client with an
+        <strong>Aspen Git</strong> — a visual desktop client for Git, with an
         AI commit-message and merge agent.
       </p>
       <p className="confirm-message">
@@ -847,7 +847,7 @@ export function AboutDialog(): JSX.Element | null {
       <div className="settings-section">
         <h3>Support the development</h3>
         <p className="confirm-message">
-          GitDesk is free and open source. If it saves you time, consider a
+          Aspen is free and open source. If it saves you time, consider a
           small donation to support Kurtis Hight and continued work on the
           project.
         </p>

@@ -55,7 +55,7 @@ const MENUS: ReadonlyArray<TopMenu> = [
         accelerator: 'CmdOrCtrl+,',
         action: 'show-preferences'
       },
-      { label: 'Quit GitDesk', role: 'quit', accelerator: 'Alt+F4', noBand: false }
+      { label: 'Quit Aspen', role: 'quit', accelerator: 'Alt+F4', noBand: false }
     ]
   },
   {
@@ -169,7 +169,7 @@ const MENUS: ReadonlyArray<TopMenu> = [
   {
     label: 'Help',
     items: [
-      { label: 'About GitDesk', action: 'show-about' },
+      { label: 'About Aspen', action: 'show-about' },
       { separator: true },
       { label: 'Donate via PayPal', action: 'donate' }
     ]

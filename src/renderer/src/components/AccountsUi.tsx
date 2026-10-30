@@ -277,7 +277,7 @@ function BrowserSignInProgress({
           <button className="mini link" onClick={() => void call('openExternal', url)}>
             Continue in your browser
           </button>{' '}
-          — GitDesk is listening on 127.0.0.1 for the redirect.
+          — Aspen is listening on 127.0.0.1 for the redirect.
         </p>
       )}
       <p className="signin-waiting">

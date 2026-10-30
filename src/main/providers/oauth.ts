@@ -137,7 +137,7 @@ async function beginGitHubDevice(
 }
 
 function callbackPage(title: string, message: string): string {
-  return `<!doctype html><meta charset="utf-8"><title>GitDesk — ${title}</title>` +
+  return `<!doctype html><meta charset="utf-8"><title>Aspen — ${title}</title>` +
     `<body style="font:14px -apple-system,'Segoe UI',sans-serif;padding:40px;">` +
     `<h2>${title}</h2><p>${message}</p>`
 }
@@ -157,18 +157,18 @@ function startGitLabCallbackServer(entry: PendingSignIn): Promise<void> {
       if (error !== null) {
         entry.denied = url.searchParams.get('error_description') ?? error
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end(callbackPage('Sign-in failed', 'GitDesk was denied access. Close this tab and try again.'))
+        res.end(callbackPage('Sign-in failed', 'Aspen was denied access. Close this tab and try again.'))
         return
       }
       if (state !== entry.state || code === null) {
         entry.denied = 'The sign-in callback did not match this request.'
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end(callbackPage('Sign-in failed', 'The callback did not match GitDesk. Close this tab and try again.'))
+        res.end(callbackPage('Sign-in failed', 'The callback did not match Aspen. Close this tab and try again.'))
         return
       }
       entry.code = code
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(callbackPage('Signed in', 'GitDesk received your GitLab authorization. You can close this tab and return to GitDesk.'))
+      res.end(callbackPage('Signed in', 'Aspen received your GitLab authorization. You can close this tab and return to Aspen.'))
     })
     server.once('error', err => {
       reject(

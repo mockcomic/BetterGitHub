@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * GitDesk elevated git broker (Windows sandbox hardening).
+ * Aspen elevated git broker (Windows sandbox hardening).
  *
- * When GitDesk is launched from an agent/command sandbox, its whole process
+ * When Aspen is launched from an agent/command sandbox, its whole process
  * tree runs at Low process integrity: reads of a repository work, but any
  * git command that writes into `.git` (add / commit / stash / checkout …)
  * dies on `Unable to create '…\.git\index.lock': Permission denied`.
@@ -21,11 +21,11 @@
  *   <queue>/broker.log            best-effort append log (rotated at 1 MB)
  *
  * Queue roots watched (deduplicated):
- *   - every --queue <dir> passed on the command line (or GITDESK_BROKER_DIR,
- *     or the platform default %APPDATA%/GitDesk/git-broker);
- *   - when running from a GitDesk checkout, <repo>/.userdata-dev/git-broker —
+ *   - every --queue <dir> passed on the command line (or ASPEN_BROKER_DIR,
+ *     or the platform default %APPDATA%/Aspen/git-broker);
+ *   - when running from an Aspen checkout, <repo>/.userdata-dev/git-broker —
  *     the directory a Low-integrity dev instance can actually write to;
- *   - the GITDESK_PROFILE override dir, if set, same reasoning.
+ *   - the ASPEN_PROFILE (or legacy GITDESK_PROFILE) override dir, if set, same reasoning.
  * So `npm run git-broker:install` from a normal shell needs no arguments and
  * still serves the sandboxed dev server out of the box.
  *
@@ -58,7 +58,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const TASK_NAME = 'GitDeskGitBroker'
+const TASK_NAME = 'AspenGitBroker'
 const LOCK_STALE_MS = 15_000
 const RESPONSE_MAX_AGE_MS = 6 * 60 * 60_000
 const DONE_MAX_AGE_MS = 7 * 24 * 60 * 60_000
@@ -86,10 +86,24 @@ function parseArgs(argv) {
 function defaultQueueDir() {
   if (process.platform === 'win32') {
     const appdata = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming')
-    return join(appdata, 'GitDesk', 'git-broker')
+    return join(appdata, 'Aspen', 'git-broker')
   }
   const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config')
-  return join(xdg, 'GitDesk', 'git-broker')
+  return join(xdg, 'Aspen', 'git-broker')
+}
+
+/** The queue roots a pre-rename GitDesk install used, so one broker still
+ *  serves an upgraded machine's leftovers (see src/main/migrate.ts). */
+function legacyQueueDirs() {
+  const dirs = []
+  if (process.platform === 'win32') {
+    const appdata = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming')
+    dirs.push(join(appdata, 'GitDesk', 'git-broker'))
+  } else {
+    const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config')
+    dirs.push(join(xdg, 'GitDesk', 'git-broker'))
+  }
+  return dirs
 }
 
 const flags = parseArgs(process.argv.slice(2))
@@ -107,19 +121,22 @@ function collectQueues() {
   const roots = new Set()
   const add = p => roots.add(resolve(p))
   if (flags.queues.length > 0) flags.queues.forEach(q => add(q))
-  else if (typeof process.env.GITDESK_BROKER_DIR === 'string' && process.env.GITDESK_BROKER_DIR.trim().length > 0) {
-    add(process.env.GITDESK_BROKER_DIR.trim())
-  } else add(defaultQueueDir())
+  else {
+    const envDir = process.env.ASPEN_BROKER_DIR ?? process.env.GITDESK_BROKER_DIR
+    if (typeof envDir === 'string' && envDir.trim().length > 0) add(envDir.trim())
+    else add(defaultQueueDir())
+    for (const dir of legacyQueueDirs()) if (existsSync(dir)) add(dir)
+  }
 
   try {
     const pkg = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'))
-    if (pkg?.name === 'gitdesk') {
+    if (pkg?.name === 'aspen') {
       add(join(projectRoot, '.userdata-dev', 'git-broker'))
-      const profile = process.env.GITDESK_PROFILE
+      const profile = process.env.ASPEN_PROFILE ?? process.env.GITDESK_PROFILE
       if (typeof profile === 'string' && profile.length > 0) add(join(profile, 'git-broker'))
     }
   } catch {
-    /* not a gitdesk checkout — only the configured queue */
+    /* not an Aspen checkout — only the configured queue */
   }
   return [...roots]
 }

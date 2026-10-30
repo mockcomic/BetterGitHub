@@ -42,6 +42,6 @@ const api = {
   }
 }
 
-contextBridge.exposeInMainWorld('gitdesk', api)
+contextBridge.exposeInMainWorld('aspen', api)
 
-export type GitdeskApi = typeof api
+export type AspenApi = typeof api

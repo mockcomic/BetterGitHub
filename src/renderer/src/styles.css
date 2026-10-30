@@ -1338,7 +1338,7 @@ html[data-wco] .titlebar {
   white-space: nowrap;
 }
 
-/* The desktop mark (resources/gitdesk-icon.svg) leading the wordmark — the
+/* The desktop mark (resources/aspen-icon.svg) leading the wordmark — the
    same asset the taskbar button and tray use, so the window reads as the
    app at a glance. */
 .titlebar-logo {
@@ -2232,7 +2232,7 @@ body.desk-resizing .main-pane {
 }
 
 /* ---------------------------------------------------------------- motion */
-/* GitDesk moves the way GitHub Desktop moves: almost not at all. Controls
+/* Aspen moves the way GitHub Desktop moves: almost not at all. Controls
    answer the cursor with color alone — the two completing verbs alone aside,
    which press on a hair of scale and arm on a ring — floated layers fade in at
    a hair of scale, the desk swap fades the incoming pane in, a running

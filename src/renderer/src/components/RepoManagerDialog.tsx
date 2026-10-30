@@ -378,7 +378,7 @@ export function RepoManagerDialog(): JSX.Element | null {
     const multi = targets.length > 1
     return [
       {
-        label: 'Open in GitDesk',
+        label: 'Open in Aspen',
         onSelect: () => openRepo(row),
         disabled: row.missing
       },
@@ -433,7 +433,7 @@ export function RepoManagerDialog(): JSX.Element | null {
             className="btn"
             disabled={selNone}
             onClick={() => store.removeRepositories(selectedIds, false)}
-            title="Remove the selected repositories from GitDesk — the folders stay on disk. Delete does the same."
+            title="Remove the selected repositories from Aspen — the folders stay on disk. Delete does the same."
           >
             Remove
           </button>
@@ -444,7 +444,7 @@ export function RepoManagerDialog(): JSX.Element | null {
             title={
               selectedExisting.length === 0 && !selNone
                 ? 'The selected folders are already gone from disk'
-                : 'Remove from GitDesk and move the whole folders to the Recycle Bin'
+                : 'Remove from Aspen and move the whole folders to the Recycle Bin'
             }
           >
             Move to Recycle Bin…
@@ -519,7 +519,7 @@ export function RepoManagerDialog(): JSX.Element | null {
             title={
               openTarget === undefined
                 ? 'Select a repository whose folder is on disk'
-                : `Open “${openTarget.name}” — GitDesk works in one repository at a time`
+                : `Open “${openTarget.name}” — Aspen works in one repository at a time`
             }
           >
             Open
@@ -665,7 +665,7 @@ export function RepoManagerDialog(): JSX.Element | null {
                   </span>
                   <button
                     className="mini"
-                    title="Remove every missing entry from GitDesk (nothing left on disk to lose)"
+                    title="Remove every missing entry from Aspen (nothing left on disk to lose)"
                     onClick={() => store.removeRepositories(allMissingIds, false)}
                   >
                     Remove all from list
@@ -851,7 +851,7 @@ function RepoRow({
                 e.stopPropagation()
                 onOpen(repo)
               }}
-              title={`Open “${repo.name}” in GitDesk`}
+              title={`Open “${repo.name}” in Aspen`}
             >
               Open
             </button>

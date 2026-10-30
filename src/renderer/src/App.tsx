@@ -65,8 +65,8 @@ function visibleDeskTabs(state: AppState): ReadonlyArray<DeskTab> {
 
 /* The docked panels are drag-resizable within these bounds; `def` is the
    DESIGN.md measure the responsive defaults fall back to. */
-const QUEUE_KEY = 'gitdesk.layout.queueWidth'
-const TRAY_KEY = 'gitdesk.layout.trayWidth'
+const QUEUE_KEY = 'aspen.layout.queueWidth'
+const TRAY_KEY = 'aspen.layout.trayWidth'
 const QUEUE_RANGE: WidthRange = { min: 220, max: 480, def: 340 }
 const TRAY_RANGE: WidthRange = { min: 220, max: 420, def: 300 }
 
@@ -170,7 +170,7 @@ export function App(): JSX.Element {
       <Header />
       {state.initError !== null && (
         <div className="app-banner error">
-          <strong>GitDesk could not start correctly.</strong> {state.initError}{' '}
+          <strong>Aspen could not start correctly.</strong> {state.initError}{' '}
           <button className="mini" onClick={() => void store.init()}>
             Retry
           </button>
@@ -480,7 +480,7 @@ function StatusBar(): JSX.Element | null {
         {state.lastRefreshedAt !== null && (
           <span title="Last refreshed">updated {clockTime(state.lastRefreshedAt)} · </span>
         )}
-        GitDesk
+        Aspen
       </span>
     </footer>
   )

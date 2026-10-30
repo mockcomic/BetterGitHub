@@ -1,5 +1,5 @@
 ---
-name: GitDesk
+name: Aspen
 description: GitHub Desktop's own component family — neutral chrome, hairline borders, one blue for interaction, and git state as the only loud thing on screen.
 colors:
   canvas: "#ffffff"
@@ -57,8 +57,9 @@ colors:
   syntax-constant-dark: "#79c0ff"
   syntax-entity-dark: "#ffa657"
   # App mark only — brand-asset colors, not UI roles (see Colors ▸ Brand Mark).
-  card-stock: "#e9e2cf"
-  printed-ink: "#0b1120"
+  aspen-green: "#215c4a"
+  aspen-vein: "#fbf7ea"
+  aspen-gold: "#e3ac38"
 typography:
   display:
     fontFamily: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
@@ -203,13 +204,13 @@ components:
     textColor: "{colors.accent-blue}"
 ---
 
-# Design System: GitDesk
+# Design System: Aspen
 
 ## Overview
 
-**North Star: "GitHub Desktop, played straight."** GitDesk is a clone of a specific tool, so it borrows that tool's face rather than inventing one: the chrome is Primer's — GitHub's own design system — and every color in the interface is GitHub's color for that job. The strip, the queue, the commit tray and the status bar are all the same `#f6f8fa` chrome; the work surface is canvas-white; every boundary is a 1px `#d0d7de` hairline. One blue (`#0969da`, dark `#1f6feb`) does all interaction work — links, focus rings, the active tab, the selected row, the commit verb. Green belongs to additions and success only, red to deletions and destructive verbs, amber to warnings you can continue past, and purple to the AI agent alone. What is left to speak loudly is the repository: a status symbol, a green add-row, the ahead/behind count, the diff.
+**North Star: "GitHub Desktop, played straight."** Aspen is a clone of a specific tool, so it borrows that tool's face rather than inventing one: the chrome is Primer's — GitHub's own design system — and every color in the interface is GitHub's color for that job. The strip, the queue, the commit tray and the status bar are all the same `#f6f8fa` chrome; the work surface is canvas-white; every boundary is a 1px `#d0d7de` hairline. One blue (`#0969da`, dark `#1f6feb`) does all interaction work — links, focus rings, the active tab, the selected row, the commit verb. Green belongs to additions and success only, red to deletions and destructive verbs, amber to warnings you can continue past, and purple to the AI agent alone. What is left to speak loudly is the repository: a status symbol, a green add-row, the ahead/behind count, the diff.
 
-The discipline is not imitation for its own sake. A clone earns trust by being legible in the same grammar as its reference: the same quiet ground, the same 6px controls, the same blue that means "this is the app's action." The personality of GitDesk is that it gets out of git's way — and where it departs, it departs in GitHub's own vocabulary (the agent's purple is Primer's `done` accent, not an invention).
+The discipline is not imitation for its own sake. A clone earns trust by being legible in the same grammar as its reference: the same quiet ground, the same 6px controls, the same blue that means "this is the app's action." The personality of Aspen is that it gets out of git's way — and where it departs, it departs in GitHub's own vocabulary (the agent's purple is Primer's `done` accent, not an invention).
 
 Motion is GitHub Desktop's register: nearly silent. Controls answer with color, never position — no lift, no travelling indicator, no staggered rows. The two completing verbs are the sole exception, and they move on state, never on place: Commit and Push press on a hair of scale and throw one short arm ring in their own hue the instant they flip from cannot to can — checking the first file arms Commit; a landed commit arms Push, the baton pass of the compose → commit → push story. Floated layers fade in with a hair of scale; the desk swap fades the incoming pane in; a running operation gets a spinner; and a commit or push that lands gets confetti. Everything else is already where it belongs.
 
@@ -256,10 +257,10 @@ Two attributes drive the skin: `html[data-theme-base]` selects the Primer light 
 - **Scrollbar** (rgba(110, 118, 129, 0.4), 0.7 on hover): a neutral pill thumb on a transparent track; it never takes a hue.
 
 ### Brand Mark (mark-only colors)
-- **Card Stock** (#e9e2cf): the tape band in the app mark only — never a desk surface, panel, well, or text ground.
-- **Printed Ink** (#0b1120): the mark's deck tile and its prints — fills that never take a UI role (text stays Ink; borders stay Hairline).
+- **Aspen Green** (#215c4a): the app mark's leaf only — never a desk surface, panel, well, or text ground.
+- **Aspen Gold** (#e3ac38): the app mark's single accent node only — fills that never take a UI role (the desk's interactive accent stays Commit Blue).
 
-Commit Blue on the mark is the same accent token as on the desk, under a different contract: exactly one hole, inked once. These asset colors answer to the brand, not to UI roles; they appear nowhere else, and no UI surface borrows them.
+The mark's gold node is the brand's single accent, under a different contract than the desk's blue: exactly one node, once. These asset colors answer to the brand, not to UI roles; they appear nowhere else, and no UI surface borrows them.
 
 ### Named Rules
 **The One Blue Rule.** One accent does all interaction: `#0969da` / `#1f6feb`. A desk, a panel, or a section never gets its own hue — the window does not change color when you change tabs, because GitHub Desktop's does not. What changes is which tab is lifted and which row is solid blue.
@@ -270,7 +271,7 @@ Commit Blue on the mark is the same accent token as on the desk, under a differe
 
 **The Amber-Never-Shouts Rule.** Amber is for warnings you can continue past. Anything blocking or failed is red.
 
-**The Named-Colors-Do-Jobs Rule.** Every chromatic value answers to one of the roles above. A color with no role — no state, no interaction, no agent — does not ship. Hue supplements state; it never replaces it (selection is solid accent *plus* the file's status symbol and the row's weight; conflicts are still labelled). The app mark's Card Stock and Printed Ink answer to the brand, not to UI roles — they are exempt from this roster and appear only on the mark, never on the desk.
+**The Named-Colors-Do-Jobs Rule.** Every chromatic value answers to one of the roles above. A color with no role — no state, no interaction, no agent — does not ship. Hue supplements state; it never replaces it (selection is solid accent *plus* the file's status symbol and the row's weight; conflicts are still labelled). The app mark's Aspen Green and Aspen Gold answer to the brand, not to UI roles — they are exempt from this roster and appear only on the mark, never on the desk.
 
 ## Typography
 
@@ -299,7 +300,7 @@ Commit Blue on the mark is the same accent token as on the desk, under a differe
 
 ## Layout
 
-The window is a fixed vertical sandwich: a ~44px command strip on top, a ~38px desk-switch rail beneath it, a flexible `.body` work area in the middle, and an ~18px status bar at the bottom. The strip carries, left to right: repository picker, branch picker, the mono route readout (`branch ⇄ origin · ↑n ↓m`, silent when it has nothing to say), the contextual filter centered with its `Ctrl K` chip riding inside its right edge, and the sync controls (refresh, Fetch, Pull, Push, GitHub). The body splits into three zones — a 340px default **queue column**, a flexible **main pane** (diff, history, or stash detail) with `min-width: 0` so long paths ellipsize instead of breaking the rail, and a docked 300px default **commit tray** (compose fields, scope line, Generate, full-width commit verb) that swaps itself for conflict guidance in the Conflicts view. History mirrors the pattern with a 280px commit-files column. The two docked panels are drag-resizable between 220px and 480/420px by hairline dividers (`role="separator"`) at their inner edges — grip appears on hover/focus/drag only, the boundary stays a plain hairline at rest — arrow keys move the divider, double-click or Home returns the pane to its responsive default, and dragged widths persist (`gitdesk.layout.queueWidth` / `gitdesk.layout.trayWidth`). The divider itself claims no layout width: it is a 5px strip pulled back by negative margins.
+The window is a fixed vertical sandwich: a ~44px command strip on top, a ~38px desk-switch rail beneath it, a flexible `.body` work area in the middle, and an ~18px status bar at the bottom. The strip carries, left to right: repository picker, branch picker, the mono route readout (`branch ⇄ origin · ↑n ↓m`, silent when it has nothing to say), the contextual filter centered with its `Ctrl K` chip riding inside its right edge, and the sync controls (refresh, Fetch, Pull, Push, GitHub). The body splits into three zones — a 340px default **queue column**, a flexible **main pane** (diff, history, or stash detail) with `min-width: 0` so long paths ellipsize instead of breaking the rail, and a docked 300px default **commit tray** (compose fields, scope line, Generate, full-width commit verb) that swaps itself for conflict guidance in the Conflicts view. History mirrors the pattern with a 280px commit-files column. The two docked panels are drag-resizable between 220px and 480/420px by hairline dividers (`role="separator"`) at their inner edges — grip appears on hover/focus/drag only, the boundary stays a plain hairline at rest — arrow keys move the divider, double-click or Home returns the pane to its responsive default, and dragged widths persist (`aspen.layout.queueWidth` / `aspen.layout.trayWidth`). The divider itself claims no layout width: it is a 5px strip pulled back by negative margins.
 
 Panels are separated, not decorated: strip, queue, tray and status bar share one chrome tone and are held apart by 1px `--border` hairlines; the main pane is canvas-white. Sticky-in-scroll elements (changes toolbar, diff title, commit-files head) keep their panel background so content scrolls beneath them.
 
@@ -391,16 +392,16 @@ What moves: buttons change face color on hover and press without moving a pixel,
 
 ## Brand Mark
 
-GitDesk's identity asset is the app mark — **the Punched Tape** — at `resources/gitdesk-icon.svg`: one paper tape record still travelling, because a commit is a hole punched permanently into a record and the record keeps feeding — the mark *is* that travelling record rather than a picture of one. It is the desktop's face everywhere the app appears — `BrowserWindow.icon` in `src/main/windows.ts`, the electron-builder icons in `package.json`, and at 16px leading the Windows title bar ahead of the type-only wordmark in `src/renderer/src/components/TitleBar.tsx`.
+Aspen's identity asset is the app mark — **the Aspen Leaf** — at `resources/aspen-icon.svg`: one flat aspen leaf whose veins are a git commit graph, because branching history is how this project grows. It is the desktop's face everywhere the app appears — `BrowserWindow.icon` in `src/main/windows.ts`, the electron-builder icons in `package.json`, and at 16px leading the Windows title bar ahead of the type-only wordmark in `src/renderer/src/components/TitleBar.tsx`.
 
-- **The object:** a deep-ink deck tile carrying a band of card-stock tape, sprocketed along both rims, with one data row ending in a blue head at the leading edge — flat, hard-edged, printed, not drawn.
-- **Palette roles:** Printed Ink is the tile and every print on the tape; Card Stock is the band only; Commit Blue appears exactly once, as the head-commit hole punched and inked at the row's leading end. The accent is monofrequency on the mark — one hole, once — where on the desk it does all interaction work.
+- **The object:** a broad, rounded aspen leaf with a pointed tip and a short petiole, deep forest green (`#215c4a`), its midrib and two lateral veins knocked out in warm white (`#fbf7ea`) as a commit graph — a trunk rising from the stem to the head commit just under the tip, forking below into one commit on each side — flat, geometric, generous negative space.
+- **Palette roles:** Aspen Green is the leaf and its petiole; Warm White is the vein graph only; Aspen Gold (`#e3ac38`) appears exactly once, as the right-hand commit node. The accent is monofrequency on the mark — one node, once — where on the desk the blue does all interaction work.
 - **Two-value purity:** flat fills, no gradient, no gray, no shadow, no stroke. The mark obeys the Flat-By-Default Rule and the no-gradient ban exactly as the UI does.
-- **Print rule:** the tile is opaque — the sprockets and empty holes print in deck ink rather than knocking out to alpha, because on tape an empty column was never anything the machine could read. History is empty prints; exactly one carries the app's blue.
-- **Identity marks:** the straight 45-unit chamfer on the leaving edge (464,168)→(412,360) — the tape leaving the printer, rounded r 20 band corners on the feeding edge, sprockets as 16-unit rx-3 squares on 52-unit centers at y = 192 (seven) and y = 348 (six), and the data row on a strict 104-unit grid (cx 148/252/356, cy 264, r 26); tile corner radius 64 in 512-space. The silhouette must survive alone at 16px; the chamfer, the sprocket tracks and the one blue disc are what make it recognizable at that size.
+- **Transparency rule:** unlike the tile-based predecessor, the leaf knocks out to real alpha — everything outside the silhouette is transparent, so the mark sits on any taskbar, dock, or window chrome without a baked background.
+- **Identity marks:** the leaf polygon (traced from the selected ComfyUI render, points in `resources/logo-aspen/leaf-path.json`), the petiole as a 24-unit bar y 444–484 with rounded r 12 ends, the graph as r 17 capsules — trunk (256,148)→(256,428), branches (256,322)→(138,256) and (256,322)→(374,256) — and r 40 commit discs at (256,148), (138,256) and (374,256), the last one gold, in 512-space. The silhouette must survive alone at 16px; at 32px and below the rasterizer swaps in the simplified cut (r 23 capsules, r 48 discs) so the one-trunk-two-branch read and the gold node never dissolve. Mark history: the commit-graph glyph (2026-10-22) gave way to the Punched Tape (2026-10-28); the Aspen Leaf replaced the tape by user decision on 2026-10-30, generated in ComfyUI (Qwen Image 2.1, seed 13337) and vectorized — provenance in `resources/logo-aspen/GENERATION.md`.
 
 ### Named Rules
-**The One-Source Mark Rule.** The mark exists in exactly one hand-authored form — `resources/gitdesk-icon.svg`. `scripts/make-icons.mjs`, the dependency-free SDF rasterizer, mirrors its geometry through `MARK` constants and must stay in step; everything under `resources/icons/` (PNG 16–1024, `gitdesk.ico`, `gitdesk.png`, each carrying embedded provenance) is build output, never an asset. Never hand-edit a raster: change the SVG, update the rasterizer's `MARK` constants to match, and regenerate with `npm run icons`.
+**The One-Source Mark Rule.** The mark exists in exactly one hand-authored form — `resources/aspen-icon.svg`. `scripts/make-icons.mjs`, the dependency-free SDF rasterizer, mirrors its geometry through `MARK` constants and must stay in step; everything under `resources/icons/` (PNG 16–1024, `aspen.ico`, `aspen.png`) is build output, never an asset; the leaf polygon itself is shared data (`resources/logo-aspen/leaf-path.json`) that both the SVG and the rasterizer consume, so they cannot drift. Never hand-edit a raster: change the SVG (and the path JSON together), update the rasterizer's `MARK` constants to match, and regenerate with `npm run icons`.
 
 ## Do's and Don'ts
 

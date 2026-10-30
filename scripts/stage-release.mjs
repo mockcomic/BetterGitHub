@@ -14,7 +14,7 @@ import { join } from 'path'
 
 const root = process.cwd()
 const releaseDir = join(root, 'release')
-const stageDir = join(tmpdir(), 'gitdesk-release-stage')
+const stageDir = join(tmpdir(), 'aspen-release-stage')
 const builder = join(root, 'node_modules', 'electron-builder', 'cli.js')
 
 if (!existsSync(builder)) {

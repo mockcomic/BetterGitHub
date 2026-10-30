@@ -38,9 +38,9 @@ async function writeAndCommit(
 }
 
 beforeAll(async () => {
-  repo = mkdtempSync(join(tmpdir(), 'gitdesk-conflict-split-'))
+  repo = mkdtempSync(join(tmpdir(), 'aspen-conflict-split-'))
   await git(['init', '--quiet', '--initial-branch=main', repo])
-  await git(['config', 'user.name', 'GitDesk Test'])
+  await git(['config', 'user.name', 'Aspen Test'])
   await git(['config', 'user.email', 'test@example.com'])
   // The app inherits the developer's conflict style, so pin the one that adds
   // a base section: it puts the most marker lines in the diff, and that is

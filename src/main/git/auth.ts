@@ -3,7 +3,7 @@
  *
  * Sync verbs keep authenticating the way they always have — through the
  * system git credential helper. Only when git itself reports an
- * authentication failure does GitDesk rerun the exact command once,
+ * authentication failure does Aspen rerun the exact command once,
  * injecting the signed-in account's token for that host as a
  * host-scoped `http.<url>.extraHeader` via the GIT_CONFIG_* environment
  * (git 2.31+). The token therefore never appears in the command line,

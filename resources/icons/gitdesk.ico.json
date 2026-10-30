@@ -1,4 +1,0 @@
-{
-  "prompt": "Origin: code-generated raster, not AI-generated. Deterministic SDF rasterizer (scripts/make-icons.mjs, dependency-free Node, coverage-per-sample anti-aliasing) drawing resources/gitdesk-icon.svg — the GitDesk punched-tape app mark (deck tile #0b1120, card-stock tape band #e9e2cf, commit-blue head hole #0969da, opaque tile with ink prints, no alpha knockouts) — in 512-unit space. Regenerate with `npm run icons`.\r\n",
-  "createdAt": "2026-10-29T06:20:00.000Z"
-}

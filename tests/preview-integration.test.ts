@@ -25,7 +25,7 @@ function git(args: ReadonlyArray<string>): Promise<string> {
 }
 
 beforeAll(async () => {
-  repo = mkdtempSync(join(tmpdir(), 'gitdesk-preview-'))
+  repo = mkdtempSync(join(tmpdir(), 'aspen-preview-'))
   mkdirSync(join(repo, 'assets'))
   writeFileSync(join(repo, 'assets', 'dot.png'), PNG)
   writeFileSync(join(repo, 'notes.txt'), 'hello\n')

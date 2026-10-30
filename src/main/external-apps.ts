@@ -11,7 +11,7 @@ import type { ExternalApp } from '../shared/models'
  * installed on this machine.
  *
  * GitHub Desktop keeps its "Open in …" editor list in settings and launches
- * whatever the user configured. GitDesk has no such setting yet, so this
+ * whatever the user configured. Aspen has no such setting yet, so this
  * module inverts the problem: a data-driven catalog is probed at runtime and
  * only hits are ever surfaced — a row in the dropdown can never be a dead
  * click. The core is pure over injected probes (see {@link DetectDeps}) so it

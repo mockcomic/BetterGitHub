@@ -400,7 +400,7 @@ const handlers: Handlers = {
     }
     const token = await getAccountToken(account)
     if (token === null) {
-      throw new Error(`GitDesk could not read ${account.login}'s stored token — sign in again.`)
+      throw new Error(`Aspen could not read ${account.login}'s stored token — sign in again.`)
     }
     try {
       return await client.listRepos(account.apiBase, account, token, account.authKind, request)

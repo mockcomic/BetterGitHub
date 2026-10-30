@@ -70,11 +70,11 @@ async function commitAll(message: string): Promise<string> {
 
 beforeAll(async () => {
   // Isolate from the developer's global/system config and hooks.
-  process.env['GIT_CONFIG_GLOBAL'] = join(tmpdir(), 'gitdesk-it-no-global-config')
-  process.env['GIT_CONFIG_SYSTEM'] = join(tmpdir(), 'gitdesk-it-no-system-config')
+  process.env['GIT_CONFIG_GLOBAL'] = join(tmpdir(), 'aspen-it-no-global-config')
+  process.env['GIT_CONFIG_SYSTEM'] = join(tmpdir(), 'aspen-it-no-system-config')
 
-  repo = mkdtempSync(join(tmpdir(), 'gitdesk-it-'))
-  origin = mkdtempSync(join(tmpdir(), 'gitdesk-origin-'))
+  repo = mkdtempSync(join(tmpdir(), 'aspen-it-'))
+  origin = mkdtempSync(join(tmpdir(), 'aspen-origin-'))
 
   await git(['init', '--initial-branch=main', '--quiet', repo])
   await git(['init', '--bare', '--quiet', origin])
@@ -216,7 +216,7 @@ describe('git integration', () => {
     ).rejects.toThrow(/no longer be undone/)
     expect(await git(['rev-parse', 'HEAD'])).toBe(head)
 
-    const orphan = mkdtempSync(join(tmpdir(), 'gitdesk-root-'))
+    const orphan = mkdtempSync(join(tmpdir(), 'aspen-root-'))
     await execGit(['init', '--initial-branch=main', '--quiet', orphan], { cwd: orphan })
     await execGit(['config', 'user.name', 'T'], { cwd: orphan })
     await execGit(['config', 'user.email', 't@example.com'], { cwd: orphan })
@@ -329,7 +329,7 @@ describe('git integration', () => {
     expect((await getStatus(repo)).files).toHaveLength(0)
     const auto = await listStashes(repo)
     expect(auto).toHaveLength(1)
-    expect(auto[0].message).toContain('GitDesk on main')
+    expect(auto[0].message).toContain('Aspen on main')
     await dropStash(repo, 0)
     expect(await listStashes(repo)).toHaveLength(0)
     expect((await getStatus(repo)).files).toHaveLength(0)
@@ -470,7 +470,7 @@ describe('git integration', () => {
 
     // A repository without commits must simply list (no refs exist yet, and
     // nothing may run a rev-list against the unborn HEAD).
-    const fresh = mkdtempSync(join(tmpdir(), 'gitdesk-unborn-'))
+    const fresh = mkdtempSync(join(tmpdir(), 'aspen-unborn-'))
     await execGit(['init', '--initial-branch=main', '--quiet', fresh], {
       cwd: fresh
     })

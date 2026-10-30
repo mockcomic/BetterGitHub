@@ -58,7 +58,7 @@ export async function stashAll(
   const label =
     trimmed !== undefined && trimmed.length > 0
       ? trimmed
-      : `GitDesk on ${status.branch || 'HEAD'}`
+      : `Aspen on ${status.branch || 'HEAD'}`
 
   const result = await execGit(
     ['stash', 'push', '--include-untracked', '-m', label],

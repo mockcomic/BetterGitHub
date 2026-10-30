@@ -1,6 +1,6 @@
 @echo off
 setlocal
-rem Run GitDesk in dev mode (hot reload) with a clean environment.
+rem Run Aspen in dev mode (hot reload) with a clean environment.
 set "ELECTRON_RUN_AS_NODE="
 set "electron_run_as_node="
 cd /d "%~dp0.."

@@ -1,30 +1,30 @@
 /**
- * Generates the GitDesk icon set from the single design source of truth,
- * `resources/gitdesk-icon.svg`.
+ * Generates the Aspen icon set from the single design source of truth,
+ * `resources/aspen-icon.svg`.
  *
  *   npm run icons
  *
  * The geometry is redrawn here (see MARK below — keep the two in step) and
  * rasterized with signed-distance fields at supersampled coverage, so the
  * build needs no image library, no Chromium and no network: `node` alone
- * produces PNG, ICO and the macOS source. The tape is an exact-primitives
- * composition — a rounded box for the deck, a convex band with two rounded
- * corners and a straight chamfer at the leaving edge, rounded-square
- * sprockets, circle punches — which an SDF covers better than any bitmap
+ * produces PNG, ICO and the macOS source. The mark is exact-primitives
+ * apart from the leaf silhouette: a closed polygon shared with the SVG as
+ * data (resources/logo-aspen/leaf-path.json), capsules for the veins, and
+ * circles for the commits — which an SDF covers better than any bitmap
  * scaler would.
  *
- * The color model, like the SVG: deck ink everywhere the tile is; a band of
- * card stock paper over it; every sprocket and empty hole printed in deck
- * ink (the record was never anywhere else); and commit blue in exactly one
- * place, the head-commit hole at the leading edge. The tile is opaque —
- * on tape, nothing knocks out.
+ * The color model, like the SVG: a flat deep-forest-green leaf with its
+ * petiole; the commit graph knocked out of it in warm white; golden yellow
+ * in exactly one place, the right-hand commit. At 32 px and below the pass
+ * switches to the simplified cut (heavier veins, larger nodes) so the graph
+ * survives at taskbar and tray size.
  *
  * Outputs (all under resources/icons/):
  *   png/{size}x{size}.png   — 16…1024, also the linux.icon directory
- *   gitdesk.ico             — 16…256, for win.icon and the runtime window icon
- *   gitdesk.png             — 1024, for mac.icon (electron-builder builds the icns)
+ *   aspen.ico               — 16…256, for win.icon and the runtime window icon
+ *   aspen.png               — 1024, for mac.icon (electron-builder builds the icns)
  */
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { deflateSync } from 'zlib'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
@@ -36,134 +36,107 @@ const pngDir = join(iconDir, 'png')
 const PNG_SIZES = [16, 24, 32, 48, 64, 96, 128, 256, 512, 1024]
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 
-/** Mirror of resources/gitdesk-icon.svg, in that file's 512-unit space. */
+/** Mirror of resources/aspen-icon.svg, in that file's 512-unit space. */
 const MARK = {
   canvas: 512,
-  tileRadius: 64,
-  paper: '#e9e2cf',
-  ink: '#0b1120',
-  accent: '#0969da',
-  /** The paper tape: the clockwise-on-screen convex quad below; the r 20
-   *  left corners live at arc centers (84,188) and (84,340), and the right
-   *  edge is the 45-unit chamfer (464,168)→(412,360) — the tape leaving
-   *  the printer. Prints clip to this shape. */
-  band: {
-    verts: [
-      [64, 168],
-      [464, 168],
-      [412, 360],
-      [64, 360]
-    ],
-    rounds: [
-      { cx: 84, cy: 188, r: 20 },
-      { cx: 84, cy: 340, r: 20 }
-    ]
+  leaf: '#215c4a',
+  vein: '#fbf7ea',
+  accent: '#e3ac38',
+  /** The leaf silhouette as [x, y] pairs: traced from the selected ComfyUI
+   *  render (provenance in resources/logo-aspen/GENERATION.md) and
+   *  simplified to straight segments. Loaded from the shared path file so
+   *  the SVG and this rasterizer can never drift apart. */
+  leafPath: JSON.parse(
+    readFileSync(join(root, 'resources', 'logo-aspen', 'leaf-path.json'), 'utf8')
+  ),
+  /** The petiole: a 24-unit-wide bar under the leaf, rounded r 12 at both
+   *  ends (the top end hides inside the leaf, so it reads as one shape). */
+  stem: { x: 256, top: 444, bottom: 484, halfWidth: 12, radius: 12 },
+  /** The commit graph, full weight (SVG parity): r 17 capsules — a trunk
+   *  from just under the tip to the base, forking at forkY into one commit
+   *  on each side — with r 40 commit discs. */
+  graph: {
+    trunkX: 256,
+    topY: 148,
+    bottomY: 428,
+    forkY: 322,
+    span: 118,
+    rise: 66,
+    veinWidth: 34,
+    nodeRadius: 40
   },
-  /** Sprockets: 16-unit squares, rx 3, on 52-unit centers. The top row
-   *  carries seven (y = 192, x = 100…412); the bottom six (y = 348,
-   *  x = 100…360) — the seventh would fall off the chamfer. */
-  sprockets: {
-    half: 8,
-    radius: 3,
-    rows: [
-      { y: 192, xs: [100, 152, 204, 256, 308, 360, 412] },
-      { y: 348, xs: [100, 152, 204, 256, 308, 360] }
-    ]
-  },
-  /** The data row on a 104-unit pitch: two empty holes and, at the leading
-   *  edge, the head commit. r = 26 keeps the holes readable discs at the
-   *  16 px cut, where the sprocket rows fuse into track lines instead. */
-  holes: { x: [148, 252, 356], y: 264, radius: 26 },
-  /** The right-most hole is not an empty print — it is punched and inked. */
-  headIndex: 2
+  /** The small-size cut: same topology, heavier strokes, so the graph
+   *  survives the 16 px and 24 px tiles instead of merging into a blob. */
+  graphSmall: {
+    trunkX: 256,
+    topY: 150,
+    bottomY: 420,
+    forkY: 328,
+    span: 108,
+    rise: 60,
+    veinWidth: 46,
+    nodeRadius: 48
+  }
 }
 
 const CRC_TABLE = buildCrcTable()
 
 /* ------------------------------------------------------------------ geometry */
 
-/** Signed distance to the deck tile (rounded square), negative inside. */
-function distanceToTile(x, y) {
-  const half = MARK.canvas / 2
-  const r = MARK.tileRadius
-  const qx = Math.abs(x - half) - (half - r)
-  const qy = Math.abs(y - half) - (half - r)
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r
-}
-
-/** Convex-band containment: clockwise-on-screen quad, interior to the
- *  cross-product left of every directed edge. */
-function insideBand(x, y) {
-  const v = MARK.band.verts
-  for (let i = 0; i < v.length; i++) {
-    const [vx, vy] = v[i]
-    const [nx, ny] = v[(i + 1) % v.length]
-    if ((nx - vx) * (y - vy) - (ny - vy) * (x - vx) <= 0) return false
+function pointInPolygon(x, y, poly) {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]
+    const [xj, yj] = poly[j]
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
   }
-  return true
-}
-
-/** Signed distance to the paper tape. Inside, the distance is the nearest
- *  edge half-plane; outside, the nearest real edge segment or corner arc —
- *  exact for a convex shape with rounded convex corners. */
-function distanceToBand(x, y) {
-  const { verts, rounds } = MARK.band
-  if (insideBand(x, y)) {
-    let nearest = Infinity
-    for (let i = 0; i < verts.length; i++) {
-      const [vx, vy] = verts[i]
-      const [nx, ny] = verts[(i + 1) % verts.length]
-      nearest = Math.min(
-        nearest,
-        ((nx - vx) * (y - vy) - (ny - vy) * (x - vx)) / Math.hypot(nx - vx, ny - vy)
-      )
-    }
-    return -nearest
-  }
-  let nearest = Infinity
-  for (let i = 0; i < verts.length; i++) {
-    nearest = Math.min(nearest, distanceToSegment(x, y, verts[i], verts[(i + 1) % verts.length]))
-  }
-  for (const { cx, cy, r } of rounds) {
-    nearest = Math.min(nearest, Math.hypot(x - cx, y - cy) - r)
-  }
-  return nearest
+  return inside
 }
 
 function distanceToSegment(x, y, [ax, ay], [bx, by]) {
   const abx = bx - ax
   const aby = by - ay
-  const t = Math.max(0, Math.min(1, ((x - ax) * abx + (y - ay) * aby) / (abx * abx + aby * aby)))
+  const l2 = abx * abx + aby * aby
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((x - ax) * abx + (y - ay) * aby) / l2))
   return Math.hypot(x - (ax + t * abx), y - (ay + t * aby))
 }
 
-/** Distance to a sprocket: an rx-3 square of half-extent 8. */
-function distanceToSprocket(x, y, cx, cy) {
-  const h = MARK.sprockets.half - MARK.sprockets.radius
-  const qx = Math.abs(x - cx) - h
-  const qy = Math.abs(y - cy) - h
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - MARK.sprockets.radius
+/** Signed distance to the leaf polygon: negative inside, nearest edge
+ *  distance outside. Exact for any closed non-self-intersecting polygon. */
+function distanceToLeaf(x, y, poly) {
+  let nearest = Infinity
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    nearest = Math.min(nearest, distanceToSegment(x, y, poly[j], poly[i]))
+  }
+  return pointInPolygon(x, y, poly) ? -nearest : nearest
 }
 
-function distanceToHole(x, y, index) {
-  return Math.hypot(x - MARK.holes.x[index], y - MARK.holes.y) - MARK.holes.radius
+/** Signed distance to the petiole (rounded box). */
+function distanceToStem(x, y) {
+  const { x: cx, top, bottom, halfWidth, radius } = MARK.stem
+  const half = (bottom - top) / 2
+  const r = Math.min(radius, half, halfWidth)
+  const qx = Math.abs(x - cx) - (halfWidth - r)
+  const qy = Math.abs(y - (top + bottom) / 2) - (half - r)
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r
 }
 
-/** Distance fields the rasterizer needs at one sample point. */
-function sampleDistances(x, y) {
-  const prints = []
-  for (const row of MARK.sprockets.rows) {
-    for (const cx of row.xs) prints.push(distanceToSprocket(x, y, cx, row.y))
-  }
-  for (let i = 0; i < MARK.holes.x.length; i++) {
-    if (i !== MARK.headIndex) prints.push(distanceToHole(x, y, i))
-  }
-  return {
-    tile: distanceToTile(x, y),
-    band: distanceToBand(x, y),
-    prints,
-    head: distanceToHole(x, y, MARK.headIndex)
-  }
+/** The three capsule axes of the commit graph. */
+function graphAxes(g) {
+  return [
+    { a: [g.trunkX, g.topY], b: [g.trunkX, g.bottomY] },
+    { a: [g.trunkX, g.forkY], b: [g.trunkX - g.span, g.forkY - g.rise] },
+    { a: [g.trunkX, g.forkY], b: [g.trunkX + g.span, g.forkY - g.rise] }
+  ]
+}
+
+/** The three commit discs; the right-hand one carries the single accent. */
+function nodeCenters(g) {
+  return [
+    { x: g.trunkX, y: g.topY, accent: false },
+    { x: g.trunkX - g.span, y: g.forkY - g.rise, accent: false },
+    { x: g.trunkX + g.span, y: g.forkY - g.rise, accent: true }
+  ]
 }
 
 /* ----------------------------------------------------------------- rasterize */
@@ -175,60 +148,62 @@ function sampleDistances(x, y) {
  */
 function rasterize(size, samples) {
   const buffer = new Uint8Array(size * size * 4)
-  const paper = parseHex(MARK.paper)
-  const ink = parseHex(MARK.ink)
+  const leaf = parseHex(MARK.leaf)
+  const vein = parseHex(MARK.vein)
   const accent = parseHex(MARK.accent)
   const scale = MARK.canvas / size
   // One target pixel of edge falloff, expressed in 512-space.
   const softness = scale
+  const g = size <= 32 ? MARK.graphSmall : MARK.graph
+  const poly = MARK.leafPath
+  const axes = graphAxes(g).map(({ a, b }) => ({ a, b, half: g.veinWidth / 2 }))
+  const nodes = nodeCenters(g).map(n => ({ ...n, r: g.nodeRadius }))
 
   for (let py = 0; py < size; py++) {
     for (let px = 0; px < size; px++) {
-      let tileCoverage = 0
-      let paperCoverage = 0
-      let printCoverage = 0
-      let headCoverage = 0
+      let leafCoverage = 0
+      let veinCoverage = 0
+      let accentCoverage = 0
       for (let sy = 0; sy < samples; sy++) {
         for (let sx = 0; sx < samples; sx++) {
           const x = (px + (sx + 0.5) / samples) * scale
           const y = (py + (sy + 0.5) / samples) * scale
-          const { tile, band, prints, head } = sampleDistances(x, y)
-          const onTile = coverage(tile, softness)
-          if (onTile === 0) continue
-          // The tape lies on the deck; the record's prints lie on the tape.
-          const onBand = coverage(band, softness) * onTile
-          // The empty prints are a disjoint union of sprockets and empty
-          // holes; product coverage keeps AA honest where rims near-touch.
-          let punched = 1
-          for (const d of prints) punched *= 1 - coverage(d, softness)
-          tileCoverage += onTile
-          paperCoverage += onBand
-          printCoverage += (1 - punched) * onBand
-          headCoverage += coverage(head, softness) * onBand
+          const onLeaf = Math.max(
+            coverage(distanceToLeaf(x, y, poly), softness),
+            coverage(distanceToStem(x, y), softness)
+          )
+          if (onLeaf === 0) continue
+          let onVein = 0
+          for (const { a, b, half } of axes) {
+            onVein = Math.max(onVein, coverage(distanceToSegment(x, y, a, b) - half, softness))
+          }
+          for (const n of nodes) {
+            const c = coverage(Math.hypot(x - n.x, y - n.y) - n.r, softness)
+            if (n.accent) accentCoverage += c * onLeaf
+            else onVein = Math.max(onVein, c)
+          }
+          leafCoverage += onLeaf
+          veinCoverage += onVein * onLeaf
         }
       }
       const samplesTotal = samples * samples
-      const aTile = tileCoverage / samplesTotal
-      // Every layer sits on the deck: un-premultiply by the tile's coverage
+      const aLeaf = leafCoverage / samplesTotal
+      // Every layer sits on the leaf: un-premultiply by the leaf's coverage
       // so the shared edges stay one alpha value.
-      const aPaper = aTile === 0 ? 0 : paperCoverage / samplesTotal / aTile
-      const aPrint = aTile === 0 ? 0 : printCoverage / samplesTotal / aTile
-      const aHead = aTile === 0 ? 0 : headCoverage / samplesTotal / aTile
-      let [r, g, b] = ink
-      r = blend(r, paper[0], aPaper)
-      g = blend(g, paper[1], aPaper)
-      b = blend(b, paper[2], aPaper)
-      r = blend(r, ink[0], aPrint)
-      g = blend(g, ink[1], aPrint)
-      b = blend(b, ink[2], aPrint)
-      r = blend(r, accent[0], aHead)
-      g = blend(g, accent[1], aHead)
-      b = blend(b, accent[2], aHead)
+      const aVein = aLeaf === 0 ? 0 : veinCoverage / samplesTotal / aLeaf
+      const aAccent = aLeaf === 0 ? 0 : accentCoverage / samplesTotal / aLeaf
+      let [r, g2, b] = leaf
+      r = blend(r, vein[0], aVein)
+      g2 = blend(g2, vein[1], aVein)
+      b = blend(b, vein[2], aVein)
+      r = blend(r, accent[0], aAccent)
+      g2 = blend(g2, accent[1], aAccent)
+      b = blend(b, accent[2], aAccent)
       const at = (py * size + px) * 4
       buffer[at] = r
-      buffer[at + 1] = g
+      buffer[at + 1] = g2
       buffer[at + 2] = b
-      buffer[at + 3] = Math.round(aTile * 255)
+      buffer[at + 3] = Math.round(aLeaf * 255)
     }
   }
   return buffer
@@ -351,7 +326,20 @@ for (const size of PNG_SIZES) {
 }
 
 const ico = buildIco(ICO_SIZES.map(size => ({ size, png: pngs.get(size) })))
-writeFileSync(join(iconDir, 'gitdesk.ico'), ico)
-writeFileSync(join(iconDir, 'gitdesk.png'), pngs.get(1024))
-console.log(`resources/icons/gitdesk.ico (${ico.byteLength} bytes, ${ICO_SIZES.join('/')} px)`)
-console.log('resources/icons/gitdesk.png (1024 px, mac.icon source)')
+writeFileSync(join(iconDir, 'aspen.ico'), ico)
+writeFileSync(join(iconDir, 'aspen.png'), pngs.get(1024))
+writeFileSync(
+  join(iconDir, 'aspen.ico.json'),
+  JSON.stringify(
+    {
+      prompt:
+        'Origin: AI-generated source, vectorized. The Aspen app mark: one flat aspen leaf (deep forest green #215c4a) whose veins are a git commit graph knocked out in warm white (#fbf7ea), with a single golden-yellow accent (#e3ac38) on the right-hand node. Source render: ComfyUI Qwen Image 2.1, KSampler euler/simple 28 steps cfg 3.5, seed 13337 — provenance in resources/logo-aspen/GENERATION.md. Leaf outline traced with potrace and simplified to straight segments (resources/logo-aspen/leaf-path.json); veins and nodes are exact primitives. Regenerate with `npm run icons`.',
+      createdAt: '2026-10-30T00:00:00.000Z'
+    },
+    null,
+    2
+  ) + '\n',
+  'utf8'
+)
+console.log(`resources/icons/aspen.ico (${ico.byteLength} bytes, ${ICO_SIZES.join('/')} px)`)
+console.log('resources/icons/aspen.png (1024 px, mac.icon source)')

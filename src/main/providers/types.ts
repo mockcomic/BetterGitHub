@@ -23,7 +23,7 @@ export interface RepoPageRequest {
   readonly perPage: number
 }
 
-/** The hosted-API surface GitDesk needs from every provider. */
+/** The hosted-API surface Aspen needs from every provider. */
 export interface ProviderClient {
   /** Validate a credential against the provider's `/user` endpoint. */
   validate(apiBase: string, token: string, authKind: AccountAuthKind): Promise<ProviderIdentity>

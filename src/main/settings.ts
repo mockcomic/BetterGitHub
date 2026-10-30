@@ -58,7 +58,7 @@ const DEFAULTS: StoredSettings = {
 let cached: StoredSettings | null = null
 
 function settingsPath(): string {
-  return join(app.getPath('userData'), 'gitdesk-settings.json')
+  return join(app.getPath('userData'), 'aspen-settings.json')
 }
 
 function apiKeyPath(): string {

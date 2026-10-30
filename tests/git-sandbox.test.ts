@@ -86,7 +86,7 @@ describe('GitWriteBlockedError', () => {
 })
 
 function makeQueue(): string {
-  return mkdtempSync(join(tmpdir(), 'gitdesk-broker-'))
+  return mkdtempSync(join(tmpdir(), 'aspen-broker-'))
 }
 
 function runBroker(queueDir: string, extra: ReadonlyArray<string> = []): string {
@@ -139,7 +139,7 @@ describe('git-broker.mjs --once', () => {
 
   it('reports nonzero git exits faithfully (success is the app\'s call)', () => {
     const q = makeQueue()
-    const emptyRepo = mkdtempSync(join(tmpdir(), 'gitdesk-notrepo-'))
+    const emptyRepo = mkdtempSync(join(tmpdir(), 'aspen-notrepo-'))
     try {
       const resFile = writeRequest(q, 'nope', {
         id: 'nope',

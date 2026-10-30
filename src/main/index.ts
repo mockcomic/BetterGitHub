@@ -7,16 +7,18 @@ import { getThemeSetting } from './settings'
 import { initCrashLogging } from './diagnostics'
 import { stopWatching } from './watcher'
 import { configureGitBroker } from './git/sandbox'
+import { migrateFromGitDesk } from './migrate'
 
 if (process.env['ELECTRON_RENDERER_URL'] !== undefined) {
   app.setPath('userData', join(process.cwd(), '.userdata-dev'))
 }
 
 /**
- * Dev-only: GITDESK_CDP_PORT=<n> opens a Chrome DevTools endpoint so UI
- * probes can drive the renderer (used by the flyout/ignore QA pass).
+ * Dev-only: ASPEN_CDP_PORT (or the legacy GITDESK_CDP_PORT) opens a Chrome
+ * DevTools endpoint so UI probes can drive the renderer (used by the
+ * flyout/ignore QA pass).
  */
-const cdpPort = process.env['GITDESK_CDP_PORT']
+const cdpPort = process.env['ASPEN_CDP_PORT'] ?? process.env['GITDESK_CDP_PORT']
 if (cdpPort !== undefined && cdpPort !== '') {
   app.commandLine.appendSwitch('remote-debugging-port', cdpPort)
   app.commandLine.appendSwitch('remote-allow-origins', '*')
@@ -28,7 +30,7 @@ if (cdpPort !== undefined && cdpPort !== '') {
  * run at all — useful for a portable profile, and how the screenshot QA pass
  * launches the rebuilt app beside a running one.
  */
-const profileOverride = process.env['GITDESK_PROFILE']
+const profileOverride = process.env['ASPEN_PROFILE'] ?? process.env['GITDESK_PROFILE']
 if (profileOverride !== undefined && profileOverride !== '') {
   app.setPath('userData', profileOverride)
 }
@@ -45,6 +47,9 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   void app.whenReady().then(async () => {
+    // First Aspen launch after the rename: bring the GitDesk userData
+    // forward (see ./migrate.ts) before anything reads settings or tokens.
+    await migrateFromGitDesk()
     initCrashLogging()
     app.setAppUserModelId('com.kh.gitdesk')
 

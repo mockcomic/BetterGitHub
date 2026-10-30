@@ -1,9 +1,12 @@
 {
-  "name": "gitdesk",
+  "name": "aspen",
   "version": "0.1.0",
-  "description": "A GitHub Desktop-style git client with an AI commit-message agent",
+  "description": "A visual desktop client for Git.",
   "main": "./out/main/index.js",
-  "author": "KH",
+  "author": {
+    "name": "Kurtis Hight",
+    "email": "mockcomic@users.noreply.github.com"
+  },
   "license": "MIT",
   "scripts": {
     "dev": "node scripts/launch.mjs dev",
@@ -43,7 +46,7 @@
   },
   "build": {
     "appId": "com.kh.gitdesk",
-    "productName": "GitDesk",
+    "productName": "Aspen",
     "directories": {
       "output": "release"
     },
@@ -53,14 +56,14 @@
       "package.json"
     ],
     "win": {
-      "icon": "resources/icons/gitdesk.ico",
+      "icon": "resources/icons/aspen.ico",
       "target": [
         "nsis",
         "portable"
       ]
     },
     "mac": {
-      "icon": "resources/icons/gitdesk.png",
+      "icon": "resources/icons/aspen.png",
       "category": "public.app-category.developer-tools",
       "target": [
         "dmg",
@@ -68,6 +71,7 @@
       ]
     },
     "linux": {
+      "desktopName": "aspen.desktop",
       "icon": "resources/icons/png",
       "category": "Development",
       "target": [

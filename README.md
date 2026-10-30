@@ -1,8 +1,8 @@
-# GitDesk
+# Aspen — Aspen Git
 
-A GitHub Desktop–style git client built with Electron + React + TypeScript,
-featuring an integrated **AI commit-message agent** (any OpenAI-compatible
-API).
+**Aspen Git — Visual Git Client.** A visual desktop client for Git, built
+with Electron + React + TypeScript, featuring an integrated
+**AI commit-message agent** (any OpenAI-compatible API).
 
 Built from a reverse-engineering study of GitHub Desktop 3.6.7's shipped
 Electron artifact (typed IPC contract, porcelain-v2 status parsing, per-verb
@@ -62,7 +62,7 @@ parsing → cancellable request).
   remote moved ahead answers with a **Pull first / Pull and push again** toast
   instead of raw git output. Remotes authenticate through
   your system git credential helper (Git Credential Manager) — and when it
-  declines, GitDesk silently reruns the command once with the signed-in
+  declines, Aspen silently reruns the command once with the signed-in
   account's token for that host (never in the command line or `.git/config`).
   Add an `origin` from the header when a repo has none.
 - **Git identity** — warns and blocks the commit until `user.name` /
@@ -120,7 +120,7 @@ screen) and set the AI **Base URL**, **Model**, and **API key**, and press
 
 Agent CLIs and CI runners often execute commands in a **sandboxed shell**:
 on Windows the whole process tree (dev server, Electron, and the `git`
-children GitDesk spawns) then runs at *Low process integrity*, with write
+children Aspen spawns) then runs at *Low process integrity*, with write
 access narrowed to a few folders and RPC/named-pipe service calls blocked.
 Git can still read the repository — status, diffs and history look fine —
 but the first command that writes into `.git` (stage, commit, stash…) dies
@@ -128,7 +128,7 @@ with `fatal: Unable to create '…\.git\index.lock': Permission denied`
 even though the repository itself is healthy. (GitHub Desktop never hits
 this; it is always launched normally at Medium integrity.)
 
-Two mitigations ship with GitDesk:
+Two mitigations ship with Aspen:
 
 - **Actionable errors** — `src/main/git/sandbox.ts` recognizes the
   blocked `.git` write signature and replaces the raw `exit 128` fatal
@@ -175,14 +175,14 @@ is simply never consulted.
 Open **Clone a repository → Accounts** (or Preferences → Accounts).
 
 - **GitHub — browser sign-in (device flow).** The same dance `gh` and GitHub
-  Desktop do: GitDesk shows a short code, you type it at
-  github.com/login/device, and GitDesk picks up the token when you approve.
+  Desktop do: Aspen shows a short code, you type it at
+  github.com/login/device, and Aspen picks up the token when you approve.
   No localhost port, no password on this machine, and the token never
   expires until you sign out.
 - **GitLab — browser sign-in (OAuth + PKCE).** The browser opens your
-  instance's authorize page; GitDesk catches the redirect on a one-shot
+  instance's authorize page; Aspen catches the redirect on a one-shot
   server at `http://127.0.0.1:8765/callback`. PKCE means no client secret
-  travels. Access tokens expire after GitLab's two hours — GitDesk refreshes
+  travels. Access tokens expire after GitLab's two hours — Aspen refreshes
   them silently.
 - **Token sign-in — works for everything.** A GitHub classic PAT with the
   `repo` scope (or a fine-grained token with repository contents: read), or
@@ -221,7 +221,7 @@ src/main/        Electron main process
   accounts.ts    signed-account store (encrypted per-account token sidecars)
   settings.ts    JSON settings + safeStorage-encrypted API key
   windows.ts/menu.ts/ipc.ts  window, app menu, typed handle() registrar
-src/preload/     contextBridge surface (window.gitdesk)
+src/preload/     contextBridge surface (window.aspen)
 src/renderer/    React UI: Header, ChangesSidebar (+CommitBox, stash panel),
                  DiffView (unified/split, word-diff), HistoryView, Dialogs,
                  AccountsUi (sign-in panel, account rows, remote-repo pane),
@@ -234,7 +234,7 @@ tests/           Vitest suites: porcelain / diff parsers, stash & log parsing,
 
 ## Support
 
-GitDesk is free and open source. If it saves you time, consider supporting
+Aspen is free and open source. If it saves you time, consider supporting
 Kurtis Hight and continued work on the project:
 
 [![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&style=for-the-badge)](https://www.paypal.com/paypalme/kurtishight)
@@ -242,7 +242,7 @@ Kurtis Hight and continued work on the project:
 👉 **https://www.paypal.com/paypalme/kurtishight**
 
 The same link is available in the app under **Help → Donate via PayPal**, or
-in the **Help → About GitDesk → Support the development** section.
+in the **Help → About Aspen → Support the development** section.
 
 ## License
 

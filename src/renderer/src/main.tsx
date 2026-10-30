@@ -9,9 +9,28 @@ import './styles.css'
 // from saved settings. The cache is the last applied setting (written by
 // store.applyTheme), so a saved custom palette never flashes through
 // Primer; with no cache yet (first run) the OS preference decides.
+/**
+ * One-time localStorage rename: every `gitdesk.*` key (theme, last repo,
+ * panel widths, draft messages, hint flags) is copied to its `aspen.*`
+ * counterpart when no new-name value exists yet. The legacy keys are kept,
+ * so rolling back to a GitDesk build preserves that experience too.
+ */
+try {
+  for (let i = window.localStorage.length - 1; i >= 0; i--) {
+    const key = window.localStorage.key(i)
+    if (key !== null && key.startsWith('gitdesk.')) {
+      const next = 'aspen.' + key.slice('gitdesk.'.length)
+      if (window.localStorage.getItem(next) === null) {
+        window.localStorage.setItem(next, window.localStorage.getItem(key) as string)
+      }
+    }
+  }
+} catch {
+  /* private-mode storage: nothing to migrate */
+}
 let cachedTheme: string | null = null
 try {
-  cachedTheme = window.localStorage.getItem('gitdesk.theme')
+  cachedTheme = window.localStorage.getItem('aspen.theme')
 } catch {
   /* private-mode storage: fall back to the OS preference below */
 }
@@ -33,7 +52,7 @@ document.documentElement.setAttribute(
 // is the same signal main acted on; the web overlay API has no reliable
 // `enabled` property to ask. Without the marker (macOS/Linux, the QA web
 // shim) the band collapses and the layout is exactly as before.
-if (window.gitdesk?.platform === 'win32') {
+if (window.aspen?.platform === 'win32') {
   document.documentElement.setAttribute('data-wco', '')
 }
 

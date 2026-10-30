@@ -1,11 +1,11 @@
 ---
 version: 1
-slug: "resources-gitdesk-icon-svg"
-primary_target: "resources/gitdesk-icon.svg"
+slug: "resources-aspen-icon.svg"
+primary_target: "resources/aspen-icon.svg"
 related_targets: ["scripts/make-icons.mjs","src/renderer/src/components/TitleBar.tsx","src/main/windows.ts","package.json","src/renderer/src/styles.css"]
 ---
 
-# Surface brief: GitDesk app mark (`resources/gitdesk-icon.svg`)
+# Surface brief: Aspen app mark (`resources/aspen-icon.svg`)
 
 **Mode:** Persuade (identity). **Build path:** code-led (no image generation this harness).
 

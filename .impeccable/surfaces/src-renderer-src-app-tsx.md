@@ -5,7 +5,7 @@ primary_target: "src/renderer/src/App.tsx"
 related_targets: ["src/renderer/src/components/Header.tsx","src/renderer/src/components/ChangesSidebar.tsx","src/renderer/src/components/DiffView.tsx","src/renderer/src/components/HistoryView.tsx","src/renderer/src/components/Celebration.tsx","src/renderer/src/components/Dialogs.tsx","src/renderer/src/components/RepoManagerDialog.tsx","src/renderer/src/components/Toasts.tsx","src/renderer/src/styles.css","src/renderer/src/view-transition.ts","src/renderer/src/store.ts"]
 ---
 
-# Surface brief: GitDesk main window (`src/renderer/src/App.tsx`)
+# Surface brief: Aspen main window (`src/renderer/src/App.tsx`)
 
 **Mode:** Operate. **Build path:** code-led (no image generation in this harness; ambition lives in this contract and is audited in behavior).
 

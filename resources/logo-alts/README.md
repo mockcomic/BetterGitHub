@@ -2,7 +2,7 @@
 
 Exploration sheets for the 2026-10-28 brand roll. These SVGs are proposals,
 not mark sources: per DESIGN.md's One-Source Mark Rule, the mark exists in
-exactly one hand-authored form — `../gitdesk-icon.svg`, now the **Tape**
+exactly one hand-authored form — `gitdesk-icon.svg`, the retired **Tape** mark, kept here
 concept from batch 1.
 
 - `alt-sheet.html` / `alt-sheet.png` — batch 1: Tape, Punched G, Branch deck, Chad.

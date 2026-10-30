@@ -13,7 +13,7 @@ describe('parseStashList', () => {
     const out = parseStashList(
       entry(
         'stash@{0}',
-        'On main: GitDesk on main',
+        'On main: Aspen on main',
         '2026-10-19T21:31:55-07:00'
       ) +
         entry('stash@{1}', 'WIP on feature/x: abc1234 some subject', '2026-10-01T10:00:00Z')
@@ -22,7 +22,7 @@ describe('parseStashList', () => {
     expect(out[0]).toEqual({
       index: 0,
       label: 'stash@{0}',
-      message: 'On main: GitDesk on main',
+      message: 'On main: Aspen on main',
       date: '2026-10-19T21:31:55-07:00',
       branch: 'main'
     })

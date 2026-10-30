@@ -171,7 +171,7 @@ describe('appendGitignoreRules', () => {
   let repo = ''
 
   beforeAll(() => {
-    repo = mkdtempSync(join(tmpdir(), 'gitdesk-ignore-'))
+    repo = mkdtempSync(join(tmpdir(), 'aspen-ignore-'))
   })
 
   const file = (): string => join(repo, '.gitignore')

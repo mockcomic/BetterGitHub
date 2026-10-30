@@ -15,7 +15,7 @@ import type { ProviderIdentity } from './providers/types'
 
 /**
  * Signed-in hosted accounts (GitHub/GitLab). Public metadata lives in
- * `gitdesk-accounts.json` next to the settings file; every token lives in
+ * `aspen-accounts.json` next to the settings file; every token lives in
  * its own safeStorage-encrypted sidecar (the same mechanism as the AI API
  * key) so nothing secret crosses the IPC bridge after sign-in.
  */
@@ -33,7 +33,7 @@ type StoredAccount = AccountInfo
 let cached: StoredAccount[] | null = null
 
 function accountsPath(): string {
-  return join(app.getPath('userData'), 'gitdesk-accounts.json')
+  return join(app.getPath('userData'), 'aspen-accounts.json')
 }
 
 function secretPath(id: string): string {

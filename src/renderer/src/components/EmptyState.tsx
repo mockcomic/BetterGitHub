@@ -13,7 +13,7 @@ export function EmptyState(): JSX.Element {
   return (
     <div className="empty-state">
       <div className="onboarding">
-        <h1>GitDesk</h1>
+        <h1>Aspen</h1>
         <p>
           See what changed in your code, commit it, and push it to GitHub —
           no command line. The ✨ button can even write the commit message

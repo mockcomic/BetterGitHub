@@ -61,7 +61,7 @@ export function mapGitLabProject(
   const fullName = str(json.path_with_namespace)
   const cloneUrl = str(json.http_url_to_repo)
   if (fullName === null || cloneUrl === null) return null
-  // `internal` is signed-in-only: private from GitDesk's point of view.
+  // `internal` is signed-in-only: private from Aspen's point of view.
   const isPrivate = str(json.visibility) !== 'public'
   return {
     accountId,

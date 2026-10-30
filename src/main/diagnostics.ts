@@ -5,7 +5,7 @@ import { join } from 'path'
 
 /**
  * Persistent diagnostics: main-process crashes and dead child/renderer
- * processes are appended to userData/gitdesk-crash.log so failures can be
+ * processes are appended to userData/aspen-crash.log so failures can be
  * diagnosed even when the terminal output is lost.
  */
 
@@ -20,7 +20,7 @@ export function logDiagnostics(message: string): void {
 }
 
 function logFile(): string {
-  return join(app.getPath('userData'), 'gitdesk-crash.log')
+  return join(app.getPath('userData'), 'aspen-crash.log')
 }
 
 function describe(value: unknown): string {

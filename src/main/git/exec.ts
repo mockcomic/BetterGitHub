@@ -10,7 +10,7 @@ import {
  * exec layer GitHub Desktop runs on top of dugite: predictable environment,
  * collected stdout/stderr, allowed exit codes and kill timeouts.
  *
- * On Windows, a GitDesk launched from an agent/command sandbox runs its git
+ * On Windows, an Aspen launched from an agent/command sandbox runs its git
  * children at Low process integrity, where writes into the repository's
  * `.git` directory are blocked by the OS while reads still work. When that
  * specific failure surfaces (`Unable to create '…\.git\index.lock':

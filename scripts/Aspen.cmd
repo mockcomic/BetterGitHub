@@ -1,6 +1,6 @@
 @echo off
 setlocal
-rem Run GitDesk (production build) with a clean environment, immune to
+rem Run Aspen (production build) with a clean environment, immune to
 rem ELECTRON_RUN_AS_NODE inherited from VS Code/Cursor/harness shells.
 set "ELECTRON_RUN_AS_NODE="
 set "electron_run_as_node="

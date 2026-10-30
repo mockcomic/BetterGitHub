@@ -107,7 +107,7 @@ function readHintFlags(): HintFlags {
   } as Record<keyof HintFlags, boolean>
   for (const key of HINT_FLAGS) {
     try {
-      flags[key] = localStorage.getItem(`gitdesk.hints.${key}`) === '1'
+      flags[key] = localStorage.getItem(`aspen.hints.${key}`) === '1'
     } catch {
       /* storage unavailable: the hint just shows again */
     }
@@ -117,7 +117,7 @@ function readHintFlags(): HintFlags {
 
 function writeHintFlag(key: keyof HintFlags, value: boolean): void {
   try {
-    localStorage.setItem(`gitdesk.hints.${key}`, value ? '1' : '0')
+    localStorage.setItem(`aspen.hints.${key}`, value ? '1' : '0')
   } catch {
     /* best-effort persistence */
   }
@@ -303,7 +303,7 @@ const initialState: AppState = {
 }
 
 const PAGE_SIZE = 300
-const DRAFT_KEY_PREFIX = 'gitdesk.draft.'
+const DRAFT_KEY_PREFIX = 'aspen.draft.'
 
 let toastId = 0
 let celebrationNonce = 0
@@ -458,7 +458,7 @@ export class AppStore {
       })
       this.applyTheme(settings.theme)
 
-      const lastPath = localStorage.getItem('gitdesk.lastRepo')
+      const lastPath = localStorage.getItem('aspen.lastRepo')
       // Missing folders never open silently — the manager surfaces them.
       const usable = repositories.filter(r => !r.missing)
       const selected =
@@ -511,7 +511,7 @@ export class AppStore {
     // before first paint on the next launch — a saved custom palette
     // should never flash through Primer first.
     try {
-      window.localStorage.setItem('gitdesk.theme', theme)
+      window.localStorage.setItem('aspen.theme', theme)
     } catch {
       /* private-mode storage: first-paint cache is best-effort */
     }
@@ -642,7 +642,7 @@ export class AppStore {
   // ------------------------------------------------------------------ repos
 
   async selectRepo(repo: Repository): Promise<void> {
-    localStorage.setItem('gitdesk.lastRepo', repo.path)
+    localStorage.setItem('aspen.lastRepo', repo.path)
     // Hydrate the persisted draft into visible state so the commit box shows
     // exactly what Enter/Ctrl+Enter would actually commit.
     const drafts = new Map(this.state.drafts)
@@ -771,8 +771,8 @@ export class AppStore {
             title:
               targets.length === 1 ? 'Remove repository' : 'Remove repositories',
             message: single !== null
-              ? `"${single}" will be removed from GitDesk. The folder and its git data stay on disk.`
-              : `These repositories (${list}${more}) will be removed from GitDesk. The folders and their git data stay on disk.`,
+              ? `"${single}" will be removed from Aspen. The folder and its git data stay on disk.`
+              : `These repositories (${list}${more}) will be removed from Aspen. The folders and their git data stay on disk.`,
             confirmLabel: 'Remove',
             onConfirm
           }
@@ -797,7 +797,7 @@ export class AppStore {
           branches: [],
           remoteBranches: []
         })
-        localStorage.removeItem('gitdesk.lastRepo')
+        localStorage.removeItem('aspen.lastRepo')
       }
       this.update(patch)
       const head = deleteFromDisk
@@ -1826,7 +1826,7 @@ export class AppStore {
     const repo = this.state.selectedRepo
     const last = this.state.lastCommit
     if (repo === null || last === null) {
-      this.toast('error', 'There is no GitDesk commit to undo.')
+      this.toast('error', 'There is no Aspen commit to undo.')
       return
     }
     this.update({

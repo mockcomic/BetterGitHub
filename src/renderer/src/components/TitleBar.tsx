@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { call } from '../api'
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from './ContextMenu'
 import type { MenuBarSpec, MenuEntrySpec } from '../../../shared/ipc'
-import logoUrl from '../../../../resources/gitdesk-icon.svg'
+import logoUrl from '../../../../resources/aspen-icon.svg'
 
 /** Menu-bar entries → the shared dropdown primitive. Separators ride the
  *  next item as separatorBefore, exactly like the app's other menus. */
@@ -85,7 +85,7 @@ export function TitleBar(): JSX.Element {
   return (
     <div className="titlebar" aria-hidden="true">
       <img className="titlebar-logo" src={logoUrl} alt="" draggable={false} />
-      <span className="titlebar-label">GitDesk</span>
+      <span className="titlebar-label">Aspen</span>
       {menus.length > 0 && (
         <div className="titlebar-menu" role="menubar">
           {menus.map(menu => (

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    Aspen app mark — the leaf IS the graph. One flat aspen leaf: broad
+    rounded silhouette, pointed tip, short petiole, deep forest green
+    (#215c4a). Its veins are a git commit graph knocked out in warm white
+    (#fbf7ea): a trunk rising from the stem to the head commit just under
+    the tip, forking below it into one commit on each side. Exactly one
+    accent — the right-hand commit is golden yellow (#e3ac38).
+
+    The leaf outline is traced from the selected ComfyUI render (Qwen
+    Image 2.1, seed 13337 — provenance in resources/logo-aspen/
+    GENERATION.md) and simplified to straight segments; deliberate for the
+    flat geometric look. Geometry in 512-unit space: the leaf polygon
+    (points in resources/logo-aspen/leaf-path.json, mirrored by
+    scripts/make-icons.mjs), the petiole as a 24-unit bar y 444–484 with
+    rounded r 12 free end, the graph as r 17 capsules — trunk
+    (256,148)→(256,428), branches (256,322)→(138,256) and
+    (256,322)→(374,256) — and r 40 commit discs at (256,148), (138,256)
+    and (374,256), the last one gold. Below 40 px the rasterizer switches
+    to the simplified cut (r 23 capsules, r 48 discs). Keep
+    scripts/make-icons.mjs in step with this file.
+  -->
+  <rect x="244" y="444" width="24" height="40" rx="12" fill="#215c4a"/>
+  <path fill="#215c4a" d="M 252.76 48.33 L 233.03 67.73 L 219.21 79.8 L 203.31 92.41 L 162.19 123.44 L 146.96 136.04 L 135.12 147.12 L 124.15 158.64 L 109.45 176.62 L 100.68 189.01 L 89.27 208.52 L 83.8 219.82 L 78.97 231.55 L 75.03 243.5 L 71.73 255.79 L 69.21 268.18 L 67.57 280.57 L 66.69 292.85 L 66.58 305.02 L 67.46 316.86 L 68.99 328.37 L 70.96 337.14 L 73.38 345.7 L 76.34 353.92 L 81.6 365.54 L 86.75 374.32 L 90.37 379.47 L 98.49 389.45 L 107.81 398.77 L 112.85 403.15 L 123.6 411.27 L 136.97 419.38 L 153.97 427.39 L 173.05 434.41 L 193.88 440.21 L 216.47 444.93 L 231.38 447.12 L 251.23 448 L 272.06 447.78 L 291.58 445.7 L 308.03 442.85 L 332.26 437.04 L 347.18 432.21 L 360.66 426.95 L 378.65 417.96 L 389.27 411.27 L 403.53 399.97 L 415.81 387.36 L 424.81 375.3 L 432.26 362.14 L 437.96 348 L 442.13 332.87 L 444.54 316.86 L 445.42 299.87 L 445.09 288.13 L 443.99 276.4 L 442.24 264.88 L 439.72 253.27 L 436.54 241.86 L 432.7 230.67 L 428.2 219.6 L 423.05 208.64 L 417.13 198 L 406.38 181.44 L 397.28 169.27 L 382.15 152.05 L 371.29 141.2 L 359.57 131 L 341.14 116.53 L 307.59 91.53 L 290.27 77.82 L 276.88 65.88 L 259.67 48.88 L 256.93 48 L 252.76 48.33 Z"/>
+  <g stroke="#fbf7ea" stroke-width="34" stroke-linecap="round" fill="none">
+    <line x1="256" y1="148" x2="256" y2="428"/>
+    <line x1="256" y1="322" x2="138" y2="256"/>
+    <line x1="256" y1="322" x2="374" y2="256"/>
+  </g>
+  <circle cx="256" cy="148" r="40" fill="#fbf7ea"/>
+  <circle cx="138" cy="256" r="40" fill="#fbf7ea"/>
+  <circle cx="374" cy="256" r="40" fill="#e3ac38"/>
+</svg>

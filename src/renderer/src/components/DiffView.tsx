@@ -56,7 +56,7 @@ const EXT_LANGUAGES = new Map<string, string>([
 /** Lines rendered before the "show all" guard kicks in. */
 const RENDER_LIMIT = 3000
 
-const VIEW_KEY = 'gitdesk.diffView'
+const VIEW_KEY = 'aspen.diffView'
 
 interface DiffViewState {
   readonly split: boolean
@@ -342,7 +342,7 @@ function MediaPreview({
           </p>
         ) : failed ? (
           <p className="muted">
-            This {preview.kind} could not be played here — GitDesk's viewer only ships the
+            This {preview.kind} could not be played here — Aspen's viewer only ships the
             codecs Chromium itself has.
           </p>
         ) : url === null ? (
