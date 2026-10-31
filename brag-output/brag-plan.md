@@ -163,3 +163,15 @@ Generate click 8.96, typing 9.635-10.645, commit 13.70, punchline 17.91,
 glow breathes 18.44/18.96/19.49. Check: 0 errors, 0 lint warnings, 1 contrast
 warning (gold heading tone, intentional). New best-frame poster (t=2.0) baked
 as frame 0.
+
+
+## Addendum 3 (2026-10-31): original brand bed (MusicGen)
+
+The user rejected the Ende-library swap (all five bundled vols are used by
+other projects' brag films). Score is now an ORIGINAL track generated locally
+with facebook/musicgen-small on the 3090 (provenance + beat grid in
+assets-source/aspen-bed-MANIFEST.md). Edit re-synced end-to-end to the new
+grid. Also fixed: the ✨ emoji on the Generate buttons rendered as a missing-
+glyph box in the render — replaced with an inline gold sparkle SVG; confetti
+over the commit verb marked intentional occlusion. The "renames" collision
+fix from addendum 2 verified again at t=11.2s on the final render.

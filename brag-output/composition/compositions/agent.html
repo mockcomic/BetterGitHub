@@ -274,7 +274,7 @@
         <div data-hf-id="hf-l5wj" class="ascope"><b data-hf-id="hf-rslv">3 of 4</b> files &middot; <span data-hf-id="hf-0prn" class="a">+62</span> <span data-hf-id="hf-zh5d" class="d">&minus;8</span></div>
 
         <div data-hf-id="hf-7fd1" class="abtn" id="agent-gen">
-          <span data-hf-id="hf-cd7x" class="lbl" id="agent-gen-lbl">&#10024; Generate</span>
+          <span data-hf-id="hf-cd7x" class="lbl" id="agent-gen-lbl"><svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true" style="vertical-align:-4px"><path d="M12 2 L14.2 9.2 L22 12 L14.2 14.8 L12 22 L9.8 14.8 L2 12 L9.8 9.2 Z" fill="#f5d98a"/></svg> Generate</span>
           <span data-hf-id="hf-v59j" class="lbl cancel" id="agent-cancel"><span data-hf-id="hf-jggx" class="spin"></span> Cancel</span>
         </div>
         <div data-hf-id="hf-3r19" class="abtn" id="agent-commit">Commit to main</div>
@@ -325,29 +325,29 @@
       0.04,
     );
     tl.to("#agent-cursor .cur", { x: 560, y: 700, duration: 0.3, ease: "power2.inOut" }, 0.05);
-    // beat-locked: 8.96 (vol-11 strong cue) — the click on Generate (scene-local 0.56)
-    tl.to("#agent-cursor .cur", { scale: 0.9, duration: 0.07, ease: "power2.in" }, 0.56);
-    tl.to("#agent-cursor .cur", { scale: 1, duration: 0.12, ease: "back.out(2)" }, 0.64);
-    tl.to("#agent-gen-lbl", { opacity: 0, duration: 0.1 }, 0.58);
-    tl.to("#agent-cancel", { opacity: 1, duration: 0.1 }, 0.62);
-    tl.fromTo("#agent-cancel .spin", { rotation: 0 }, { rotation: 720, duration: 0.62, ease: "none" }, 0.62);
-    tl.fromTo("#agent-ring", { opacity: 0 }, { opacity: 0.9, duration: 0.12 }, 0.62);
-    tl.to("#agent-ring", { opacity: 0, duration: 0.3 }, 1.16);
+    // beat-locked: 8.85 (bed beat) — the click on Generate (scene-local 0.45)
+    tl.to("#agent-cursor .cur", { scale: 0.9, duration: 0.07, ease: "power2.in" }, 0.45);
+    tl.to("#agent-cursor .cur", { scale: 1, duration: 0.12, ease: "back.out(2)" }, 0.53);
+    tl.to("#agent-gen-lbl", { opacity: 0, duration: 0.1 }, 0.47);
+    tl.to("#agent-cancel", { opacity: 1, duration: 0.1 }, 0.51);
+    tl.fromTo("#agent-cancel .spin", { rotation: 0 }, { rotation: 720, duration: 0.62, ease: "none" }, 0.51);
+    tl.fromTo("#agent-ring", { opacity: 0 }, { opacity: 0.9, duration: 0.12 }, 0.51);
+    tl.to("#agent-ring", { opacity: 0, duration: 0.3 }, 1.05);
     // one gold sweep while the agent thinks
     tl.fromTo(
       "#agent-panel .sheen",
       { x: -560, opacity: 0 },
       { x: 1400, opacity: 0.55, duration: 0.4, ease: "power1.in" },
-      0.64,
+      0.53,
     );
-    tl.to("#agent-panel .sheen", { opacity: 0, duration: 0.3, ease: "power1.out" }, 1.04);
-    tl.to("#agent-gen-lbl", { opacity: 1, duration: 0.1 }, 1.26);
-    tl.to("#agent-cancel", { opacity: 0, duration: 0.1 }, 1.24);
+    tl.to("#agent-panel .sheen", { opacity: 0, duration: 0.3, ease: "power1.out" }, 0.93);
+    tl.to("#agent-gen-lbl", { opacity: 1, duration: 0.1 }, 1.15);
+    tl.to("#agent-cancel", { opacity: 0, duration: 0.1 }, 1.13);
 
     // the placeholder leaves and the field types itself
-    tl.to("#agent-ph", { opacity: 0, duration: 0.1 }, 1.2);
-    tl.fromTo("#agent-caret", { opacity: 0, x: 0 }, { opacity: 1, duration: 0.08 }, 1.22);
-    let t = 1.24;
+    tl.to("#agent-ph", { opacity: 0, duration: 0.1 }, 1.14);
+    tl.fromTo("#agent-caret", { opacity: 0, x: 0 }, { opacity: 1, duration: 0.08 }, 1.16);
+    let t = 1.18;
     chars.forEach((_, i) => {
       tl.to(target.children[i], { opacity: 1, duration: 0.02 }, t);
       tl.set("#agent-caret", { x: ADV * (i + 1) }, t + 0.01);

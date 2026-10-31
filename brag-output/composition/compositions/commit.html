@@ -190,11 +190,11 @@
         <div data-hf-id="hf-jdr4" id="commit-sum">Fix rename handling<span data-hf-id="hf-4bi1" class="cur"></span></div>
         <div data-hf-id="hf-lj1y" id="commit-desc">Renames carry a second path.</div>
         <div data-hf-id="hf-95wl" id="commit-scope"><b data-hf-id="hf-rslv">3 of 4</b> files &middot; <span data-hf-id="hf-0prn" class="a">+62</span> <span data-hf-id="hf-zh5d" class="d">&minus;8</span></div>
-        <div data-hf-id="hf-fhl2" class="cbtn" id="commit-gen">&#10024; Generate</div>
-        <div data-hf-id="hf-nmoo" class="cbtn" id="commit-go">Commit to main</div>
+        <div data-hf-id="hf-fhl2" class="cbtn" id="commit-gen"><svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true" style="vertical-align:-4px"><path d="M12 2 L14.2 9.2 L22 12 L14.2 14.8 L12 22 L9.8 14.8 L2 12 L9.8 9.2 Z" fill="#f5d98a"/></svg> Generate</div>
+        <div data-hf-id="hf-nmoo" class="cbtn" id="commit-go" data-layout-allow-occlusion="true">Commit to main</div>
         <div data-hf-id="hf-q0zo" class="cbtn" id="commit-push">&#8593; Push <span data-hf-id="hf-e3y0" class="n">1</span></div>
       </div>
-      <div data-hf-id="hf-lctg" id="commit-confetti" data-layout-allow-overflow="true"></div>
+      <div data-hf-id="hf-lctg" id="commit-confetti" data-layout-allow-overflow="true" data-layout-allow-occlusion="true"></div>
     </div>
 
     <div data-hf-id="hf-ufnx" id="commit-cursor" class="clip" data-start="0" data-duration="3">
@@ -254,12 +254,12 @@
         bit,
         { x: 0, y: 0, opacity: 1, rotation: 0 },
         { x: cx, y: cy, opacity: 1, rotation: rot * 0.55, duration: 0.26, ease: "power2.out" },
-        0.52 + delay,
+        0.67 + delay,
       );
       tl.to(
         bit,
         { x: cx * 1.3, y: cy + 300, opacity: 0, rotation: rot, duration: 0.46, ease: "power2.in" },
-        0.78 + delay,
+        0.93 + delay,
       );
     }
 
@@ -269,17 +269,17 @@
       { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power3.out" },
       0,
     );
-    tl.fromTo("#commit-toast", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.6);
+    tl.fromTo("#commit-toast", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.32, ease: "power3.out" }, 0.8);
 
     // cursor comes to the verb
     tl.fromTo("#commit-cursor .cur", { opacity: 0, x: 1620, y: 990 }, { opacity: 1, duration: 0.1 }, 0.04);
     tl.to("#commit-cursor .cur", { x: 1006, y: 730, duration: 0.34, ease: "power2.inOut" }, 0.06);
-    // beat-locked: 13.70 (vol-11 grid beat) — the commit click (scene-local 0.50); the button pops and sheds confetti
-    tl.to("#commit-go", { scale: 0.955, duration: 0.07, ease: "power2.in" }, 0.5);
-    tl.to("#commit-go", { scale: 1.035, duration: 0.16, ease: "back.out(3)" }, 0.57);
-    tl.to("#commit-go", { scale: 1, duration: 0.2, ease: "power2.out" }, 0.73);
-    tl.to("#commit-cursor .cur", { scale: 0.9, duration: 0.07 }, 0.5);
-    tl.to("#commit-cursor .cur", { scale: 1, duration: 0.14, ease: "back.out(2)" }, 0.58);
+    // beat-locked: 13.85 (bed strong cue) — the commit click (scene-local 0.65); the button pops and sheds confetti
+    tl.to("#commit-go", { scale: 0.955, duration: 0.07, ease: "power2.in" }, 0.65);
+    tl.to("#commit-go", { scale: 1.035, duration: 0.16, ease: "back.out(3)" }, 0.72);
+    tl.to("#commit-go", { scale: 1, duration: 0.2, ease: "power2.out" }, 0.88);
+    tl.to("#commit-cursor .cur", { scale: 0.9, duration: 0.07 }, 0.65);
+    tl.to("#commit-cursor .cur", { scale: 1, duration: 0.14, ease: "back.out(2)" }, 0.74);
 
     window.__timelines = window.__timelines || {};
     window.__timelines["commit"] = tl;

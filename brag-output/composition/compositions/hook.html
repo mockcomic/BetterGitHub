@@ -160,15 +160,15 @@
       { scale: 1, duration: 0.22, ease: "back.out(1.7)" },
       1.0,
     );
-    // beat-locked: 1.60 (vol-11 strong cue) — the head commit sprouts gold, the one accent
+    // beat-locked: 1.64 (bed beat) — the head commit sprouts gold, the one accent
     tl.fromTo(
       "#hook-node-3",
       { opacity: 1, scale: 0, svgOrigin: "374 256" },
       { scale: 1.08, duration: 0.22, ease: "back.out(2.2)" },
-      1.6,
+      1.64,
     );
-    tl.to("#hook-node-3", { scale: 1, duration: 0.16, ease: "power2.out" }, 1.84);
-    tl.fromTo("#hook-mark .glow", { opacity: 0.95 }, { opacity: 0.3, duration: 0.5 }, 1.62);
+    tl.to("#hook-node-3", { scale: 1, duration: 0.16, ease: "power2.out" }, 1.88);
+    tl.fromTo("#hook-mark .glow", { opacity: 0.95 }, { opacity: 0.3, duration: 0.5 }, 1.66);
     // the claim: slides in from the sides (new move), then a long hold
     tl.fromTo(
       "#hook-title .l1",
@@ -188,12 +188,10 @@
       { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" },
       1.1,
     );
-    // beat-grid: the gold glow breathes on the bed's 0.523s period (2.12 / 2.65 / 3.18)
-    tl.to("#hook-mark .glow", { opacity: 0.44, duration: 0.14, ease: "sine.inOut" }, 2.12);
-    tl.to("#hook-mark .glow", { opacity: 0.26, duration: 0.2, ease: "sine.inOut" }, 2.3);
-    tl.to("#hook-mark .glow", { opacity: 0.42, duration: 0.14, ease: "sine.inOut" }, 2.65);
-    tl.to("#hook-mark .glow", { opacity: 0.28, duration: 0.2, ease: "sine.inOut" }, 2.83);
-    tl.to("#hook-mark .glow", { opacity: 0.4, duration: 0.16, ease: "sine.inOut" }, 3.18);
+    // beat-grid: the gold glow breathes on the bed (2.74 / 3.30)
+    tl.to("#hook-mark .glow", { opacity: 0.44, duration: 0.14, ease: "sine.inOut" }, 2.74);
+    tl.to("#hook-mark .glow", { opacity: 0.26, duration: 0.2, ease: "sine.inOut" }, 2.92);
+    tl.to("#hook-mark .glow", { opacity: 0.42, duration: 0.14, ease: "sine.inOut" }, 3.3);
 
     window.__timelines = window.__timelines || {};
     window.__timelines["hook"] = tl;

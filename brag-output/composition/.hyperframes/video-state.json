@@ -1,7 +1,7 @@
 {
   "version": 1,
   "historyId": "acaf4cfa-1aab-4820-9361-f4df113a1cf7",
-  "currentRevision": "9944be40-52f2-4638-a030-667860d97f8e",
+  "currentRevision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
   "pendingChanges": false,
   "files": {
     "AGENTS.md": {
@@ -129,24 +129,24 @@
       "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/d0/d0bc0fcba496d73df1da8c145e5330df75f87ab5a4f33a9b71461b006b5c338e"
     },
     "compositions/agent.html": {
-      "hash": "0e793f9e8972400e79713f36d8a2ed3158b61bccfa3125c0ad6f80c66f66aa50",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/0e/0e793f9e8972400e79713f36d8a2ed3158b61bccfa3125c0ad6f80c66f66aa50"
+      "hash": "b73c58ab9137a66ea41818c0894c88c4445bf66fb0629b4683e1855d6765a793",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/b7/b73c58ab9137a66ea41818c0894c88c4445bf66fb0629b4683e1855d6765a793"
     },
     "compositions/commit.html": {
-      "hash": "9b60f33f675d35ec4e058354343aceeed820358771015dc26e6f33f4ebc1cb9a",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/9b/9b60f33f675d35ec4e058354343aceeed820358771015dc26e6f33f4ebc1cb9a"
+      "hash": "b08e0a460aeacd5398e6c46e0d37489d89a4bc29b4c4a71d954c9ecbece95f41",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/b0/b08e0a460aeacd5398e6c46e0d37489d89a4bc29b4c4a71d954c9ecbece95f41"
     },
     "compositions/desk.html": {
-      "hash": "53ea6180b4de7cb898c39532d24483dfd98e27dd8215011e9e19edfd01a8f237",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/53/53ea6180b4de7cb898c39532d24483dfd98e27dd8215011e9e19edfd01a8f237"
+      "hash": "72dadb8befb16b534969450785f9082a1cb3356d0db76e7449dd67c981b52127",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/72/72dadb8befb16b534969450785f9082a1cb3356d0db76e7449dd67c981b52127"
     },
     "compositions/endcard.html": {
-      "hash": "7ab036bfed5e8224ed2bf70df0c40dcafce12eb222f6b6c8dc9d4c73140c76d6",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/7a/7ab036bfed5e8224ed2bf70df0c40dcafce12eb222f6b6c8dc9d4c73140c76d6"
+      "hash": "3b89ff8e8b383d7e4f2ee2015cf3bf74fef71226e3fcb2398716f5fb7b5582fb",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/3b/3b89ff8e8b383d7e4f2ee2015cf3bf74fef71226e3fcb2398716f5fb7b5582fb"
     },
     "compositions/hook.html": {
-      "hash": "afafbfc972c53e8da20aed2cb7f4c31654c58e727b12110b9c9258532f5a418b",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/af/afafbfc972c53e8da20aed2cb7f4c31654c58e727b12110b9c9258532f5a418b"
+      "hash": "fd72482a8ac7a7fb6794341e048f7103344063534802b520bce4f30e9f8db65a",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/fd/fd72482a8ac7a7fb6794341e048f7103344063534802b520bce4f30e9f8db65a"
     },
     "hyperframes.json": {
       "hash": "3c38388541dc55db09a0d96c9bc2bc85e88cf00135c1928e9224dcd464c03171",
@@ -157,8 +157,8 @@
       "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/5b/5b1f8e63f90577982146177a52a066aec3341cf6724a67244bef9baa97332658"
     },
     "index.html": {
-      "hash": "620d894ac3eb930d5072b138796c42509ba99a2362413ae86d07426bfa35b704",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/62/620d894ac3eb930d5072b138796c42509ba99a2362413ae86d07426bfa35b704"
+      "hash": "47114ae05ba8088133bcfa2c9be00b5555d81f6b8557784d18f739c8b6afba38",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/47/47114ae05ba8088133bcfa2c9be00b5555d81f6b8557784d18f739c8b6afba38"
     },
     "meta.json": {
       "hash": "54c687dce9825f75f6276c519d997926406230e60b3331d0a26a8ef0248e34cc",
@@ -171,6 +171,10 @@
     "assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3": {
       "hash": "364a546834db4c0c2e3b3240eb6df03e98b7362230154b04c5c614442f6660d7",
       "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/36/364a546834db4c0c2e3b3240eb6df03e98b7362230154b04c5c614442f6660d7"
+    },
+    "assets/music/aspen-bed.wav": {
+      "hash": "d649f8333e00f83cfbeaf854ff6c9ecc5ab984cbf9971476e7f7a60db35a0f7f",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/d6/d649f8333e00f83cfbeaf854ff6c9ecc5ab984cbf9971476e7f7a60db35a0f7f"
     }
   },
   "revisions": {
@@ -285,20 +289,106 @@
           "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/9b/9b60f33f675d35ec4e058354343aceeed820358771015dc26e6f33f4ebc1cb9a"
         }
       }
+    },
+    "0601a02b-f9fc-496f-bdd0-398533f9109b": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793414928795,
+      "endedAt": 1793414928810,
+      "files": {
+        "assets/music/aspen-bed.wav": {
+          "before": null,
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/d6/d649f8333e00f83cfbeaf854ff6c9ecc5ab984cbf9971476e7f7a60db35a0f7f"
+        },
+        "compositions/agent.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/0e/0e793f9e8972400e79713f36d8a2ed3158b61bccfa3125c0ad6f80c66f66aa50",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/3e/3e89e9dbefee3b67fc1a074f0e8c136e3e9c4bb86d186472ae51e367e3c9e05b"
+        },
+        "compositions/commit.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/9b/9b60f33f675d35ec4e058354343aceeed820358771015dc26e6f33f4ebc1cb9a",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/98/981ff8ae5aa71160ba04a944cbbef815412be3174cfb30930dd210658a3541f6"
+        },
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/53/53ea6180b4de7cb898c39532d24483dfd98e27dd8215011e9e19edfd01a8f237",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/72/72dadb8befb16b534969450785f9082a1cb3356d0db76e7449dd67c981b52127"
+        },
+        "compositions/endcard.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/7a/7ab036bfed5e8224ed2bf70df0c40dcafce12eb222f6b6c8dc9d4c73140c76d6",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/3b/3b89ff8e8b383d7e4f2ee2015cf3bf74fef71226e3fcb2398716f5fb7b5582fb"
+        },
+        "compositions/hook.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/af/afafbfc972c53e8da20aed2cb7f4c31654c58e727b12110b9c9258532f5a418b",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/fd/fd72482a8ac7a7fb6794341e048f7103344063534802b520bce4f30e9f8db65a"
+        },
+        "index.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/62/620d894ac3eb930d5072b138796c42509ba99a2362413ae86d07426bfa35b704",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/47/47114ae05ba8088133bcfa2c9be00b5555d81f6b8557784d18f739c8b6afba38"
+        }
+      }
+    },
+    "a924d1fe-4c0e-494e-97ad-3061647b85fc": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793414943119,
+      "endedAt": 1793414943120,
+      "files": {
+        "compositions/commit.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/98/981ff8ae5aa71160ba04a944cbbef815412be3174cfb30930dd210658a3541f6",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/68/68b3bf12a11cd8d1f8ad647037d461d41db7ac247503ebe874b65a8046485b63"
+        }
+      }
+    },
+    "b196d8d3-c2bf-400d-98b1-6010e1d9d25b": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793414979081,
+      "endedAt": 1793414979084,
+      "files": {
+        "compositions/agent.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/3e/3e89e9dbefee3b67fc1a074f0e8c136e3e9c4bb86d186472ae51e367e3c9e05b",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/b7/b73c58ab9137a66ea41818c0894c88c4445bf66fb0629b4683e1855d6765a793"
+        },
+        "compositions/commit.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/68/68b3bf12a11cd8d1f8ad647037d461d41db7ac247503ebe874b65a8046485b63",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/5a/5aaf3c21d016bd03f105be2371e4f20160752f49f813073fa25f6e164d50dd84"
+        }
+      }
+    },
+    "f1363116-cab8-4f6e-bd2d-3558a7f2bab7": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793415029452,
+      "endedAt": 1793415029453,
+      "files": {
+        "compositions/commit.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/5a/5aaf3c21d016bd03f105be2371e4f20160752f49f813073fa25f6e164d50dd84",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/b0/b08e0a460aeacd5398e6c46e0d37489d89a4bc29b4c4a71d954c9ecbece95f41"
+        }
+      }
     }
   },
   "checks": {
     "latest": {
-      "revision": "a8226ad9-77ef-4a0a-8db2-163977e0b400",
-      "id": "30069cc3-1aec-4be6-9783-3c1577a8db1d"
+      "revision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
+      "id": "6f0d11a0-0e68-4f4e-90dd-209ff37e6edb"
     },
     "revisions": {
-      "fb90e045-732b-4029-85b9-3c245eb508f6": [],
       "a8226ad9-77ef-4a0a-8db2-163977e0b400": [
         {
           "id": "30069cc3-1aec-4be6-9783-3c1577a8db1d",
           "scope": "project",
-          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/30069cc3-1aec-4be6-9783-3c1577a8db1d.json",
           "metadata": {
             "ok": true,
             "browserSkipped": false,
@@ -320,7 +410,9 @@
           "revision": "a8226ad9-77ef-4a0a-8db2-163977e0b400",
           "inputFingerprint": "3c45da31730d97b7de9d3c588bf6613abf9dadf84088239c42cefb064cca4707",
           "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "6bcdeb1f-caa8-4232-969a-fae6e0f17fdd"
         }
       ],
       "80822364-3add-474c-a2b6-f692c25adabd": [
@@ -382,6 +474,94 @@
           "status": "cleaned",
           "cleanedAfterRender": "de1451bd-f0db-4a5c-b20c-c3fd538ecd95"
         }
+      ],
+      "0601a02b-f9fc-496f-bdd0-398533f9109b": [
+        {
+          "id": "90d87c2e-8cb9-4fdf-b0fa-010d2759aa95",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793414932151,
+          "contentHash": "a27ab4f06f0e6bf5f2766f765c95f0e7d9f94ebbc0d4cfab0dfe4fa317e501d8",
+          "revision": "0601a02b-f9fc-496f-bdd0-398533f9109b",
+          "inputFingerprint": "7580e719026b5b1d8e8f3796257472ac5391d7af409d92b4fddd5d0102d9fba7",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "6bcdeb1f-caa8-4232-969a-fae6e0f17fdd"
+        }
+      ],
+      "b196d8d3-c2bf-400d-98b1-6010e1d9d25b": [
+        {
+          "id": "2fd22212-5f44-4292-bb63-62c0a2981025",
+          "scope": "project",
+          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/2fd22212-5f44-4292-bb63-62c0a2981025.json",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793414983524,
+          "contentHash": "a683179ed4ba6a6e3e027ccd1f948085c2ac452c46abb36c61b23f930318ff8c",
+          "revision": "b196d8d3-c2bf-400d-98b1-6010e1d9d25b",
+          "inputFingerprint": "ab37c5b3b59f9f09210ede5d3f940d2a05f5fc7d4821a5434ef08acfe1be9e68",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
+      ],
+      "f1363116-cab8-4f6e-bd2d-3558a7f2bab7": [
+        {
+          "id": "6f0d11a0-0e68-4f4e-90dd-209ff37e6edb",
+          "scope": "project",
+          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/6f0d11a0-0e68-4f4e-90dd-209ff37e6edb.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793415032978,
+          "contentHash": "abd4e8ef98bbcae3d349c7e33e8a6c129a9b7a4db05a4b566ad618975c56b8da",
+          "revision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
+          "inputFingerprint": "2cb8a0d4c8bc4b44e4e7bfa03a1e2bb118e6f51b5edf1a93c8840cfe2b2e4295",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
       ]
     },
     "unversioned": [
@@ -442,167 +622,21 @@
     ]
   },
   "snapshots": {
-    "latest": {
-      "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-      "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-6"
-    },
-    "revisions": {
-      "fb90e045-732b-4029-85b9-3c245eb508f6": [
-        {
-          "scope": "full",
-          "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-0",
-          "image": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub\\brag-output\\composition\\.hyperframes\\artifacts\\snapshots\\d190ec23-2712-42a8-993c-a56d3c838233\\frame-00-at-3.6s.png",
-          "time": 3.6,
-          "metadata": {
-            "width": 1920,
-            "height": 1080,
-            "zoomScale": 1,
-            "browserGpuMode": "auto",
-            "warnings": [],
-            "partial": false
-          },
-          "createdAt": 1792899714280,
-          "contentHash": "51e041218d7057e23906be3c1e865f22fa4345b89a7d85a3eef27dfc501700ae",
-          "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-          "inputFingerprint": "54c57fa18867dacf79a68f71e15f83f1c51721cb0d1a8f3f675082b5987b8766",
-          "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
-        },
-        {
-          "scope": "full",
-          "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-1",
-          "image": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub\\brag-output\\composition\\.hyperframes\\artifacts\\snapshots\\d190ec23-2712-42a8-993c-a56d3c838233\\frame-01-at-4.05s.png",
-          "time": 4.05,
-          "metadata": {
-            "width": 1920,
-            "height": 1080,
-            "zoomScale": 1,
-            "browserGpuMode": "auto",
-            "warnings": [],
-            "partial": false
-          },
-          "createdAt": 1792899714282,
-          "contentHash": "c7e4c894767124e65d8384e679d12d20617007fc7c9b802c485508066acb7215",
-          "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-          "inputFingerprint": "54c57fa18867dacf79a68f71e15f83f1c51721cb0d1a8f3f675082b5987b8766",
-          "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
-        },
-        {
-          "scope": "full",
-          "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-2",
-          "image": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub\\brag-output\\composition\\.hyperframes\\artifacts\\snapshots\\d190ec23-2712-42a8-993c-a56d3c838233\\frame-02-at-4.6s.png",
-          "time": 4.6,
-          "metadata": {
-            "width": 1920,
-            "height": 1080,
-            "zoomScale": 1,
-            "browserGpuMode": "auto",
-            "warnings": [],
-            "partial": false
-          },
-          "createdAt": 1792899714282,
-          "contentHash": "4bd2f359153cdbccf91b1d682677a5d303ac36539aba9511a3e6da04bf1e9834",
-          "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-          "inputFingerprint": "54c57fa18867dacf79a68f71e15f83f1c51721cb0d1a8f3f675082b5987b8766",
-          "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
-        },
-        {
-          "scope": "full",
-          "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-3",
-          "image": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub\\brag-output\\composition\\.hyperframes\\artifacts\\snapshots\\d190ec23-2712-42a8-993c-a56d3c838233\\frame-03-at-6.2s.png",
-          "time": 6.2,
-          "metadata": {
-            "width": 1920,
-            "height": 1080,
-            "zoomScale": 1,
-            "browserGpuMode": "auto",
-            "warnings": [],
-            "partial": false
-          },
-          "createdAt": 1792899714284,
-          "contentHash": "137c434710f41ebccda4f70f32fb8f4e564bf511ed716798971a3e9f99242cd9",
-          "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-          "inputFingerprint": "54c57fa18867dacf79a68f71e15f83f1c51721cb0d1a8f3f675082b5987b8766",
-          "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
-        },
-        {
-          "scope": "full",
-          "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-4",
-          "image": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub\\brag-output\\composition\\.hyperframes\\artifacts\\snapshots\\d190ec23-2712-42a8-993c-a56d3c838233\\frame-04-at-7.4s.png",
-          "time": 7.4,
-          "metadata": {
-            "width": 1920,
-            "height": 1080,
-            "zoomScale": 1,
-            "browserGpuMode": "auto",
-            "warnings": [],
-            "partial": false
-          },
-          "createdAt": 1792899714285,
-          "contentHash": "a7f33ac7a26d76a879172ce5bdaab4f3e69d54333e629ccb8a819a4b5146ef30",
-          "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-          "inputFingerprint": "54c57fa18867dacf79a68f71e15f83f1c51721cb0d1a8f3f675082b5987b8766",
-          "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
-        },
-        {
-          "scope": "full",
-          "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-5",
-          "image": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub\\brag-output\\composition\\.hyperframes\\artifacts\\snapshots\\d190ec23-2712-42a8-993c-a56d3c838233\\frame-05-at-8.15s.png",
-          "time": 8.15,
-          "metadata": {
-            "width": 1920,
-            "height": 1080,
-            "zoomScale": 1,
-            "browserGpuMode": "auto",
-            "warnings": [],
-            "partial": false
-          },
-          "createdAt": 1792899714286,
-          "contentHash": "166afdb554d5532eb9ecc09ac3368031e917945750b43b32825e6d9c98e6c934",
-          "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-          "inputFingerprint": "54c57fa18867dacf79a68f71e15f83f1c51721cb0d1a8f3f675082b5987b8766",
-          "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
-        },
-        {
-          "scope": "full",
-          "id": "31a69d46-0185-4f2f-b84a-420b2604e94a-6",
-          "image": "C:\\Users\\KH-PC\\Documents\\GitHub\\BetterGitHub\\brag-output\\composition\\.hyperframes\\artifacts\\snapshots\\d190ec23-2712-42a8-993c-a56d3c838233\\frame-06-at-19.4s.png",
-          "time": 19.4,
-          "metadata": {
-            "width": 1920,
-            "height": 1080,
-            "zoomScale": 1,
-            "browserGpuMode": "auto",
-            "warnings": [],
-            "partial": false
-          },
-          "createdAt": 1792899714287,
-          "contentHash": "671f281785747f404c59648e002e90dffcd8db574e512605fc6d8bfbee006baf",
-          "revision": "fb90e045-732b-4029-85b9-3c245eb508f6",
-          "inputFingerprint": "54c57fa18867dacf79a68f71e15f83f1c51721cb0d1a8f3f675082b5987b8766",
-          "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
-        }
-      ]
-    },
+    "latest": null,
+    "revisions": {},
     "unversioned": []
   },
   "renders": {
     "latest": {
-      "id": "de1451bd-f0db-4a5c-b20c-c3fd538ecd95",
-      "completedAt": 1793410327585,
+      "id": "9357a6b4-db6d-4b05-ae08-6e999d8d88a9",
+      "completedAt": 1793415049691,
       "output": "/home/mockcomic/projects/BetterGitHub/brag-output/brag.mp4",
       "status": "completed",
-      "revision": "9944be40-52f2-4638-a030-667860d97f8e"
+      "revision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7"
     },
     "retainedRevisions": [
-      "9944be40-52f2-4638-a030-667860d97f8e",
-      "a8226ad9-77ef-4a0a-8db2-163977e0b400"
+      "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
+      "b196d8d3-c2bf-400d-98b1-6010e1d9d25b"
     ]
   },
   "pendingArtifactCleanup": []
