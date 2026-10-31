@@ -135,3 +135,16 @@ Transition mood: none (final).
 - Its perspective mechanics are kept — 2800px stage, `preserve-3d` wrapper, the blue-lit depth face — but inverted into an entrance instead of an exit: the window swings in from `z: -2200` at `rotationY: -34deg` and straightens flat on the 4.49 beat, assembles on the music's grid, then breathes ±5deg while the camera drifts into the commit box.
 - All readable text raised to the 28px check floor; the tiny `Ctrl K` hint and the Stage/Unstage/Discard/Stash cluster were dropped rather than shrunk, and the diff lines shortened so none clip.
 - Audio: the stale fifth-row hit re-timed onto the fourth row (6.00) and two keypress ticks removed, so the keypress type stays at 10 instances. One new hit — `impactSoft_medium_000` at 4.486 (measured peak +0.004s) — marks the window landing flat.
+
+
+## Addendum (2026-10-30, night): Aspen re-brand pass
+
+The film was re-themed with the Aspen identity: hook mark re-cut to the
+ComfyUI aspen-leaf (the leaf grows from its stem, veins draw as the commit
+graph, the gold node sprouts on the 1.09 beat where the blue hole used to
+punch); the registry `ui-3d-reveal` desk scene replaced by a hand-built
+`desk.html` in Aspen's green-ink palette (rows still land on 4.39 / 4.91 /
+5.34 / 6.00); agent/commit/endcard recolored from printed-ink/commit-blue to
+#0b1512 / #0d1b16 grounds with aspen green + the single gold; confetti
+palette swapped to green/gold/cream/violet. Timing, audio and every
+beat-lock are unchanged from the 2026-10-24 build.

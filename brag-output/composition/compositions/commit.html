@@ -4,7 +4,7 @@
       position: absolute;
       inset: 0;
       overflow: hidden;
-      background: #0b1120;
+      background: #0b1512;
       font-family: Inter, sans-serif;
     }
     /* the same commit box, punched in on the verbs */
@@ -19,8 +19,8 @@
       position: absolute;
       inset: 0;
       border-radius: 16px;
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: #12241c;
+      border: 1px solid #24352c;
       box-shadow: 0 12px 28px rgba(1, 4, 9, 0.6), 0 2px 4px rgba(1, 4, 9, 0.4);
     }
     #commit-sum {
@@ -30,21 +30,21 @@
       width: 1360px;
       height: 110px;
       border-radius: 10px;
-      border: 1px solid #30363d;
-      background: #0d1117;
+      border: 1px solid #24352c;
+      background: #0d1b16;
       display: flex;
       align-items: center;
       padding: 0 26px;
       font-family: "JetBrains Mono", monospace;
       font-size: 46px;
-      color: #e6edf3;
+      color: #fbf7ea;
       white-space: nowrap;
     }
     #commit-sum .cur {
       width: 4px;
       height: 56px;
       margin-left: 6px;
-      background: #7d8590;
+      background: #93a49a;
       opacity: 0.6;
     }
     #commit-desc {
@@ -54,14 +54,14 @@
       width: 1360px;
       height: 108px;
       border-radius: 10px;
-      border: 1px solid #30363d;
-      background: #0d1117;
+      border: 1px solid #24352c;
+      background: #0d1b16;
       display: flex;
       align-items: center;
       padding: 0 26px;
       font-family: "JetBrains Mono", monospace;
       font-size: 34px;
-      color: #e6edf3;
+      color: #fbf7ea;
       white-space: nowrap;
     }
     #commit-scope {
@@ -69,10 +69,10 @@
       left: 44px;
       top: 302px;
       font-size: 30px;
-      color: #7d8590;
+      color: #93a49a;
     }
     #commit-scope b {
-      color: #e6edf3;
+      color: #fbf7ea;
     }
     #commit-scope .a {
       color: #3fb950;
@@ -101,18 +101,18 @@
     #commit-go {
       left: 500px;
       width: 560px;
-      background: #1f6feb;
+      background: #2e7d55;
     }
     #commit-push {
       left: 1074px;
       width: 326px;
-      background: #21262d;
-      border: 1px solid #30363d;
-      color: #e6edf3;
+      background: #1c2f26;
+      border: 1px solid #24352c;
+      color: #fbf7ea;
       font-weight: 500;
     }
     #commit-push .n {
-      color: #8d959f;
+      color: #8fa096;
       font-weight: 700;
     }
     #commit-confetti {
@@ -152,8 +152,8 @@
       width: 1000px;
       height: 112px;
       border-radius: 12px;
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: #12241c;
+      border: 1px solid #24352c;
       border-left: 6px solid #3fb950;
       box-shadow: 0 12px 28px rgba(1, 4, 9, 0.6);
       display: flex;
@@ -163,7 +163,7 @@
     }
     #commit-toast .msg {
       font-size: 30px;
-      color: #e6edf3;
+      color: #fbf7ea;
       white-space: nowrap;
     }
     #commit-toast .msg code {
@@ -175,7 +175,7 @@
       height: 64px;
       padding: 0 26px;
       border-radius: 8px;
-      background: #1f6feb;
+      background: #2e7d55;
       color: #ffffff;
       font-size: 30px;
       font-weight: 600;
@@ -202,7 +202,7 @@
         <path data-hf-id="hf-5tlk"
           d="M4 1 L4 19 L8.6 14.8 L11.4 21 L14.4 19.7 L11.6 13.7 L18 13.2 Z"
           fill="#ffffff"
-          stroke="#0b1120"
+          stroke="#0b1512"
           stroke-width="1.4"
           stroke-linejoin="round"
         />
@@ -229,7 +229,7 @@
       };
     }
     // the app's burst: success, accent, caution, and a touch of the agent's violet
-    const COLORS = ["#3fb950", "#3fb950", "#2f81f7", "#2f81f7", "#d4a72c", "#a371f7"];
+    const COLORS = ["#3fb950", "#3fa06b", "#e3ac38", "#e3ac38", "#fbf7ea", "#a371f7"];
     const rand = mulberry32(7 * 2654435761);
     const layer = document.getElementById("commit-confetti");
     for (let i = 0; i < 14; i++) {

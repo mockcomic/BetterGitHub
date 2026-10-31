@@ -1,4 +1,4 @@
-# Hyperframes Composition Brief: GitDesk
+# Hyperframes Composition Brief: Aspen (re-themed 2026-10-30; brief body kept as authored for the GitDesk original)
 
 ## Objective
 

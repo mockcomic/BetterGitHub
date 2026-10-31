@@ -1,2 +1,2 @@
-Introducing GitDesk: a GitHub Desktop-style git client with an AI commit-message agent — OpenAI, OpenRouter, Ollama or LM Studio, no GitHub account required.
-Built with Electron, React and TypeScript, after reverse-engineering GitHub Desktop 3.6.7's shipped artifact.
+Introducing Aspen: a visual desktop client for Git with an AI commit-message agent — OpenAI, OpenRouter, Ollama or LM Studio, no GitHub account required.
+Built with Electron, React and TypeScript, after reverse-engineering GitHub Desktop 3.6.7's shipped artifact. The mark is an aspen leaf whose veins are a commit graph — one gold node, once.

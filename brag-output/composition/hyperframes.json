@@ -9,11 +9,5 @@
   "media": {
     "autoProxy": true
   },
-  "registryItems": [
-    {
-      "name": "ui-3d-reveal",
-      "type": "hyperframes:block",
-      "target": "compositions/ui-3d-reveal.html"
-    }
-  ]
+  "registryItems": []
 }
