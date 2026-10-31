@@ -80,7 +80,6 @@
       ]
     },
     "linux": {
-      "desktopName": "aspen.desktop",
       "icon": "resources/icons/png",
       "category": "Development",
       "target": [

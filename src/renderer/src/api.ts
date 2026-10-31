@@ -56,11 +56,11 @@ export function onRepoChanged(
 export function onTerminalOutput(
   callback: (id: string, data: string) => void
 ): () => void {
-  return window.gitdesk.onTerminalOutput(callback)
+  return window.aspen.onTerminalOutput(callback)
 }
 
 export function onTerminalExit(
   callback: (id: string, exitCode: number) => void
 ): () => void {
-  return window.gitdesk.onTerminalExit(callback)
+  return window.aspen.onTerminalExit(callback)
 }

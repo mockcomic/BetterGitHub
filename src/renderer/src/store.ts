@@ -348,7 +348,7 @@ function readStoredDraft(repoPath: string): RepoDraft | null {
  * AppStore/Dispatcher split observed in the shipped app; per-repository
  * commit drafts mirror its repository state cache and also survive restarts.
  */
-const TERMINAL_OPEN_KEY = 'gitdesk.terminalOpen'
+const TERMINAL_OPEN_KEY = 'aspen.terminalOpen'
 
 function readTerminalOpen(): boolean {
   try {
