@@ -54,6 +54,14 @@ parsing → cancellable request).
   files' diff via any OpenAI-compatible endpoint (OpenAI, OpenRouter,
   Ollama, LM Studio…). Cancelable; confirms before replacing text you typed;
   API key stored encrypted via Electron `safeStorage`.
+- **Integrated terminal** — a docked terminal panel (`Ctrl+```, the ⋯ menu
+  or View ▸ Toggle Terminal) running a real interactive shell with the
+  open repository as its working directory: ConPTY + PowerShell (Windows,
+  preferring PowerShell 7), your `$SHELL` (macOS/Linux). xterm.js in the
+  panel, node-pty in main; resize with the divider, restart or Clear from
+  its bar, right-click or Ctrl+V to paste. Anything the shell changes in
+  the working tree lands in the changes list through the same watcher the
+  rest of the app uses; closing the panel ends the shell.
 - **History** — searchable commit log (message + author filters) with paging,
   per-commit changed files and diffs, and commit actions: copy SHA, create
   branch from commit, cherry-pick, revert, open on GitHub.
@@ -110,7 +118,9 @@ npm run dist:linux # Linux AppImage + DEB
 
 Run the platform-specific distribution command on the target operating system.
 `npm run dist:all` requests all three targets when the build environment supports
-cross-platform packaging.
+cross-platform packaging. (`npmRebuild: false` is deliberate: node-pty ships
+N-API prebuilds that load unchanged in Electron, so the builder skips the
+node-gyp step instead of demanding a full C++ toolchain.)
 
 Then, on first run, open **Preferences** (File menu or the link on the empty
 screen) and set the AI **Base URL**, **Model**, and **API key**, and press
@@ -215,6 +225,8 @@ src/main/        Electron main process
                  commit/branches/log/sync/stash/ignore/workflow/github-url
   watcher.ts     debounced recursive working-tree watcher (watch-filter.ts
                  holds the pure ignore logic)
+  terminal.ts    integrated terminal: node-pty sessions, shell-choice
+                 table, the two push channels (xterm.js renders them)
   ai/            commit-agent (system prompt, tags, parser, fetch call)
   providers/     GitHub & GitLab REST clients (pure mappers), device flow /
                  PKCE sign-in, token refresh, client-id config
@@ -225,7 +237,7 @@ src/preload/     contextBridge surface (window.aspen)
 src/renderer/    React UI: Header, ChangesSidebar (+CommitBox, stash panel),
                  DiffView (unified/split, word-diff), HistoryView, Dialogs,
                  AccountsUi (sign-in panel, account rows, remote-repo pane),
-                 ContextMenu, Toasts, AppStore (store.ts)
+                 ContextMenu, Toasts, TerminalPanel, AppStore (store.ts)
 tests/           Vitest suites: porcelain / diff parsers, stash & log parsing,
                  github URLs, watcher filter, word-diff, provider mappers,
                  git auth-retry classifier, plus an integration suite that

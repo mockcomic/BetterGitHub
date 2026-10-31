@@ -291,6 +291,19 @@ export interface ExternalApp {
   readonly kind: 'files' | 'editor'
 }
 
+/**
+ * A live integrated-terminal session, created by the main process when the
+ * panel opens (src/main/terminal.ts). The renderer addresses every later
+ * write/resize/kill and both push channels by `id`, so a panel that was
+ * already closed simply stops being listened to — main ignores unknown ids.
+ */
+export interface TerminalSessionInfo {
+  /** Opaque main-side session id. */
+  readonly id: string
+  /** Shell display name for the panel title (e.g. 'PowerShell 7', 'zsh'). */
+  readonly shellLabel: string
+}
+
 /** Public (renderer-visible) settings. Tokens (AI + accounts) never leave main. */
 export interface PublicSettings {
   readonly ai: {

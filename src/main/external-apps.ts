@@ -555,17 +555,6 @@ export async function getDetectedApps(refresh: boolean): Promise<DetectedApp[]> 
  */
 export async function openRepoInApp(repoPath: string, appId: string): Promise<void> {
   const detected = (await getDetectedApps(false)).find(a => a.app.id === appId)
-  // [dbg-42] temporary probe
-  try {
-    const { appendFileSync } = await import('fs')
-    appendFileSync(
-      process.cwd() + '/_dbg_openin.log',
-      `${new Date().toISOString()} appId=${appId} repoPath=${JSON.stringify(repoPath)} ` +
-        `detected=${detected ? JSON.stringify(detected.launch) : 'NONE'}\n`
-    )
-  } catch {
-    /* probe must not break the launch */
-  }
   if (detected === undefined) {
     throw new Error('That application is not available on this machine.')
   }

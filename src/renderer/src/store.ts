@@ -193,6 +193,13 @@ export interface AppState {
    * list simply means no supported editors were found.
    */
   readonly externalApps: ReadonlyArray<ExternalApp>
+  /**
+   * Whether the integrated terminal panel is docked under the desk. Kept
+   * in localStorage like the layout widths — it records a preference, not
+   * git state. The session itself lives in main (src/main/terminal.ts);
+   * the panel component owns its xterm instance and IPC.
+   */
+  readonly terminalOpen: boolean
   readonly busy: string | null
   readonly aiBusy: boolean
   /** The AI merge agent's live conversation about one conflicted file. */
@@ -274,6 +281,7 @@ const initialState: AppState = {
   identity: null,
   remoteUrl: null,
   externalApps: [],
+  terminalOpen: false,
   busy: null,
   aiBusy: false,
   aiMerge: null,
@@ -340,6 +348,24 @@ function readStoredDraft(repoPath: string): RepoDraft | null {
  * AppStore/Dispatcher split observed in the shipped app; per-repository
  * commit drafts mirror its repository state cache and also survive restarts.
  */
+const TERMINAL_OPEN_KEY = 'gitdesk.terminalOpen'
+
+function readTerminalOpen(): boolean {
+  try {
+    return localStorage.getItem(TERMINAL_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeTerminalOpen(value: boolean): void {
+  try {
+    localStorage.setItem(TERMINAL_OPEN_KEY, value ? '1' : '0')
+  } catch {
+    /* storage unavailable: the panel just starts closed next time */
+  }
+}
+
 export class AppStore {
   private state: AppState = initialState
   private listeners = new Set<() => void>()
@@ -454,7 +480,8 @@ export class AppStore {
         repositories,
         accounts,
         initError: null,
-        hints: readHintFlags()
+        hints: readHintFlags(),
+        terminalOpen: readTerminalOpen()
       })
       this.applyTheme(settings.theme)
 
@@ -555,6 +582,7 @@ export class AppStore {
     if (
       action !== 'refresh' &&
       action !== 'donate' &&
+      action !== 'toggle-terminal' &&
       this.state.busy !== null
     ) {
       this.toast('info', 'Wait for the current operation to finish.')
@@ -602,6 +630,9 @@ export class AppStore {
         break
       case 'show-about':
         this.update({ showAbout: true })
+        break
+      case 'toggle-terminal':
+        this.toggleTerminal()
         break
       case 'donate':
         void call('openExternal', DONATE_URL)
@@ -1606,6 +1637,21 @@ export class AppStore {
       () => call('openInExternalApp', repo.path, appId),
       'open-in'
     )
+  }
+
+  /**
+   * Dock or undock the integrated terminal panel (⋯ menu, View menu,
+   * Ctrl+`). The session itself is the panel component's business: it
+   * spawns on mount and kills on unmount, so closing here is what tears
+   * the PTY down. Closing also asks for a silent refresh — a shell that
+   * just ran `npm test` or edited files must not leave a stale desk.
+   */
+  toggleTerminal(): void {
+    if (this.state.selectedRepo === null) return
+    const next = !this.state.terminalOpen
+    writeTerminalOpen(next)
+    this.update({ terminalOpen: next })
+    if (!next) void this.refresh({ silent: true })
   }
 
   async openFile(path: string): Promise<void> {

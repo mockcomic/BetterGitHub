@@ -6,6 +6,7 @@ import { applyTheme, createMainWindow, getMainWindow } from './windows'
 import { getThemeSetting } from './settings'
 import { initCrashLogging } from './diagnostics'
 import { stopWatching } from './watcher'
+import { terminalManager } from './terminal'
 import { configureGitBroker } from './git/sandbox'
 import { migrateFromGitDesk } from './migrate'
 
@@ -77,5 +78,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     stopWatching()
+    // No orphaned shells: every live terminal session dies with the app.
+    terminalManager.killAll()
   })
 }

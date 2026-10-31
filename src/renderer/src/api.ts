@@ -15,6 +15,12 @@ declare global {
       ): Promise<unknown>
       onMenuAction(callback: (action: MenuAction) => void): () => void
       onRepoChanged(callback: (repoPath: string) => void): () => void
+      onTerminalOutput(
+        callback: (id: string, data: string) => void
+      ): () => void
+      onTerminalExit(
+        callback: (id: string, exitCode: number) => void
+      ): () => void
     }
   }
 }
@@ -45,4 +51,16 @@ export function onRepoChanged(
   callback: (repoPath: string) => void
 ): () => void {
   return window.aspen.onRepoChanged(callback)
+}
+
+export function onTerminalOutput(
+  callback: (id: string, data: string) => void
+): () => void {
+  return window.gitdesk.onTerminalOutput(callback)
+}
+
+export function onTerminalExit(
+  callback: (id: string, exitCode: number) => void
+): () => void {
+  return window.gitdesk.onTerminalExit(callback)
 }

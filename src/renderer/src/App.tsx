@@ -16,6 +16,7 @@ import { DiffView } from './components/DiffView'
 import { HistoryView } from './components/HistoryView'
 import { ResizeHandle } from './components/ResizeHandle'
 import type { WidthRange } from './components/ResizeHandle'
+import { TerminalPanel } from './components/TerminalPanel'
 import { Toasts } from './components/Toasts'
 import {
   AboutDialog,
@@ -67,8 +68,10 @@ function visibleDeskTabs(state: AppState): ReadonlyArray<DeskTab> {
    DESIGN.md measure the responsive defaults fall back to. */
 const QUEUE_KEY = 'aspen.layout.queueWidth'
 const TRAY_KEY = 'aspen.layout.trayWidth'
+const TERMINAL_KEY = 'aspen.layout.terminalHeight'
 const QUEUE_RANGE: WidthRange = { min: 220, max: 480, def: 340 }
 const TRAY_RANGE: WidthRange = { min: 220, max: 420, def: 300 }
+const TERMINAL_RANGE: WidthRange = { min: 120, max: 600, def: 260 }
 
 function readStoredWidth(key: string, range: WidthRange): number | null {
   try {
@@ -113,6 +116,19 @@ export function App(): JSX.Element {
   const [trayWidth, setTrayWidth] = useState<number | null>(() =>
     readStoredWidth(TRAY_KEY, TRAY_RANGE)
   )
+  const [terminalHeight, setTerminalHeight] = useState<number | null>(() =>
+    readStoredWidth(TERMINAL_KEY, TERMINAL_RANGE)
+  )
+  // The terminal's height variable lives on .app (the column the panel sits
+  // in), the queue/tray widths on .work-area (the row they partition) — two
+  // style objects, same write-through-during-drag rule.
+  const appStyle = useMemo(
+    () =>
+      (terminalHeight !== null
+        ? { '--term-h': `${terminalHeight}px` }
+        : {}) as CSSProperties,
+    [terminalHeight]
+  )
   const workStyle = useMemo(
     () =>
       ({
@@ -128,6 +144,10 @@ export function App(): JSX.Element {
   const commitTrayWidth = (value: number | null): void => {
     setTrayWidth(value)
     writeStoredWidth(TRAY_KEY, value)
+  }
+  const commitTerminalHeight = (value: number | null): void => {
+    setTerminalHeight(value)
+    writeStoredWidth(TERMINAL_KEY, value)
   }
 
   // Progressive desks: when the tab a visitor sits on loses its reason to
@@ -165,7 +185,7 @@ export function App(): JSX.Element {
   const conflictCount = state.status?.conflictCount ?? 0
 
   return (
-    <div className="app" data-view={view}>
+    <div className="app" data-view={view} style={appStyle}>
       <TitleBar />
       <Header />
       {state.initError !== null && (
@@ -277,6 +297,29 @@ export function App(): JSX.Element {
           </>
         )}
       </div>
+      {state.terminalOpen && (
+        <>
+          {/* The handle precedes the panel and drags its height — the
+              side="next" sign logic reads identically on the vertical axis:
+              pulling the divider up grows the dock. */}
+          <ResizeHandle
+            side="next"
+            direction="vertical"
+            range={TERMINAL_RANGE}
+            label="Terminal height"
+            cssVar="--term-h"
+            width={terminalHeight}
+            onCommit={commitTerminalHeight}
+          />
+          {/* Keyed by repo: switching repositories unmounts the panel, and
+              the unmount is what kills the old shell. */}
+          <TerminalPanel
+            key={state.selectedRepo.id}
+            repoPath={state.selectedRepo.path}
+            repoName={state.selectedRepo.name}
+          />
+        </>
+      )}
       <StatusBar />
       <Toasts />
       <SettingsDialog />

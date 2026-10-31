@@ -28,6 +28,7 @@ import type {
   SignInChallenge,
   SignInStatus,
   StashEntry,
+  TerminalSessionInfo,
   WorkflowKind
 } from './models'
 
@@ -219,6 +220,17 @@ export interface RequestResponseChannels {
   /** Launch a detected target with the repository root (by catalog id). */
   openInExternalApp: (repoPath: string, appId: string) => void
 
+  // integrated terminal (main pushes TERMINAL_OUTPUT/EXIT channels)
+  /**
+   * Spawn the platform-priority shell in `repoPath` (validated like every
+   * other repo verb) at the given size; one session at a time per panel.
+   */
+  terminalStart: (repoPath: string, cols: number, rows: number) => TerminalSessionInfo
+  /** Feed keystrokes to a live session; an unknown id is a silent no-op. */
+  terminalWrite: (id: string, data: string) => void
+  terminalResize: (id: string, cols: number, rows: number) => void
+  terminalKill: (id: string) => void
+
   // Window-frame menu (win32 WCO title band, components/TitleBar.tsx):
   // main owns the menu data (src/main/menu.ts); the band asks for the
   // declarative menu bar, forwards plain actions exactly like the native
@@ -282,6 +294,7 @@ export type MenuAction =
   | 'delete-branch'
   | 'rename-branch'
   | 'view-on-github'
+  | 'toggle-terminal'
   | 'show-about'
   | 'donate'
 
@@ -328,3 +341,9 @@ export interface MenuBarSpec {
 
 /** Main -> renderer push: the working tree of a watched repository changed. */
 export const REPO_CHANGED_CHANNEL = 'repo-changed'
+
+/** Main -> renderer push: one chunk of PTY output for a terminal session. */
+export const TERMINAL_OUTPUT_CHANNEL = 'terminal-output'
+
+/** Main -> renderer push: a terminal session's shell exited (id, code). */
+export const TERMINAL_EXIT_CHANNEL = 'terminal-exit'

@@ -23,6 +23,13 @@ interface ResizeHandleProps {
   readonly width: number | null
   /** Persist once the gesture ends (and immediately for keypresses). */
   readonly onCommit: (width: number | null) => void
+  /**
+   * 'vertical' turns the strip into a horizontal divider that drags the
+   * pane's *height* (the bottom-docked terminal uses it above the status
+   * bar); the sign logic is identical — the divider always reads as moving
+   * the wall itself, and the keys become ArrowUp / ArrowDown.
+   */
+  readonly direction?: 'horizontal' | 'vertical'
 }
 
 /** Arrow-key step; Shift steps further. */
@@ -48,13 +55,14 @@ export function ResizeHandle({
   label,
   cssVar,
   width,
-  onCommit
+  onCommit,
+  direction = 'horizontal'
 }: ResizeHandleProps): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
   const [liveWidth, setLiveWidth] = useState<number | null>(null)
   const drag = useRef<{
     pointerId: number
-    startX: number
+    startCoord: number
     startWidth: number
     lastWidth: number
   } | null>(null)
@@ -80,30 +88,37 @@ export function ResizeHandle({
     const inline = ref.current?.parentElement?.style.getPropertyValue(cssVar)
     const parsed = inline !== undefined ? Number.parseFloat(inline) : Number.NaN
     if (Number.isFinite(parsed)) return parsed
-    const measured = target()?.getBoundingClientRect().width
+    const box = target()?.getBoundingClientRect()
+    const measured = box === undefined ? undefined : direction === 'vertical' ? box.height : box.width
     return measured ?? width ?? range.def
   }
 
   // A view swap or unmount mid-gesture must not leave the window stuck in
   // the resizing state.
   useEffect(() => {
-    return () => document.body.classList.remove('desk-resizing')
+    return () => {
+      document.body.classList.remove('desk-resizing', 'desk-resizing-row')
+    }
   }, [])
 
   const beginDrag = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
     const start = currentWidth()
-    drag.current = { pointerId: e.pointerId, startX: e.clientX, startWidth: start, lastWidth: start }
+    const coord = direction === 'vertical' ? e.clientY : e.clientX
+    drag.current = { pointerId: e.pointerId, startCoord: coord, startWidth: start, lastWidth: start }
     document.body.classList.add('desk-resizing')
+    // The terminal divider drags rows; everything else drags columns.
+    if (direction === 'vertical') document.body.classList.add('desk-resizing-row')
   }
 
   const moveDrag = (e: React.PointerEvent<HTMLDivElement>): void => {
     const d = drag.current
     if (d === null || d.pointerId !== e.pointerId) return
-    const delta = e.clientX - d.startX
-    // Dragging the divider right widens a left-docked pane and narrows a
-    // right-docked one — the gesture always reads as moving the wall itself.
+    const now = direction === 'vertical' ? e.clientY : e.clientX
+    const delta = now - d.startCoord
+    // Dragging the divider "past" the pane widens a leading pane and narrows
+    // a trailing one — the gesture always reads as moving the wall itself.
     const raw = side === 'prev' ? d.startWidth + delta : d.startWidth - delta
     d.lastWidth = clampWidth(raw, range)
     apply(d.lastWidth)
@@ -116,7 +131,7 @@ export function ResizeHandle({
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId)
     }
-    document.body.classList.remove('desk-resizing')
+    document.body.classList.remove('desk-resizing', 'desk-resizing-row')
     onCommit(d.lastWidth)
   }
 
@@ -127,9 +142,11 @@ export function ResizeHandle({
       onCommit(null)
       return
     }
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    const increase = direction === 'vertical' ? e.key === 'ArrowDown' : e.key === 'ArrowRight'
+    const decrease = direction === 'vertical' ? e.key === 'ArrowUp' : e.key === 'ArrowLeft'
+    if (!increase && !decrease) return
     e.preventDefault()
-    const step = (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? KEY_STEP_FAST : KEY_STEP)
+    const step = (increase ? 1 : -1) * (e.shiftKey ? KEY_STEP_FAST : KEY_STEP)
     const raw = side === 'prev' ? currentWidth() + step : currentWidth() - step
     const next = clampWidth(raw, range)
     apply(next)
@@ -146,9 +163,9 @@ export function ResizeHandle({
   return (
     <div
       ref={ref}
-      className="resizer"
+      className={`resizer${direction === 'vertical' ? ' resizer-horizontal' : ''}`}
       role="separator"
-      aria-orientation="vertical"
+      aria-orientation={direction === 'vertical' ? 'horizontal' : 'vertical'}
       aria-label={label}
       tabIndex={0}
       {...(shown !== null

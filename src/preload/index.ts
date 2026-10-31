@@ -3,6 +3,8 @@ import type { RequestResponseChannel } from '../shared/ipc'
 import {
   MENU_ACTION_CHANNEL,
   REPO_CHANGED_CHANNEL,
+  TERMINAL_EXIT_CHANNEL,
+  TERMINAL_OUTPUT_CHANNEL,
   type MenuAction
 } from '../shared/ipc'
 
@@ -38,6 +40,34 @@ const api = {
     ipcRenderer.on(REPO_CHANGED_CHANNEL, listener)
     return () => {
       ipcRenderer.removeListener(REPO_CHANGED_CHANNEL, listener)
+    }
+  },
+  /** Main pushes one PTY output chunk for a terminal session. */
+  onTerminalOutput: (
+    callback: (id: string, data: string) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      id: string,
+      data: string
+    ) => callback(id, data)
+    ipcRenderer.on(TERMINAL_OUTPUT_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(TERMINAL_OUTPUT_CHANNEL, listener)
+    }
+  },
+  /** Main pushes the exit code when a terminal session's shell quits. */
+  onTerminalExit: (
+    callback: (id: string, exitCode: number) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      id: string,
+      exitCode: number
+    ) => callback(id, exitCode)
+    ipcRenderer.on(TERMINAL_EXIT_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(TERMINAL_EXIT_CHANNEL, listener)
     }
   }
 }

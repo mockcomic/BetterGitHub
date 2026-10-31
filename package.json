@@ -40,6 +40,10 @@
   },
   "dependencies": {
     "@types/prismjs": "^1.26.6",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
+    "node-pty": "^1.1.0",
     "prismjs": "^1.30.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
@@ -47,13 +51,18 @@
   "build": {
     "appId": "com.kh.gitdesk",
     "productName": "Aspen",
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },
     "files": [
       "out/**/*",
       "resources/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/node-pty/**"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**"
     ],
     "win": {
       "icon": "resources/icons/aspen.ico",
@@ -79,5 +88,8 @@
         "deb"
       ]
     }
+  },
+  "allowScripts": {
+    "node-pty@1.1.0": true
   }
 }

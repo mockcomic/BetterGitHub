@@ -21,6 +21,7 @@ import type {
 import { friendlyGitError, execGit } from './git/exec'
 import { safeJoin } from './git/repo-path'
 import { getDetectedApps, launchDetached, openRepoInApp } from './external-apps'
+import { terminalManager, terminalStart } from './terminal'
 import { getStatus } from './git/status'
 import { getCommitFileDiff, getCommitFileNames, getPathsDiffText, getPathDiff } from './git/diff'
 import { getPreview } from './git/preview'
@@ -725,6 +726,19 @@ const handlers: Handlers = {
   },
   async openInExternalApp(repoPath: string, appId: string) {
     await openRepoInApp(repoPath, appId)
+  },
+
+  async terminalStart(repoPath: string, cols: number, rows: number) {
+    return terminalStart(repoPath, cols, rows)
+  },
+  async terminalWrite(id: string, data: string) {
+    terminalManager.write(id, data)
+  },
+  async terminalResize(id: string, cols: number, rows: number) {
+    terminalManager.resize(id, cols, rows)
+  },
+  async terminalKill(id: string) {
+    terminalManager.kill(id)
   },
 
   // The win32 title band: menu data for its dropdowns, action forwarding
