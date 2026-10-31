@@ -51,7 +51,7 @@ const DEFAULTS: StoredSettings = {
   },
   confirmOverrideWithGeneratedMessage: true,
   autoRefresh: true,
-  theme: 'system',
+  theme: 'light',
   hintsEnabled: true
 }
 

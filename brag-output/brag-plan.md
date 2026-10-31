@@ -148,3 +148,18 @@ punch); the registry `ui-3d-reveal` desk scene replaced by a hand-built
 #0b1512 / #0d1b16 grounds with aspen green + the single gold; confetti
 palette swapped to green/gold/cream/violet. Timing, audio and every
 beat-lock are unchanged from the 2026-10-24 build.
+
+
+## Addendum 2 (2026-10-31): light cut
+
+Per the user the film went LIGHT: warm-paper ground (#f4f1e8) instead of the
+green ink, ink-green type, gold kept as the single accent. The old
+ui-3d-reveal desk was already replaced; this pass also fixes the
+"renames/Description" text collision in the agent scene (the Description
+placeholder now leaves with the typed text) and re-scores the whole edit to
+Happy Beats Business Moves Vol 11 — the only library track no other project's
+brag uses. Beat moves: hook node 1.60, desk rows 4.23/4.75/5.28/5.80/6.34,
+Generate click 8.96, typing 9.635-10.645, commit 13.70, punchline 17.91,
+glow breathes 18.44/18.96/19.49. Check: 0 errors, 0 lint warnings, 1 contrast
+warning (gold heading tone, intentional). New best-frame poster (t=2.0) baked
+as frame 0.

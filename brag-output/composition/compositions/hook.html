@@ -6,11 +6,11 @@
       overflow: hidden;
       font-family: Inter, sans-serif;
     }
-    /* Flat brand ground: Aspen's deep green ink, the film's canvas. */
+    /* Warm-white film ground: the leaf prints dark, not light. */
     #hook-ground {
       position: absolute;
       inset: 0;
-      background: #0b1512;
+      background: #f4f1e8;
     }
     #hook-halo {
       position: absolute;
@@ -19,7 +19,7 @@
       width: 900px;
       height: 560px;
       margin: -280px 0 0 -450px;
-      background: radial-gradient(closest-side, rgba(227, 172, 56, 0.1), rgba(11, 21, 18, 0));
+      background: radial-gradient(closest-side, rgba(227, 172, 56, 0.22), rgba(244, 241, 232, 0));
     }
     #hook-mark {
       position: absolute;
@@ -35,7 +35,7 @@
       width: 190px;
       height: 190px;
       border-radius: 50%;
-      background: radial-gradient(closest-side, rgba(227, 172, 56, 0.55), rgba(227, 172, 56, 0));
+      background: radial-gradient(closest-side, rgba(227, 172, 56, 0.6), rgba(227, 172, 56, 0));
       opacity: 0;
     }
     #hook-mark svg {
@@ -45,7 +45,11 @@
       height: 260px;
       overflow: visible;
     }
-    /* pathLength="1" on the vein strokes: one dash, offset 1 hides it, 0 draws it. */
+    /* The leaf descends under a top-down mask — the re-cut's new opening move.
+       Veins still draw by dash, pathLength="1". */
+    #hook-mark .leaf-clip {
+      clip-path: inset(0 0 100% 0);
+    }
     #hook-mark .vein {
       stroke: #fbf7ea;
       stroke-dasharray: 1;
@@ -70,12 +74,12 @@
     }
     #hook-title .l1 {
       display: block;
-      color: #fbf7ea;
+      color: #16382a;
       opacity: 0;
     }
     #hook-title .l2 {
       display: block;
-      color: #e3ac38;
+      color: #8a6514;
       opacity: 0;
     }
     #hook-caption {
@@ -86,7 +90,7 @@
       text-align: center;
       font-size: 36px;
       font-weight: 400;
-      color: #8fa096;
+      color: #4e5d52;
       letter-spacing: 0.01em;
     }
   </style>
@@ -95,24 +99,24 @@
     <div data-hf-id="hf-ym8n" id="hook-ground" data-layout-ignore="true"></div>
     <div data-hf-id="hf-bwno" id="hook-halo" data-layout-ignore="true"></div>
 
-    <!-- The live mark, geometry lifted from resources/aspen-icon.svg: the leaf
-         grows, its veins draw as a commit graph, the gold node sprouts last. -->
+    <!-- resources/aspen-icon.svg: the leaf descends, veins branch, gold node sprouts -->
     <div data-hf-id="hf-g4p8" id="hook-mark" class="clip" data-start="0" data-duration="3.4">
       <div data-hf-id="hf-2s7n" class="glow"></div>
       <svg data-hf-id="hf-we78" viewBox="0 0 512 512" aria-hidden="true">
-        <path
-          class="leaf"
-          fill="#215c4a"
-          d="M 252.76 48.33 L 233.03 67.73 L 219.21 79.8 L 203.31 92.41 L 162.19 123.44 L 146.96 136.04 L 135.12 147.12 L 124.15 158.64 L 109.45 176.62 L 100.68 189.01 L 89.27 208.52 L 83.8 219.82 L 78.97 231.55 L 75.03 243.5 L 71.73 255.79 L 69.21 268.18 L 67.57 280.57 L 66.69 292.85 L 66.58 305.02 L 67.46 316.86 L 68.99 328.37 L 70.96 337.14 L 73.38 345.7 L 76.34 353.92 L 81.6 365.54 L 86.75 374.32 L 90.37 379.47 L 98.49 389.45 L 107.81 398.77 L 112.85 403.15 L 123.6 411.27 L 136.97 419.38 L 153.97 427.39 L 173.05 434.41 L 193.88 440.21 L 216.47 444.93 L 231.38 447.12 L 251.23 448 L 272.06 447.78 L 291.58 445.7 L 308.03 442.85 L 332.26 437.04 L 347.18 432.21 L 360.66 426.95 L 378.65 417.96 L 389.27 411.27 L 403.53 399.97 L 415.81 387.36 L 424.81 375.3 L 432.26 362.14 L 437.96 348 L 442.13 332.87 L 444.54 316.86 L 445.42 299.87 L 445.09 288.13 L 443.99 276.4 L 442.24 264.88 L 439.72 253.27 L 436.54 241.86 L 432.7 230.67 L 428.2 219.6 L 423.05 208.64 L 417.13 198 L 406.38 181.44 L 397.28 169.27 L 382.15 152.05 L 371.29 141.2 L 359.57 131 L 341.14 116.53 L 307.59 91.53 L 290.27 77.82 L 276.88 65.88 L 259.67 48.88 L 256.93 48 L 252.76 48.33 Z"
-          pathLength="1"
-        />
-        <rect x="244" y="444" width="24" height="40" rx="12" fill="#215c4a" class="node" id="hook-stem" />
-        <line class="vein" pathLength="1" x1="256" y1="148" x2="256" y2="428" />
-        <line class="vein" pathLength="1" x1="256" y1="322" x2="138" y2="256" />
-        <line class="vein" pathLength="1" x1="256" y1="322" x2="374" y2="256" />
-        <circle class="node n-cream" id="hook-node-1" cx="138" cy="256" r="40" fill="#fbf7ea" />
-        <circle class="node n-cream" id="hook-node-2" cx="256" cy="148" r="40" fill="#fbf7ea" />
-        <circle class="node n-gold" id="hook-node-3" cx="374" cy="256" r="40" fill="#e3ac38" />
+        <g class="leaf-clip">
+          <path
+            class="leaf"
+            fill="#215c4a"
+            d="M 252.76 48.33 L 233.03 67.73 L 219.21 79.8 L 203.31 92.41 L 162.19 123.44 L 146.96 136.04 L 135.12 147.12 L 124.15 158.64 L 109.45 176.62 L 100.68 189.01 L 89.27 208.52 L 83.8 219.82 L 78.97 231.55 L 75.03 243.5 L 71.73 255.79 L 69.21 268.18 L 67.57 280.57 L 66.69 292.85 L 66.58 305.02 L 67.46 316.86 L 68.99 328.37 L 70.96 337.14 L 73.38 345.7 L 76.34 353.92 L 81.6 365.54 L 86.75 374.32 L 90.37 379.47 L 98.49 389.45 L 107.81 398.77 L 112.85 403.15 L 123.6 411.27 L 136.97 419.38 L 153.97 427.39 L 173.05 434.41 L 193.88 440.21 L 216.47 444.93 L 231.38 447.12 L 251.23 448 L 272.06 447.78 L 291.58 445.7 L 308.03 442.85 L 332.26 437.04 L 347.18 432.21 L 360.66 426.95 L 378.65 417.96 L 389.27 411.27 L 403.53 399.97 L 415.81 387.36 L 424.81 375.3 L 432.26 362.14 L 437.96 348 L 442.13 332.87 L 444.54 316.86 L 445.42 299.87 L 445.09 288.13 L 443.99 276.4 L 442.24 264.88 L 439.72 253.27 L 436.54 241.86 L 432.7 230.67 L 428.2 219.6 L 423.05 208.64 L 417.13 198 L 406.38 181.44 L 397.28 169.27 L 382.15 152.05 L 371.29 141.2 L 359.57 131 L 341.14 116.53 L 307.59 91.53 L 290.27 77.82 L 276.88 65.88 L 259.67 48.88 L 256.93 48 L 252.76 48.33 Z"
+          />
+          <rect class="node" id="hook-stem" x="244" y="444" width="24" height="40" rx="12" fill="#215c4a" />
+          <line class="vein" pathLength="1" x1="256" y1="148" x2="256" y2="428" />
+          <line class="vein" pathLength="1" x1="256" y1="322" x2="138" y2="256" />
+          <line class="vein" pathLength="1" x1="256" y1="322" x2="374" y2="256" />
+          <circle class="node" id="hook-node-1" cx="138" cy="256" r="40" fill="#fbf7ea" />
+          <circle class="node" id="hook-node-2" cx="256" cy="148" r="40" fill="#fbf7ea" />
+          <circle class="node" id="hook-node-3" cx="374" cy="256" r="40" fill="#e3ac38" />
+        </g>
       </svg>
     </div>
 
@@ -129,74 +133,67 @@
   <script>
     const tl = gsap.timeline({ paused: true });
 
-    // frame 0 already carries the leaf: it settles rather than fades in from nothing
+    // the mark settles, then the leaf descends under its mask
     tl.fromTo(
       "#hook-mark svg",
-      { opacity: 0.55, y: -14, scale: 0.985 },
-      { opacity: 1, y: 0, scale: 1, duration: 0.26, ease: "power3.out" },
+      { y: -30, opacity: 0.6 },
+      { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" },
       0,
     );
-    // the leaf grows from its stem
-    tl.fromTo(
-      "#hook-mark .leaf",
-      { opacity: 0.2, scaleY: 0.55, svgOrigin: "256 460" },
-      { opacity: 1, scaleY: 1, duration: 0.55, ease: "power3.out" },
-      0.14,
-    );
-    // the veins branch out along the graph
+    tl.to("#hook-mark .leaf-clip", { clipPath: "inset(0 0 0% 0)", duration: 0.62, ease: "power2.inOut" }, 0.1);
+    tl.fromTo("#hook-stem", { opacity: 1, scaleY: 0, svgOrigin: "256 444" }, { scaleY: 1, duration: 0.2, ease: "power2.out" }, 0.5);
+    // veins branch along the graph
     tl.to(
       "#hook-mark .vein",
       { strokeDashoffset: 0, duration: 0.5, ease: "power2.inOut", stagger: 0.07 },
-      0.55,
+      0.58,
     );
-    // the petiole and the two cream commits
-    tl.fromTo("#hook-stem", { opacity: 1, scaleY: 0, svgOrigin: "256 444" }, { scaleY: 1, duration: 0.18, ease: "power2.out" }, 0.62);
     tl.fromTo(
       "#hook-node-1",
       { opacity: 1, scale: 0, svgOrigin: "138 256" },
       { scale: 1, duration: 0.22, ease: "back.out(1.7)" },
-      0.86,
+      0.9,
     );
     tl.fromTo(
       "#hook-node-2",
       { opacity: 1, scale: 0, svgOrigin: "256 148" },
       { scale: 1, duration: 0.22, ease: "back.out(1.7)" },
-      0.96,
+      1.0,
     );
-    // beat-locked: 1.09 — the head commit sprouts gold, the one accent in the film
+    // beat-locked: 1.60 (vol-11 strong cue) — the head commit sprouts gold, the one accent
     tl.fromTo(
       "#hook-node-3",
       { opacity: 1, scale: 0, svgOrigin: "374 256" },
-      { scale: 1.06, duration: 0.2, ease: "back.out(2.2)" },
-      1.09,
+      { scale: 1.08, duration: 0.22, ease: "back.out(2.2)" },
+      1.6,
     );
-    tl.to("#hook-node-3", { scale: 1, duration: 0.14, ease: "power2.out" }, 1.29);
-    tl.fromTo("#hook-mark .glow", { opacity: 0.95 }, { opacity: 0.28, duration: 0.5 }, 1.11);
-    // the claim: fast in, then a long hold
+    tl.to("#hook-node-3", { scale: 1, duration: 0.16, ease: "power2.out" }, 1.84);
+    tl.fromTo("#hook-mark .glow", { opacity: 0.95 }, { opacity: 0.3, duration: 0.5 }, 1.62);
+    // the claim: slides in from the sides (new move), then a long hold
     tl.fromTo(
       "#hook-title .l1",
-      { opacity: 0, y: 34, filter: "blur(12px)" },
-      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.32, ease: "power4.out" },
+      { opacity: 0, x: -46 },
+      { opacity: 1, x: 0, duration: 0.36, ease: "power4.out" },
       0.2,
     );
     tl.fromTo(
       "#hook-title .l2",
-      { opacity: 0, y: 34, filter: "blur(12px)" },
-      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.32, ease: "power4.out" },
-      0.32,
+      { opacity: 0, x: 46 },
+      { opacity: 1, x: 0, duration: 0.36, ease: "power4.out" },
+      0.34,
     );
     tl.fromTo(
       "#hook-caption",
       { opacity: 0, y: 14 },
       { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" },
-      0.85,
+      1.1,
     );
-    // beat-grid: the gold node's glow breathes on the bed's 0.5455s period (1.64 / 2.19 / 2.73)
-    tl.to("#hook-mark .glow", { opacity: 0.42, duration: 0.14, ease: "sine.inOut" }, 1.64);
-    tl.to("#hook-mark .glow", { opacity: 0.26, duration: 0.2, ease: "sine.inOut" }, 1.8);
-    tl.to("#hook-mark .glow", { opacity: 0.4, duration: 0.14, ease: "sine.inOut" }, 2.19);
-    tl.to("#hook-mark .glow", { opacity: 0.26, duration: 0.2, ease: "sine.inOut" }, 2.35);
-    tl.to("#hook-mark .glow", { opacity: 0.38, duration: 0.16, ease: "sine.inOut" }, 2.73);
+    // beat-grid: the gold glow breathes on the bed's 0.523s period (2.12 / 2.65 / 3.18)
+    tl.to("#hook-mark .glow", { opacity: 0.44, duration: 0.14, ease: "sine.inOut" }, 2.12);
+    tl.to("#hook-mark .glow", { opacity: 0.26, duration: 0.2, ease: "sine.inOut" }, 2.3);
+    tl.to("#hook-mark .glow", { opacity: 0.42, duration: 0.14, ease: "sine.inOut" }, 2.65);
+    tl.to("#hook-mark .glow", { opacity: 0.28, duration: 0.2, ease: "sine.inOut" }, 2.83);
+    tl.to("#hook-mark .glow", { opacity: 0.4, duration: 0.16, ease: "sine.inOut" }, 3.18);
 
     window.__timelines = window.__timelines || {};
     window.__timelines["hook"] = tl;

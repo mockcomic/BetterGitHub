@@ -4,10 +4,10 @@
       position: absolute;
       inset: 0;
       overflow: hidden;
-      background: #0b1512;
+      background: #f4f1e8;
       font-family: Inter, sans-serif;
     }
-    /* the commit box, rebuilt at push-in scale */
+    /* the commit box, rebuilt at push-in scale (light desk) */
     #agent-panel {
       position: absolute;
       left: 300px;
@@ -19,9 +19,9 @@
       position: absolute;
       inset: 0;
       border-radius: 16px;
-      background: #12241c;
-      border: 1px solid #24352c;
-      box-shadow: 0 12px 28px rgba(1, 4, 9, 0.6), 0 2px 4px rgba(1, 4, 9, 0.4);
+      background: #ffffff;
+      border: 1px solid #d9d3c2;
+      box-shadow: 0 12px 28px rgba(38, 60, 48, 0.16), 0 2px 4px rgba(38, 60, 48, 0.08);
       overflow: hidden;
     }
     #agent-panel .sheen {
@@ -30,7 +30,7 @@
       top: 0;
       width: 520px;
       height: 100%;
-      background: linear-gradient(100deg, rgba(130, 80, 223, 0) 0%, rgba(163, 113, 247, 0.35) 45%, rgba(130, 80, 223, 0) 100%);
+      background: linear-gradient(100deg, rgba(227, 172, 56, 0) 0%, rgba(227, 172, 56, 0.4) 45%, rgba(227, 172, 56, 0) 100%);
       opacity: 0;
     }
     .arow {
@@ -41,7 +41,7 @@
       gap: 16px;
       height: 64px;
       font-size: 34px;
-      color: #fbf7ea;
+      color: #24402f;
     }
     .arow .tick {
       width: 30px;
@@ -82,8 +82,8 @@
       left: 36px;
       width: 1248px;
       border-radius: 10px;
-      border: 1px solid #24352c;
-      background: #0d1b16;
+      border: 1px solid #d4cebc;
+      background: #f8f6ee;
     }
     #agent-sum {
       top: 172px;
@@ -101,7 +101,7 @@
       display: flex;
       align-items: center;
       font-size: 42px;
-      color: #93a49a;
+      color: #879282;
     }
     #agent-desc .ph {
       align-items: flex-start;
@@ -118,13 +118,13 @@
       font-family: "JetBrains Mono", monospace;
       font-size: 42px;
       white-space: nowrap;
-      color: #fbf7ea;
+      color: #1c3527;
     }
     #agent-desc .txt {
       font-size: 34px;
       align-items: flex-start;
       padding-top: 16px;
-      color: #fbf7ea;
+      color: #1c3527;
       clip-path: inset(0 100% 0 0);
     }
     .fld .txt .c {
@@ -136,7 +136,7 @@
       top: 18px;
       width: 4px;
       height: 60px;
-      background: #a371f7;
+      background: #2e7d55;
       opacity: 0;
     }
     #agent-ring {
@@ -146,7 +146,7 @@
       width: 1256px;
       height: 108px;
       border-radius: 12px;
-      border: 2px solid #a371f7;
+      border: 2px solid #8a6514;
       opacity: 0;
     }
     .ascope {
@@ -154,16 +154,16 @@
       left: 40px;
       top: 438px;
       font-size: 30px;
-      color: #93a49a;
+      color: #4e5d52;
     }
     .ascope b {
-      color: #fbf7ea;
+      color: #1c3527;
     }
     .ascope .a {
-      color: #3fb950;
+      color: #2e7d3a;
     }
     .ascope .d {
-      color: #f85149;
+      color: #c04a48;
     }
     .abtn {
       position: absolute;
@@ -181,7 +181,7 @@
     #agent-gen {
       left: 36px;
       width: 420px;
-      background: #8250df;
+      background: #215c4a;
     }
     #agent-gen .lbl {
       display: flex;
@@ -217,15 +217,15 @@
     #agent-trust code {
       font-family: "JetBrains Mono", monospace;
       font-size: 34px;
-      color: #a371f7;
-      background: rgba(130, 80, 223, 0.16);
-      border: 1px solid rgba(130, 80, 223, 0.5);
+      color: #8a6514;
+      background: rgba(227, 172, 56, 0.16);
+      border: 1px solid rgba(227, 172, 56, 0.55);
       border-radius: 8px;
       padding: 2px 12px;
     }
     #agent-trust span {
       font-size: 30px;
-      color: #93a49a;
+      color: #4e5d52;
     }
     #agent-cursor {
       position: absolute;
@@ -249,11 +249,11 @@
       <div data-hf-id="hf-d74r" class="box">
         <div data-hf-id="hf-x5sz" class="sheen"></div>
         <div data-hf-id="hf-pipu" class="arow" id="agent-r1">
-          <span data-hf-id="hf-coyi" class="tick"></span><span data-hf-id="hf-i0dr" class="mk" style="color: #e3ac38">M</span
+          <span data-hf-id="hf-coyi" class="tick"></span><span data-hf-id="hf-i0dr" class="mk" style="color: #9a7b1f">M</span
           ><span data-hf-id="hf-kgwn" class="p">src/main/git/porcelain.ts</span>
         </div>
         <div data-hf-id="hf-lklt" class="arow" id="agent-r2">
-          <span data-hf-id="hf-ptha" class="tick"></span><span data-hf-id="hf-98cv" class="mk" style="color: #e3ac38">M</span
+          <span data-hf-id="hf-ptha" class="tick"></span><span data-hf-id="hf-98cv" class="mk" style="color: #9a7b1f">M</span
           ><span data-hf-id="hf-ftd4" class="p">src/main/git/status.ts</span>
         </div>
 
@@ -263,7 +263,10 @@
           <span data-hf-id="hf-0739" id="agent-caret" data-layout-allow-overlap="true" data-layout-allow-occlusion="true"></span>
         </div>
         <div data-hf-id="hf-nnuz" class="fld" id="agent-desc">
-          <span data-hf-id="hf-7th5" class="ph">Description</span>
+          <!-- the old cut left this placeholder up while the text faded in over
+               it: "Renames carry a second path." collided with "Description".
+               The placeholder now leaves with the text. -->
+          <span data-hf-id="hf-7th5" class="ph" id="agent-desc-ph">Description</span>
           <span data-hf-id="hf-blgg" class="txt" id="agent-desc-text">Renames carry a second path.</span>
         </div>
         <div data-hf-id="hf-udan" id="agent-ring"></div>
@@ -288,7 +291,7 @@
         <path data-hf-id="hf-5tlk"
           d="M4 1 L4 19 L8.6 14.8 L11.4 21 L14.4 19.7 L11.6 13.7 L18 13.2 Z"
           fill="#ffffff"
-          stroke="#0b1512"
+          stroke="#16382a"
           stroke-width="1.4"
           stroke-linejoin="round"
         />
@@ -314,7 +317,7 @@
       0,
     );
 
-    // cursor arrives and presses the violet button
+    // cursor arrives and presses the deep-green button
     tl.fromTo(
       "#agent-cursor .cur",
       { opacity: 0, x: 1520, y: 900 },
@@ -322,29 +325,29 @@
       0.04,
     );
     tl.to("#agent-cursor .cur", { x: 560, y: 700, duration: 0.3, ease: "power2.inOut" }, 0.05);
-    // beat-locked: 8.74 — the click on Generate (scene-local 0.34)
-    tl.to("#agent-cursor .cur", { scale: 0.9, duration: 0.07, ease: "power2.in" }, 0.34);
-    tl.to("#agent-cursor .cur", { scale: 1, duration: 0.12, ease: "back.out(2)" }, 0.42);
-    tl.to("#agent-gen-lbl", { opacity: 0, duration: 0.1 }, 0.36);
-    tl.to("#agent-cancel", { opacity: 1, duration: 0.1 }, 0.4);
-    tl.fromTo("#agent-cancel .spin", { rotation: 0 }, { rotation: 720, duration: 0.62, ease: "none" }, 0.4);
-    tl.fromTo("#agent-ring", { opacity: 0 }, { opacity: 0.9, duration: 0.12 }, 0.4);
-    tl.to("#agent-ring", { opacity: 0, duration: 0.3 }, 0.94);
-    // one violet sweep while the agent thinks
+    // beat-locked: 8.96 (vol-11 strong cue) — the click on Generate (scene-local 0.56)
+    tl.to("#agent-cursor .cur", { scale: 0.9, duration: 0.07, ease: "power2.in" }, 0.56);
+    tl.to("#agent-cursor .cur", { scale: 1, duration: 0.12, ease: "back.out(2)" }, 0.64);
+    tl.to("#agent-gen-lbl", { opacity: 0, duration: 0.1 }, 0.58);
+    tl.to("#agent-cancel", { opacity: 1, duration: 0.1 }, 0.62);
+    tl.fromTo("#agent-cancel .spin", { rotation: 0 }, { rotation: 720, duration: 0.62, ease: "none" }, 0.62);
+    tl.fromTo("#agent-ring", { opacity: 0 }, { opacity: 0.9, duration: 0.12 }, 0.62);
+    tl.to("#agent-ring", { opacity: 0, duration: 0.3 }, 1.16);
+    // one gold sweep while the agent thinks
     tl.fromTo(
       "#agent-panel .sheen",
       { x: -560, opacity: 0 },
       { x: 1400, opacity: 0.55, duration: 0.4, ease: "power1.in" },
-      0.42,
+      0.64,
     );
-    tl.to("#agent-panel .sheen", { opacity: 0, duration: 0.3, ease: "power1.out" }, 0.82);
-    tl.to("#agent-gen-lbl", { opacity: 1, duration: 0.1 }, 1.04);
-    tl.to("#agent-cancel", { opacity: 0, duration: 0.1 }, 1.02);
+    tl.to("#agent-panel .sheen", { opacity: 0, duration: 0.3, ease: "power1.out" }, 1.04);
+    tl.to("#agent-gen-lbl", { opacity: 1, duration: 0.1 }, 1.26);
+    tl.to("#agent-cancel", { opacity: 0, duration: 0.1 }, 1.24);
 
     // the placeholder leaves and the field types itself
-    tl.to("#agent-ph", { opacity: 0, duration: 0.1 }, 0.98);
-    tl.fromTo("#agent-caret", { opacity: 0, x: 0 }, { opacity: 1, duration: 0.08 }, 1.0);
-    let t = 1.02;
+    tl.to("#agent-ph", { opacity: 0, duration: 0.1 }, 1.2);
+    tl.fromTo("#agent-caret", { opacity: 0, x: 0 }, { opacity: 1, duration: 0.08 }, 1.22);
+    let t = 1.24;
     chars.forEach((_, i) => {
       tl.to(target.children[i], { opacity: 1, duration: 0.02 }, t);
       tl.set("#agent-caret", { x: ADV * (i + 1) }, t + 0.01);
@@ -352,7 +355,9 @@
       t += 0.052 + ((i * 37) % 11) * 0.002;
     });
 
-    // the description fills once the title is done; the caret rests where the typing stopped
+    // the description fills once the title is done — placeholder leaves WITH the
+    // text (the collision fix) — and the caret rests where the typing stopped
+    tl.to("#agent-desc-ph", { opacity: 0, duration: 0.12 }, t + 0.12);
     tl.to("#agent-desc-text", { clipPath: "inset(0 0% 0 0)", duration: 0.34, ease: "power2.out" }, t + 0.18);
     tl.to("#agent-caret", { opacity: 0, duration: 0.16 }, t + 0.5);
 

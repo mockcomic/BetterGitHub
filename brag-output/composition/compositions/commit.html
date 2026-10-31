@@ -4,10 +4,10 @@
       position: absolute;
       inset: 0;
       overflow: hidden;
-      background: #0b1512;
+      background: #f4f1e8;
       font-family: Inter, sans-serif;
     }
-    /* the same commit box, punched in on the verbs */
+    /* the same commit box, punched in on the verbs (light desk) */
     #commit-panel {
       position: absolute;
       left: 240px;
@@ -19,9 +19,9 @@
       position: absolute;
       inset: 0;
       border-radius: 16px;
-      background: #12241c;
-      border: 1px solid #24352c;
-      box-shadow: 0 12px 28px rgba(1, 4, 9, 0.6), 0 2px 4px rgba(1, 4, 9, 0.4);
+      background: #ffffff;
+      border: 1px solid #d9d3c2;
+      box-shadow: 0 12px 28px rgba(38, 60, 48, 0.16), 0 2px 4px rgba(38, 60, 48, 0.08);
     }
     #commit-sum {
       position: absolute;
@@ -30,21 +30,21 @@
       width: 1360px;
       height: 110px;
       border-radius: 10px;
-      border: 1px solid #24352c;
-      background: #0d1b16;
+      border: 1px solid #d4cebc;
+      background: #f8f6ee;
       display: flex;
       align-items: center;
       padding: 0 26px;
       font-family: "JetBrains Mono", monospace;
       font-size: 46px;
-      color: #fbf7ea;
+      color: #1c3527;
       white-space: nowrap;
     }
     #commit-sum .cur {
       width: 4px;
       height: 56px;
       margin-left: 6px;
-      background: #93a49a;
+      background: #4e5d52;
       opacity: 0.6;
     }
     #commit-desc {
@@ -54,14 +54,14 @@
       width: 1360px;
       height: 108px;
       border-radius: 10px;
-      border: 1px solid #24352c;
-      background: #0d1b16;
+      border: 1px solid #d4cebc;
+      background: #f8f6ee;
       display: flex;
       align-items: center;
       padding: 0 26px;
       font-family: "JetBrains Mono", monospace;
       font-size: 34px;
-      color: #fbf7ea;
+      color: #1c3527;
       white-space: nowrap;
     }
     #commit-scope {
@@ -69,16 +69,16 @@
       left: 44px;
       top: 302px;
       font-size: 30px;
-      color: #93a49a;
+      color: #4e5d52;
     }
     #commit-scope b {
-      color: #fbf7ea;
+      color: #1c3527;
     }
     #commit-scope .a {
-      color: #3fb950;
+      color: #2e7d3a;
     }
     #commit-scope .d {
-      color: #f85149;
+      color: #c04a48;
     }
     .cbtn {
       position: absolute;
@@ -96,7 +96,7 @@
     #commit-gen {
       left: 40px;
       width: 440px;
-      background: #8250df;
+      background: #215c4a;
     }
     #commit-go {
       left: 500px;
@@ -106,13 +106,13 @@
     #commit-push {
       left: 1074px;
       width: 326px;
-      background: #1c2f26;
-      border: 1px solid #24352c;
-      color: #fbf7ea;
+      background: #f6f3ea;
+      border: 1px solid #d4cebc;
+      color: #1c3527;
       font-weight: 500;
     }
     #commit-push .n {
-      color: #8fa096;
+      color: #6e5210;
       font-weight: 700;
     }
     #commit-confetti {
@@ -152,10 +152,10 @@
       width: 1000px;
       height: 112px;
       border-radius: 12px;
-      background: #12241c;
-      border: 1px solid #24352c;
-      border-left: 6px solid #3fb950;
-      box-shadow: 0 12px 28px rgba(1, 4, 9, 0.6);
+      background: #ffffff;
+      border: 1px solid #d9d3c2;
+      border-left: 6px solid #2e7d55;
+      box-shadow: 0 12px 28px rgba(38, 60, 48, 0.18);
       display: flex;
       align-items: center;
       gap: 24px;
@@ -163,12 +163,12 @@
     }
     #commit-toast .msg {
       font-size: 30px;
-      color: #fbf7ea;
+      color: #1c3527;
       white-space: nowrap;
     }
     #commit-toast .msg code {
       font-family: "JetBrains Mono", monospace;
-      color: #3fb950;
+      color: #2e7d55;
     }
     #commit-toast .undo {
       margin-left: auto;
@@ -202,7 +202,7 @@
         <path data-hf-id="hf-5tlk"
           d="M4 1 L4 19 L8.6 14.8 L11.4 21 L14.4 19.7 L11.6 13.7 L18 13.2 Z"
           fill="#ffffff"
-          stroke="#0b1512"
+          stroke="#16382a"
           stroke-width="1.4"
           stroke-linejoin="round"
         />
@@ -228,8 +228,8 @@
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       };
     }
-    // the app's burst: success, accent, caution, and a touch of the agent's violet
-    const COLORS = ["#3fb950", "#3fa06b", "#e3ac38", "#e3ac38", "#fbf7ea", "#a371f7"];
+    // Aspen's burst: aspen greens, the gold once, and a deeper gold for legibility on paper
+    const COLORS = ["#2e7d55", "#215c4a", "#e3ac38", "#e3ac38", "#8a6514", "#a371f7"];
     const rand = mulberry32(7 * 2654435761);
     const layer = document.getElementById("commit-confetti");
     for (let i = 0; i < 14; i++) {
@@ -254,12 +254,12 @@
         bit,
         { x: 0, y: 0, opacity: 1, rotation: 0 },
         { x: cx, y: cy, opacity: 1, rotation: rot * 0.55, duration: 0.26, ease: "power2.out" },
-        0.46 + delay,
+        0.52 + delay,
       );
       tl.to(
         bit,
         { x: cx * 1.3, y: cy + 300, opacity: 0, rotation: rot, duration: 0.46, ease: "power2.in" },
-        0.72 + delay,
+        0.78 + delay,
       );
     }
 
@@ -274,12 +274,12 @@
     // cursor comes to the verb
     tl.fromTo("#commit-cursor .cur", { opacity: 0, x: 1620, y: 990 }, { opacity: 1, duration: 0.1 }, 0.04);
     tl.to("#commit-cursor .cur", { x: 1006, y: 730, duration: 0.34, ease: "power2.inOut" }, 0.06);
-    // beat-locked: 13.64 — the commit click (scene-local 0.44); the button pops and sheds confetti
-    tl.to("#commit-go", { scale: 0.955, duration: 0.07, ease: "power2.in" }, 0.44);
-    tl.to("#commit-go", { scale: 1.035, duration: 0.16, ease: "back.out(3)" }, 0.51);
-    tl.to("#commit-go", { scale: 1, duration: 0.2, ease: "power2.out" }, 0.67);
-    tl.to("#commit-cursor .cur", { scale: 0.9, duration: 0.07 }, 0.44);
-    tl.to("#commit-cursor .cur", { scale: 1, duration: 0.14, ease: "back.out(2)" }, 0.52);
+    // beat-locked: 13.70 (vol-11 grid beat) — the commit click (scene-local 0.50); the button pops and sheds confetti
+    tl.to("#commit-go", { scale: 0.955, duration: 0.07, ease: "power2.in" }, 0.5);
+    tl.to("#commit-go", { scale: 1.035, duration: 0.16, ease: "back.out(3)" }, 0.57);
+    tl.to("#commit-go", { scale: 1, duration: 0.2, ease: "power2.out" }, 0.73);
+    tl.to("#commit-cursor .cur", { scale: 0.9, duration: 0.07 }, 0.5);
+    tl.to("#commit-cursor .cur", { scale: 1, duration: 0.14, ease: "back.out(2)" }, 0.58);
 
     window.__timelines = window.__timelines || {};
     window.__timelines["commit"] = tl;
