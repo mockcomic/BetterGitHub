@@ -177,6 +177,13 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
         setSessionId(info.id)
         setLabel(info.shellLabel)
         terminal.focus()
+        // The input leg of the round trip: everything xterm encodes from a
+        // keystroke (printables, Enter, arrows, paste, IME commits) leaves
+        // the renderer on this one line. Without it the PTY never hears the
+        // keyboard — the push channel alone only carries output back.
+        terminal.onData(data => {
+          if (sessionId !== null) void call('terminalWrite', sessionId, data)
+        })
         unsubOutput = onTerminalOutput((id, data) => {
           if (id === sessionId) terminal.write(data)
         })
