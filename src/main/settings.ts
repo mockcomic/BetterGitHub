@@ -12,7 +12,7 @@ import type {
   SettingsPatch
 } from '../shared/models'
 import {
-  DEFAULT_GITHUB_DEVICE_CLIENT_ID,
+  DEFAULT_GITHUB_CLIENT_ID,
   DEFAULT_GITLAB_CLIENT_ID
 } from './providers/config'
 
@@ -36,6 +36,8 @@ interface StoredSettings {
   autoRefresh: boolean
   theme: ThemeId
   hintsEnabled: boolean
+  /** Silent startup Releases check + background download (see updates.ts). */
+  autoUpdateChecks: boolean
 }
 
 const DEFAULTS: StoredSettings = {
@@ -46,13 +48,14 @@ const DEFAULTS: StoredSettings = {
     customInstructions: ''
   },
   accounts: {
-    githubClientId: DEFAULT_GITHUB_DEVICE_CLIENT_ID,
+    githubClientId: DEFAULT_GITHUB_CLIENT_ID,
     gitlabClientId: DEFAULT_GITLAB_CLIENT_ID
   },
   confirmOverrideWithGeneratedMessage: true,
   autoRefresh: true,
   theme: 'light',
-  hintsEnabled: true
+  hintsEnabled: true,
+  autoUpdateChecks: true
 }
 
 let cached: StoredSettings | null = null
@@ -122,7 +125,8 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     confirmOverrideWithGeneratedMessage: s.confirmOverrideWithGeneratedMessage,
     autoRefresh: s.autoRefresh,
     theme: s.theme,
-    hintsEnabled: s.hintsEnabled
+    hintsEnabled: s.hintsEnabled,
+    autoUpdateChecks: s.autoUpdateChecks
   }
 }
 
@@ -143,7 +147,7 @@ function effectiveClientIds(s: StoredSettings): {
   gitlab: string
 } {
   return {
-    github: s.accounts.githubClientId.trim() || DEFAULT_GITHUB_DEVICE_CLIENT_ID,
+    github: s.accounts.githubClientId.trim() || DEFAULT_GITHUB_CLIENT_ID,
     gitlab: s.accounts.gitlabClientId.trim() || DEFAULT_GITLAB_CLIENT_ID
   }
 }
@@ -174,6 +178,9 @@ export async function saveSettings(patch: SettingsPatch): Promise<PublicSettings
   }
   if (patch.autoRefresh !== undefined) s.autoRefresh = patch.autoRefresh
   if (patch.hintsEnabled !== undefined) s.hintsEnabled = patch.hintsEnabled
+  if (patch.autoUpdateChecks !== undefined) {
+    s.autoUpdateChecks = patch.autoUpdateChecks
+  }
   if (patch.theme !== undefined && isThemeId(patch.theme)) s.theme = patch.theme
   await persist()
   return getPublicSettings()
@@ -230,6 +237,10 @@ export async function getThemeSetting(): Promise<ThemeId> {
 
 export async function isAutoRefreshEnabled(): Promise<boolean> {
   return (await load()).autoRefresh
+}
+
+export async function isAutoUpdateChecksEnabled(): Promise<boolean> {
+  return (await load()).autoUpdateChecks
 }
 
 // ---------------------------------------------------------------------------

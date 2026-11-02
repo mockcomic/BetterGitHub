@@ -1,6 +1,7 @@
 import type {
   AccountInfo,
   AccountProvider,
+  AccountSyncReport,
   AddRepositoriesResult,
   AiMergeOutcome,
   BranchList,
@@ -31,6 +32,7 @@ import type {
   TerminalSessionInfo,
   WorkflowKind
 } from './models'
+import type { UpdateCheckResult } from './updates'
 
 /**
  * The typed renderer -> main request/response contract.
@@ -72,6 +74,23 @@ export interface RequestResponseChannels {
   }) => { ok: boolean; message: string }
   suggestCloneFolder: (url: string) => string
 
+  // self-update (GitHub Releases; see src/main/updates.ts)
+  /**
+   * Manual "Check for updates…". Unlike the silent startup pass this always
+   * answers — up-to-date, available, or an error string — so the UI can
+   * report it. Main additionally pushes UPDATE_STATE_CHANNEL phases (progress
+   * of a self-applying download included).
+   */
+  checkForUpdates: () => UpdateCheckResult
+  /**
+   * Apply an already-downloaded update and restart. Self-updating builds
+   * only; everywhere else it throws a "download from the releases page"
+   * message the generic toast displays.
+   */
+  quitAndInstallUpdate: () => void
+  /** The real packaged version for the About dialog's version line. */
+  getAppVersion: () => string
+
   // hosted accounts (GitHub / GitLab) — sign in, browse, clone
   /** Every signed-in account, token-free. */
   listAccounts: () => AccountInfo[]
@@ -86,16 +105,32 @@ export interface RequestResponseChannels {
     apiBase?: string
   ) => AccountInfo
   /**
-   * Start a browser sign-in: GitHub device flow (type the code) or GitLab
-   * OAuth PKCE (main already listens for the localhost redirect). Throws a
-   * clear message when the provider's client id is not configured.
+   * Start a browser sign-in: GitHub authorization-code + PKCE (falling back
+   * to the device-code flow when the loopback port is busy or `prefer` says
+   * so) or GitLab OAuth PKCE; main already listens for the localhost
+   * redirect. Throws a clear message when the provider's client id is not
+   * configured.
    */
-  beginSignIn: (provider: AccountProvider, apiBase?: string) => SignInChallenge
+  beginSignIn: (
+    provider: AccountProvider,
+    apiBase?: string,
+    prefer?: 'web' | 'device'
+  ) => SignInChallenge
   /** Poll a pending challenge; 'pending' keeps the UI's wait state alive. */
   pollSignIn: (requestId: string) => SignInStatus
   cancelSignIn: (requestId: string) => void
   /** Forget an account and destroy its stored token. */
   removeAccount: (id: string) => void
+  /**
+   * Re-validate every stored account against the provider: refreshes
+   * display name/avatar and drops accounts whose token was revoked.
+   */
+  syncAccounts: () => AccountSyncReport
+  /**
+   * The account's avatar as a `data:` URL (fetched in main so the renderer
+   * CSP never needs remote image sources); null while unavailable.
+   */
+  accountAvatar: (accountId: string) => string | null
   /** One page of the account's repositories, owner/collaborator/org-wide. */
   listRemoteRepositories: (
     accountId: string,
@@ -295,6 +330,7 @@ export type MenuAction =
   | 'rename-branch'
   | 'view-on-github'
   | 'toggle-terminal'
+  | 'check-updates'
   | 'show-about'
   | 'donate'
 
@@ -347,3 +383,10 @@ export const TERMINAL_OUTPUT_CHANNEL = 'terminal-output'
 
 /** Main -> renderer push: a terminal session's shell exited (id, code). */
 export const TERMINAL_EXIT_CHANNEL = 'terminal-exit'
+
+/**
+ * Main -> renderer push: the self-update flow changed phase. Payload is an
+ * UpdateState (src/shared/updates.ts); the store mirrors it and toasts on
+ * the transitions that deserve attention.
+ */
+export const UPDATE_STATE_CHANNEL = 'update-state'

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildGitHubSearchQuery,
+  githubListSortParams,
   githubRepoHost,
   githubSiteRoot,
   mapGitHubIdentity,
   mapGitHubRepo,
   mapGitHubRepoPage,
+  mapGitHubSearchPage,
   normalizeGitHubApiBase
 } from '../src/main/providers/github'
 import {
@@ -238,5 +241,57 @@ describe('mapGitLabRepoPage', () => {
       mapGitLabRepoPage(one, 'a', new Headers({ 'x-next-page': '' })).nextCursor
     ).toBeNull()
     expect(mapGitLabRepoPage({}, 'a', new Headers()).items).toEqual([])
+  })
+})
+
+describe('githubListSortParams', () => {
+  it('maps each sort choice to GitHub parameters', () => {
+    expect(githubListSortParams('pushed')).toBe('&sort=pushed&direction=desc')
+    expect(githubListSortParams('created')).toBe('&sort=created&direction=desc')
+    expect(githubListSortParams('name')).toBe('&sort=full-name&direction=asc')
+    expect(githubListSortParams(undefined)).toBe('')
+  })
+})
+
+describe('buildGitHubSearchQuery', () => {
+  it('scopes to the user plus seen orgs and includes forks', () => {
+    expect(buildGitHubSearchQuery('octo', ['github', 'octocat'], 'aspen git')).toBe(
+      'aspen git org:github org:octocat user:octo fork:true'
+    )
+  })
+
+  it('drops the login from the org list and caps orgs at five', () => {
+    const many = ['octo', 'a', 'b', 'c', 'd', 'e', 'f']
+    expect(buildGitHubSearchQuery('octo', many, 'x')).toBe(
+      'x org:a org:b org:c org:d org:e user:octo fork:true'
+    )
+  })
+
+  it('neutralizes query-syntax characters in the pasted text', () => {
+    expect(buildGitHubSearchQuery('octo', [], '"quoted" -minus normal')).toBe(
+      'quoted minus normal user:octo fork:true'
+    )
+  })
+})
+
+describe('mapGitHubSearchPage', () => {
+  const body = {
+    total_count: 2,
+    items: [
+      { full_name: 'a/one', clone_url: 'https://github.com/a/one.git' },
+      { full_name: 'a/two', clone_url: 'https://github.com/a/two.git' }
+    ]
+  }
+
+  it('maps the items array with the same full-page cursor rule', () => {
+    const page = mapGitHubSearchPage(body, 'acct', 1, 2)
+    expect(page.items).toHaveLength(2)
+    expect(page.nextCursor).toBe('2')
+    expect(mapGitHubSearchPage(body, 'acct', 1, 50).nextCursor).toBeNull()
+  })
+
+  it('survives bodies without an items array', () => {
+    expect(mapGitHubSearchPage({ message: 'sad' }, 'acct', 1, 10).items).toEqual([])
+    expect(mapGitHubSearchPage([1, 2], 'acct', 1, 10).items).toEqual([])
   })
 })

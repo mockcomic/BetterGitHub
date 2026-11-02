@@ -59,7 +59,8 @@ function settings(
     confirmOverrideWithGeneratedMessage: true,
     autoRefresh: true,
     theme: 'system',
-    hintsEnabled: true
+    hintsEnabled: true,
+    autoUpdateChecks: true
   }
 }
 

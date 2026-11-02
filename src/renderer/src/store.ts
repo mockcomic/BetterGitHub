@@ -21,6 +21,7 @@ import type {
   MergeQuestion,
   PublicSettings,
   RemoteRepoPage,
+  RemoteRepoSort,
   Repository,
   RepositoryStatus,
   SettingsPatch,
@@ -32,9 +33,10 @@ import type { MenuAction } from '../../shared/ipc'
 import type { ThemeId } from '../../shared/themes'
 import { themeBase } from '../../shared/themes'
 import { DONATE_URL } from '../../shared/links'
+import { RELEASES_URL, type UpdateState } from '../../shared/updates'
 import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
 import { aiLooksUnconfigured } from './progressive'
-import { call, onMenuAction, onRepoChanged } from './api'
+import { call, onMenuAction, onRepoChanged, onUpdateState } from './api'
 
 export interface ToastAction {
   readonly label: string
@@ -209,6 +211,12 @@ export interface AppState {
   readonly settings: PublicSettings | null
   /** Signed-in hosted accounts (GitHub/GitLab); tokens never cross the bridge. */
   readonly accounts: ReadonlyArray<AccountInfo>
+  /**
+   * Account avatars as data: URLs (main fetches them so the CSP stays
+   * local-only), keyed by account id; absent = not fetched yet, null =
+   * unavailable (initials render instead).
+   */
+  readonly avatars: Readonly<Record<string, string | null>>
   /** An in-flight browser sign-in (device code / PKCE redirect), if any. */
   readonly signIn: SignInChallenge | null
   /** Last sign-in failure, shown inline by the sign-in panel. */
@@ -228,6 +236,8 @@ export interface AppState {
   readonly renameBranchTarget: string | null
   readonly mergeBranchOpen: boolean
   readonly showAbout: boolean
+  /** The self-update flow's latest phase (main pushes UPDATE_STATE_CHANNEL). */
+  readonly update: UpdateState | null
   readonly confirm: ConfirmRequest | null
   readonly initError: string | null
   readonly lastRefreshedAt: number | null
@@ -288,6 +298,7 @@ const initialState: AppState = {
   celebration: null,
   settings: null,
   accounts: [],
+  avatars: {},
   signIn: null,
   signInError: null,
   toasts: [],
@@ -305,6 +316,7 @@ const initialState: AppState = {
   renameBranchTarget: null,
   mergeBranchOpen: false,
   showAbout: false,
+  update: null,
   confirm: null,
   initError: null,
   lastRefreshedAt: null
@@ -484,6 +496,10 @@ export class AppStore {
         terminalOpen: readTerminalOpen()
       })
       this.applyTheme(settings.theme)
+      // Best-effort pass over the stored accounts: refreshed names/avatars,
+      // and a toast for anything the provider now rejects.
+      void this.loadAvatars()
+      void this.syncAccounts()
 
       const lastPath = localStorage.getItem('aspen.lastRepo')
       // Missing folders never open silently — the manager surfaces them.
@@ -519,6 +535,10 @@ export class AppStore {
       ) {
         void this.refresh({ silent: true })
       }
+    })
+
+    onUpdateState(state => {
+      this.applyUpdatePush(state)
     })
 
     window.addEventListener('focus', () => {
@@ -578,10 +598,13 @@ export class AppStore {
   private async handleMenuAction(action: MenuAction): Promise<void> {
     // Menu accelerators bypass the disabled buttons; without this gate a
     // second Ctrl+Enter double-commits and Ctrl+Shift+{P,U} run git
-    // concurrently and hit index-lock errors. Read-only refresh is exempt.
+    // concurrently and hit index-lock errors. Read-only refresh is exempt —
+    // as are the donate and check-for-updates one-offs, neither of which
+    // touches the working tree.
     if (
       action !== 'refresh' &&
       action !== 'donate' &&
+      action !== 'check-updates' &&
       action !== 'toggle-terminal' &&
       this.state.busy !== null
     ) {
@@ -630,6 +653,9 @@ export class AppStore {
         break
       case 'show-about':
         this.update({ showAbout: true })
+        break
+      case 'check-updates':
+        await this.checkForUpdatesNow()
         break
       case 'toggle-terminal':
         this.toggleTerminal()
@@ -919,8 +945,45 @@ export class AppStore {
   async refreshAccounts(): Promise<void> {
     try {
       this.update({ accounts: await call('listAccounts') })
+      void this.loadAvatars()
     } catch {
       /* Account lists are best-effort; the next dialog open retries. */
+    }
+  }
+
+  /**
+   * Boot-time re-validation of every stored account (main owns the logic):
+   * updated names/avatars land in the list, and an account whose token was
+   * revoked signs itself out with a toast explaining why.
+   */
+  async syncAccounts(): Promise<void> {
+    try {
+      const report = await call('syncAccounts')
+      this.update({ accounts: report.accounts })
+      for (const gone of report.signedOut) {
+        this.toast(
+          'info',
+          `Signed out of ${gone.login} — ${gone.provider === 'github' ? 'GitHub' : 'GitLab'} no longer accepts the stored token.`
+        )
+      }
+      if (report.signedOut.length > 0) void this.loadAvatars()
+    } catch {
+      /* Offline at boot: the identities simply stay as last seen. */
+    }
+  }
+
+  /** Fetch any account avatars this renderer pass has not seen yet. */
+  private async loadAvatars(): Promise<void> {
+    for (const account of this.state.accounts) {
+      if (account.avatarUrl === null) continue
+      if (account.id in this.state.avatars) continue
+      void call('accountAvatar', account.id)
+        .then(url => {
+          this.update({ avatars: { ...this.state.avatars, [account.id]: url } })
+        })
+        .catch(() => {
+          this.update({ avatars: { ...this.state.avatars, [account.id]: null } })
+        })
     }
   }
 
@@ -951,20 +1014,24 @@ export class AppStore {
   }
 
   /**
-   * Browser sign-in: device flow for GitHub, PKCE redirect for GitLab. The
-   * main process owns the token exchange; this loop only asks "is it done"
-   * at the provider's own cadence, so closing the dialog never strands the
-   * sign-in — it completes on the next poll wherever the UI happens to be.
+   * Browser sign-in: GitHub authorization-code + PKCE (falling back to the
+   * device-code flow when the loopback port is busy, or when `prefer` says
+   * 'device'), GitLab OAuth PKCE. The main process owns the token exchange;
+   * this loop only asks "is it done" at the provider's own cadence, so
+   * closing the dialog never strands the sign-in — it completes on the next
+   * poll wherever the UI happens to be.
    */
   async startBrowserSignIn(
     provider: AccountProvider,
-    apiBase?: string
+    apiBase?: string,
+    prefer?: 'web' | 'device'
   ): Promise<{ ok: boolean; message: string }> {
     try {
       const challenge = await call(
         'beginSignIn',
         provider,
-        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined
+        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined,
+        prefer
       )
       this.update({ signIn: challenge, signInError: null })
       const openUrl =
@@ -1032,6 +1099,9 @@ export class AppStore {
   async signOut(accountId: string): Promise<void> {
     try {
       await call('removeAccount', accountId)
+      const avatars = { ...this.state.avatars }
+      delete avatars[accountId]
+      this.update({ avatars })
       await this.refreshAccounts()
       this.toast('info', 'Signed out — the stored token was deleted.')
     } catch (err) {
@@ -1040,15 +1110,17 @@ export class AppStore {
   }
 
   /**
-   * One page of an account's hosted repositories (main applies the provider
-   * search where the API supports it; the pane re-filters loaded items).
+   * One page of an account's hosted repositories. A non-empty `search` is
+   * applied provider-side (GitHub Search API / GitLab `?search=`); the pane
+   * re-filters loaded items client-side too.
    */
   async listRemoteRepos(
     accountId: string,
     search: string,
-    cursor: string | null
+    cursor: string | null,
+    sort?: RemoteRepoSort
   ): Promise<RemoteRepoPage> {
-    return call('listRemoteRepositories', accountId, { search, cursor, perPage: 50 })
+    return call('listRemoteRepositories', accountId, { search, cursor, perPage: 50, sort })
   }
 
   // ---------------------------------------------------------------- refresh
@@ -2496,6 +2568,110 @@ export class AppStore {
 
   setAboutOpen(open: boolean): void {
     this.update({ showAbout: open })
+  }
+
+  // ------------------------------------------------------------------ updates
+
+  /** Last pushed phase — toasts fire on transitions, not on repeats of a
+   *  phase a re-check can push again (checking → … → checking → …). */
+  private lastUpdatePhase: UpdateState['phase'] | null = null
+
+  /** Mirror main's push and speak only for the moments that matter:
+   *  a found update (download note, or the page link for builds that
+   *  can't self-apply) and a finished download. Errors and up-to-date
+   *  answers come from the manual call itself, so the silent startup
+   *  pass never nags. */
+  private applyUpdatePush(state: UpdateState): void {
+    const repeated = this.lastUpdatePhase === state.phase
+    this.lastUpdatePhase = state.phase
+    this.update({ update: state })
+    if (repeated) return
+    if (state.phase === 'ready') {
+      this.toast('success', `Aspen ${state.version ?? 'x'} is downloaded.`, [
+        {
+          label: 'Restart now',
+          onClick: () => {
+            void this.applyDownloadedUpdate()
+          }
+        }
+      ])
+    } else if (state.phase === 'available') {
+      if (state.canInstall) {
+        this.toast('info', `Downloading Aspen ${state.version ?? 'x'}…`)
+      } else {
+        this.toast('info', `Aspen ${state.version ?? 'a newer version'} is available.`, [
+          {
+            label: 'Open releases',
+            onClick: () => {
+              void call('openExternal', state.releaseUrl)
+            }
+          }
+        ])
+      }
+    }
+  }
+
+  /** Help → "Check for updates…" and the About dialog's button. When an
+   *  update already sits downloaded the honest next step is the restart
+   *  question, not another round-trip. */
+  async checkForUpdatesNow(): Promise<void> {
+    const ready = this.state.update
+    if (ready !== null && ready.phase === 'ready') {
+      this.update({
+        confirm: {
+          title: 'Restart to update',
+          message: `Aspen ${ready.version ?? 'x'} is downloaded. Restart now to install it?`,
+          confirmLabel: 'Restart now',
+          onConfirm: () => {
+            this.dismissConfirm()
+            void this.applyDownloadedUpdate()
+          }
+        }
+      })
+      return
+    }
+    try {
+      const res = await call('checkForUpdates')
+      if (res.status === 'up-to-date') {
+        this.toast('info', `Aspen ${res.currentVersion} is the newest release.`)
+      } else if (res.status === 'error') {
+        this.toast('error', res.error ?? 'The update check failed.', [
+          {
+            label: 'Open releases',
+            onClick: () => {
+              void call('openExternal', RELEASES_URL)
+            }
+          }
+        ])
+      }
+      // 'available': applyUpdatePush already toasted the right action for
+      // this build's tier; saying it twice from here would only jingle.
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Hand off to the downloaded installer. In practice the app quits
+   *  before the promise answers; a refusal (no download, portable build)
+   *  lands as the actionable toast. */
+  private async applyDownloadedUpdate(): Promise<void> {
+    try {
+      await call('quitAndInstallUpdate')
+    } catch (err) {
+      const url = this.state.update?.releaseUrl ?? RELEASES_URL
+      this.toast(
+        'error',
+        err instanceof Error ? err.message : String(err),
+        [
+          {
+            label: 'Open releases',
+            onClick: () => {
+              void call('openExternal', url)
+            }
+          }
+        ]
+      )
+    }
   }
 
   dismissConfirm(): void {

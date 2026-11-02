@@ -1,4 +1,5 @@
 import type { IpcResult } from '../../shared/models'
+import type { UpdateState } from '../../shared/updates'
 import type {
   MenuAction,
   RequestResponseChannel,
@@ -21,6 +22,7 @@ declare global {
       onTerminalExit(
         callback: (id: string, exitCode: number) => void
       ): () => void
+      onUpdateState(callback: (state: UpdateState) => void): () => void
     }
   }
 }
@@ -63,4 +65,10 @@ export function onTerminalExit(
   callback: (id: string, exitCode: number) => void
 ): () => void {
   return window.aspen.onTerminalExit(callback)
+}
+
+export function onUpdateState(
+  callback: (state: UpdateState) => void
+): () => void {
+  return window.aspen.onUpdateState(callback)
 }

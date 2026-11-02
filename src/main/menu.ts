@@ -175,6 +175,9 @@ const MENUS: ReadonlyArray<TopMenu> = [
   {
     label: 'Help',
     items: [
+      // Contextual in the renderer: 'ready' phase asks to restart-and-apply,
+      // anything else runs the check (src/renderer/src/store.ts dispatcher).
+      { label: 'Check for updates…', action: 'check-updates' },
       { label: 'About Aspen', action: 'show-about' },
       { separator: true },
       { label: 'Donate via PayPal', action: 'donate' }

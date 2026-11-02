@@ -43,6 +43,7 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
+    "electron-updater": "^6.8.11",
     "node-pty": "^1.1.0",
     "prismjs": "^1.30.0",
     "react": "^19.3.1",
@@ -52,6 +53,13 @@
     "appId": "com.kh.gitdesk",
     "productName": "Aspen",
     "npmRebuild": false,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "mockcomic",
+        "repo": "BetterGitHub"
+      }
+    ],
     "directories": {
       "output": "release"
     },

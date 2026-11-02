@@ -325,6 +325,13 @@ export interface PublicSettings {
   readonly autoRefresh: boolean
   readonly theme: ThemeId
   /**
+   * Silent GitHub Releases check a few seconds after launch (packaged runs
+   * only). The Help → "Check for updates…" item works regardless; this
+   * switch only governs the automatic pass — and with it, the background
+   * download of a found update on self-updating builds.
+   */
+  readonly autoUpdateChecks: boolean
+  /**
    * One-time coaching affordances for people new to git (the queue's
    * 3-step banner, the tray's tick-a-file hint, the Generate → Preferences
    * redirect). Dismissed states live in renderer localStorage; this switch
@@ -350,6 +357,7 @@ export interface SettingsPatch {
   readonly confirmOverrideWithGeneratedMessage?: boolean
   readonly autoRefresh?: boolean
   readonly theme?: ThemeId
+  readonly autoUpdateChecks?: boolean
   readonly hintsEnabled?: boolean
 }
 
@@ -396,11 +404,18 @@ export interface RemoteRepoPage {
   readonly nextCursor: string | null
 }
 
+export type RemoteRepoSort = 'pushed' | 'created' | 'name'
+
 export interface RemoteRepoQuery {
-  /** Provider-side text filter where supported; always re-filtered client-side. */
+  /**
+   * Provider-side text filter where supported (GitHub Search API, GitLab
+   * `?search=`); always re-filtered client-side as well.
+   */
   readonly search?: string
   readonly cursor?: string | null
   readonly perPage?: number
+  /** Server-side ordering where the provider supports one. */
+  readonly sort?: RemoteRepoSort
 }
 
 /** Kick-off data for a browser sign-in; the renderer decides when to open it. */
@@ -416,10 +431,29 @@ export type SignInChallenge =
       readonly intervalMs: number
     }
   | {
+      /** GitHub authorization-code + PKCE (public client, loopback redirect). */
+      readonly kind: 'github-browser'
+      readonly requestId: string
+      readonly authorizeUrl: string
+    }
+  | {
       readonly kind: 'gitlab-browser'
       readonly requestId: string
       readonly authorizeUrl: string
     }
+
+/**
+ * Outcome of re-validating every stored account's token against the
+ * provider (run at boot): `accounts` is the refreshed list and `signedOut`
+ * names the accounts whose token no longer works and were removed.
+ */
+export interface AccountSyncReport {
+  readonly accounts: AccountInfo[]
+  readonly signedOut: ReadonlyArray<{
+    readonly login: string
+    readonly provider: AccountProvider
+  }>
+}
 
 /** Result of polling a pending sign-in. */
 export type SignInStatus =

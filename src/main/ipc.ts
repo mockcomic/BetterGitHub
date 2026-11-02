@@ -1,4 +1,4 @@
-import { clipboard, dialog, ipcMain, shell } from 'electron'
+import { app, clipboard, dialog, ipcMain, shell } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
@@ -90,17 +90,19 @@ import {
   saveSettings
 } from './settings'
 import {
+  accountAvatar,
   addAccount,
   getAccount,
   getAccountToken,
   listAccounts,
-  removeAccount as forgetAccount
+  removeAccount as forgetAccount,
+  syncAccountIdentities
 } from './accounts'
 import { beginSignIn, cancelSignIn, pollSignIn } from './providers/oauth'
 import { githubClient, normalizeGitHubApiBase } from './providers/github'
 import { gitlabClient, normalizeGitLabApiBase } from './providers/gitlab'
 import { ProviderHttpError } from './providers/http'
-import type { AccountProvider } from '../shared/models'
+import type { AccountProvider, RemoteRepoSort } from '../shared/models'
 import { generateCommitMessage, testConnection } from './ai/commit-agent'
 import {
   askMergeAgent,
@@ -112,6 +114,7 @@ import {
   restoreEol
 } from './ai/merge-agent'
 import { dispatchMenuAction, getMenuBarSpec, runMenuRole } from './menu'
+import { checkForUpdates, quitAndInstallUpdate } from './updates'
 import { applyTheme, getMainWindow, isTrustedSender } from './windows'
 import { getWatchedPath, startWatching, stopWatching } from './watcher'
 
@@ -352,6 +355,19 @@ const handlers: Handlers = {
     return suggestedCloneDirectory(url)
   },
 
+  // --------------------------------------------------------------- self-update
+  async checkForUpdates() {
+    // Manual verdict for Help → "Check for updates…" (and the About
+    // dialog's button). Background phases ride UPDATE_STATE_CHANNEL.
+    return checkForUpdates(true)
+  },
+  async quitAndInstallUpdate() {
+    quitAndInstallUpdate()
+  },
+  async getAppVersion() {
+    return app.getVersion()
+  },
+
   // ---------------------------------------------------------- hosted accounts
   async listAccounts() {
     return listAccounts()
@@ -376,8 +392,12 @@ const handlers: Handlers = {
       credential: { token: trimmed, refreshToken: null, expiresAt: null }
     })
   },
-  async beginSignIn(provider: AccountProvider, apiBase?: string) {
-    return beginSignIn(provider, apiBase)
+  async beginSignIn(
+    provider: AccountProvider,
+    apiBase?: string,
+    prefer?: 'web' | 'device'
+  ) {
+    return beginSignIn(provider, apiBase, prefer)
   },
   async pollSignIn(requestId: string) {
     return pollSignIn(requestId)
@@ -388,6 +408,14 @@ const handlers: Handlers = {
   async removeAccount(id: string) {
     await forgetAccount(id)
   },
+  async syncAccounts() {
+    return syncAccountIdentities()
+  },
+  async accountAvatar(accountId: string) {
+    const account = await getAccount(accountId)
+    if (account === null) return null
+    return accountAvatar(account)
+  },
   async listRemoteRepositories(accountId: string, query?: RemoteRepoQuery) {
     const account = await getAccount(accountId)
     if (account === null) {
@@ -397,7 +425,8 @@ const handlers: Handlers = {
     const request = {
       search: query?.search?.trim() ?? '',
       cursor: query?.cursor ?? null,
-      perPage: query?.perPage ?? 50
+      perPage: query?.perPage ?? 50,
+      sort: query?.sort as RemoteRepoSort | undefined
     }
     const token = await getAccountToken(account)
     if (token === null) {

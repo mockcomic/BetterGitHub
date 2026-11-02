@@ -1,4 +1,4 @@
-import type { RemoteRepoPage, RemoteRepository } from '../../shared/models'
+import type { RemoteRepoPage, RemoteRepoSort, RemoteRepository } from '../../shared/models'
 import {
   apiFetch,
   bool,
@@ -10,13 +10,20 @@ import {
 import type { ProviderClient, ProviderIdentity, RepoPageRequest } from './types'
 
 /**
- * GitHub REST client for account browsing. One page of `/user/repos` per
- * call (GitHub has no search parameter there); the list view filters loaded
- * items client-side, so `search` is accepted and ignored rather than
- * reaching the separately rate-limited Search API.
+ * GitHub REST client for account browsing.
+ *
+ * Without a search term this pages `/user/repos` (GitHub has no text
+ * parameter there) and honors `sort`. With a search term it switches to the
+ * Search API — `user:{login}` plus `org:` clauses for every owner seen in
+ * previously loaded pages, so organization repositories are findable too.
+ * The Search API has its own rate limit; a refused call surfaces as a
+ * friendly error and the list view still filters loaded items client-side.
  */
 
 export const GITHUB_COM_API = 'https://api.github.com'
+
+/** Org owners learned from /user/repos pages, per account (search scoping). */
+const seenOwners = new Map<string, Set<string>>()
 
 /**
  * Normalize whatever the user pastes (host, web URL, API root) to a REST
@@ -44,7 +51,7 @@ export function githubRepoHost(apiBase: string): string {
   return host === 'api.github.com' ? 'github.com' : host
 }
 
-/** A site root for GitHub's device endpoints (api.github.com → github.com). */
+/** A site root for GitHub's OAuth endpoints (api.github.com → github.com). */
 export function githubSiteRoot(apiBase: string): string {
   if (apiBase === GITHUB_COM_API) return 'https://github.com'
   return new URL(apiBase).origin
@@ -86,23 +93,113 @@ export function mapGitHubRepo(
   }
 }
 
+function mapRepoArray(
+  values: unknown,
+  accountId: string
+): RemoteRepository[] {
+  const items: RemoteRepository[] = []
+  if (Array.isArray(values)) {
+    for (const value of values) {
+      const mapped = mapGitHubRepo(value, accountId)
+      if (mapped !== null) items.push(mapped)
+    }
+  }
+  return items
+}
+
 export function mapGitHubRepoPage(
   body: unknown,
   accountId: string,
   page: number,
   perPage: number
 ): RemoteRepoPage {
-  const items: RemoteRepository[] = []
-  if (Array.isArray(body)) {
-    for (const value of body) {
-      const mapped = mapGitHubRepo(value, accountId)
-      if (mapped !== null) items.push(mapped)
-    }
-  }
+  const items = mapRepoArray(body, accountId)
+  // GitHub has no cursor: a full page means "ask for the next number".
   return {
     items,
-    // GitHub has no cursor: a full page means "ask for the next number".
     nextCursor: items.length === perPage ? String(page + 1) : null
+  }
+}
+
+/** A Search API page: same repo schema under `items`, same paging rule. */
+export function mapGitHubSearchPage(
+  body: unknown,
+  accountId: string,
+  page: number,
+  perPage: number
+): RemoteRepoPage {
+  const items =
+    body !== null && typeof body === 'object' && !Array.isArray(body)
+      ? mapRepoArray((body as Record<string, unknown>).items, accountId)
+      : []
+  return {
+    items,
+    nextCursor: items.length === perPage ? String(page + 1) : null
+  }
+}
+
+/** The owner half of a `full_name`. */
+function ownerOf(repo: Pick<RemoteRepository, 'fullName'>): string {
+  const cut = repo.fullName.indexOf('/')
+  return cut > 0 ? repo.fullName.slice(0, cut) : repo.fullName
+}
+
+function rememberOwners(
+  accountId: string,
+  login: string,
+  items: ReadonlyArray<RemoteRepository>
+): void {
+  let owners = seenOwners.get(accountId)
+  if (owners === undefined) {
+    owners = new Set<string>()
+    seenOwners.set(accountId, owners)
+  }
+  for (const repo of items) {
+    const owner = ownerOf(repo)
+    if (owner !== login) owners.add(owner)
+  }
+}
+
+/** Query-syntax characters that would derail a pasted search term. */
+function sanitizeSearch(text: string): string {
+  return text
+    .replace(/["\u201c\u201d]/g, ' ')
+    .replace(/(^|\s)-/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * The Search API query for an account: the user's own repositories plus any
+ * organization already visible to them (max 5 orgs), forks included.
+ */
+export function buildGitHubSearchQuery(
+  login: string,
+  owners: Iterable<string>,
+  text: string
+): string {
+  const cleaned = sanitizeSearch(text)
+  const parts = [cleaned.length > 0 ? cleaned : '']
+  for (const owner of owners) {
+    if (owner === login) continue // covered by the user: qualifier
+    if (parts.length >= 6) break // search text + ≤5 owner qualifiers
+    parts.push(`org:${owner}`)
+  }
+  parts.push(`user:${login}`, 'fork:true')
+  return parts.filter(p => p.length > 0).join(' ')
+}
+
+/** The `sort`/`direction` pair for /user/repos, or none for provider default. */
+export function githubListSortParams(sort: RemoteRepoSort | undefined): string {
+  switch (sort) {
+    case 'pushed':
+      return '&sort=pushed&direction=desc'
+    case 'created':
+      return '&sort=created&direction=desc'
+    case 'name':
+      return '&sort=full-name&direction=asc'
+    default:
+      return ''
   }
 }
 
@@ -132,12 +229,29 @@ export const githubClient: ProviderClient = {
   async listRepos(apiBase, account, token, _authKind, request: RepoPageRequest) {
     const page = Math.max(1, Number.parseInt(request.cursor ?? '1', 10) || 1)
     const perPage = Math.min(100, Math.max(1, request.perPage))
+    const search = request.search.trim()
+    if (search.length > 0) {
+      // Remembered owners come from earlier /user/repos pages; the account
+      // itself is always covered by `user:`.
+      const owners = new Set<string>([account.login, ...(seenOwners.get(account.id) ?? [])])
+      const query = buildGitHubSearchQuery(account.login, owners, search)
+      const url =
+        `${apiBase}/search/repositories` +
+        `?q=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}`
+      const res = await apiFetch(url, { headers: authHeaders(token) })
+      if (!res.ok) fail(res)
+      rememberOwners(account.id, account.login, mapRepoArray((res.json as { items?: unknown }).items, account.id))
+      return mapGitHubSearchPage(res.json, account.id, page, perPage)
+    }
     const url =
       `${apiBase}/user/repos` +
       `?affiliation=owner,collaborator,organization_member` +
-      `&per_page=${perPage}&page=${page}`
+      `&per_page=${perPage}&page=${page}` +
+      githubListSortParams(request.sort)
     const res = await apiFetch(url, { headers: authHeaders(token) })
     if (!res.ok) fail(res)
-    return mapGitHubRepoPage(res.json, account.id, page, perPage)
+    const mapped = mapGitHubRepoPage(res.json, account.id, page, perPage)
+    rememberOwners(account.id, account.login, mapped.items)
+    return mapped
   }
 }

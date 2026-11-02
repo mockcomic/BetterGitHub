@@ -2,7 +2,7 @@ import type { JSX } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { call } from '../api'
 import { useStore, useStoreState } from '../store'
-import type { AccountInfo } from '../../../shared/models'
+import type { AccountInfo, RemoteRepoSort } from '../../../shared/models'
 import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field } from './Dialog'
@@ -10,6 +10,7 @@ import { BranchDivergence, divergenceTitleSuffix } from './BranchBadges'
 import { AccountList, EMPTY_PANE, RemoteRepoPane, SignInPanel, type RepoPaneState } from './AccountsUi'
 
 import { DONATE_URL } from '../../../shared/links'
+import { RELEASES_URL, type UpdateState } from '../../../shared/updates'
 
 const autoEntries = THEME_ENTRIES.filter(e => e.group === 'auto')
 const lightEntries = THEME_ENTRIES.filter(e => e.group === 'light')
@@ -29,6 +30,7 @@ export function SettingsDialog(): JSX.Element | null {
   const [confirmOverride, setConfirmOverride] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [hintsEnabled, setHintsEnabled] = useState(true)
+  const [autoUpdateChecks, setAutoUpdateChecks] = useState(true)
   const [theme, setTheme] = useState<ThemeId>('system')
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
@@ -41,6 +43,7 @@ export function SettingsDialog(): JSX.Element | null {
       setConfirmOverride(settings.confirmOverrideWithGeneratedMessage)
       setAutoRefresh(settings.autoRefresh)
       setHintsEnabled(settings.hintsEnabled)
+      setAutoUpdateChecks(settings.autoUpdateChecks)
       setTheme(settings.theme)
       setApiKey('')
       setGitHubClientId('')
@@ -85,6 +88,7 @@ export function SettingsDialog(): JSX.Element | null {
                   confirmOverrideWithGeneratedMessage: confirmOverride,
                   autoRefresh,
                   hintsEnabled,
+                  autoUpdateChecks,
                   theme
                 })
                 .then(s => {
@@ -184,13 +188,13 @@ export function SettingsDialog(): JSX.Element | null {
         <details className="signin-apps">
           <summary>Browser sign-in apps</summary>
           <p className="field-hint">
-            The browser buttons need an OAuth application you register once, then paste
-            here — Aspen ships no shared id so your sign-ins never ride on someone
-            else's rate limits.
+            The browser buttons use an OAuth application you register once, then paste
+            here (or bake in via providers/config.ts and rebuild) — Aspen ships no
+            shared id so your sign-ins never ride on someone else's rate limits.
           </p>
           <Field
             label="GitHub OAuth App client id"
-            hint="github.com/settings/developers → new OAuth App → tick “Enable Device Flow”. Public by design; leave empty to hide the button."
+            hint="github.com/settings/developers → new OAuth App → Authorization callback URL http://127.0.0.1:8765/callback and tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback. Public by design; leave empty to hide the button."
           >
             <input
               placeholder={
@@ -245,6 +249,14 @@ export function SettingsDialog(): JSX.Element | null {
           />
           Show tips for getting started
         </label>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={autoUpdateChecks}
+            onChange={e => setAutoUpdateChecks(e.target.checked)}
+          />
+          Check GitHub releases for updates at startup
+        </label>
       </section>
 
       <section className="settings-section">
@@ -287,7 +299,10 @@ export function SettingsDialog(): JSX.Element | null {
 interface PaneEntry {
   readonly state: RepoPaneState
   readonly search: string
+  readonly sort: RemoteRepoSort
 }
+
+const DEFAULT_SORT: RemoteRepoSort = 'pushed'
 
 export function CloneDialog(): JSX.Element | null {
   const state = useStoreState()
@@ -349,6 +364,7 @@ export function CloneDialog(): JSX.Element | null {
   const loadPane = async (
     account: AccountInfo,
     search: string,
+    sort: RemoteRepoSort,
     more: boolean
   ): Promise<void> => {
     const cursor = more ? panes[account.id]?.state.nextCursor ?? null : null
@@ -356,6 +372,7 @@ export function CloneDialog(): JSX.Element | null {
       ...prev,
       [account.id]: {
         search,
+        sort,
         state: {
           ...(prev[account.id]?.state ?? EMPTY_PANE),
           loading: true,
@@ -364,11 +381,12 @@ export function CloneDialog(): JSX.Element | null {
       }
     }))
     try {
-      const page = await store.listRemoteRepos(account.id, search, cursor)
+      const page = await store.listRemoteRepos(account.id, search, cursor, sort)
       setPanes(prev => ({
         ...prev,
         [account.id]: {
           search,
+          sort,
           state: {
             // 'more' appends to whatever was loaded for the same search.
             items: more ? [...(prev[account.id]?.state.items ?? []), ...page.items] : page.items,
@@ -383,6 +401,7 @@ export function CloneDialog(): JSX.Element | null {
         ...prev,
         [account.id]: {
           search,
+          sort,
           state: {
             ...(prev[account.id]?.state ?? EMPTY_PANE),
             loading: false,
@@ -396,7 +415,7 @@ export function CloneDialog(): JSX.Element | null {
   // First view of an account tab fetches its first page automatically.
   useEffect(() => {
     if (activeAccount !== null && panes[activeAccount.id] === undefined) {
-      void loadPane(activeAccount, '', false)
+      void loadPane(activeAccount, '', DEFAULT_SORT, false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.showClone, activeAccount?.id])
@@ -404,18 +423,28 @@ export function CloneDialog(): JSX.Element | null {
   const onSearch = (value: string): void => {
     if (activeAccount === null) return
     const account = activeAccount
+    const sort = panes[account.id]?.sort ?? DEFAULT_SORT
     setPanes(prev => ({
       ...prev,
       [account.id]: {
         search: value,
+        sort,
         state: prev[account.id]?.state ?? EMPTY_PANE
       }
     }))
-    // GitLab filters server-side; GitHub's client-side filter (in the pane)
-    // needs no refetch. Debounced so typing does not chase the API.
-    if (account.provider !== 'gitlab') return
+    // Both providers search server-side now (GitHub Search API / GitLab
+    // ?search=); the pane re-filters loaded items for instant feedback.
+    // Debounced so typing does not chase the API (GitHub's search has its
+    // own, tighter rate limit).
     if (searchDebounce.current !== null) clearTimeout(searchDebounce.current)
-    searchDebounce.current = setTimeout(() => void loadPane(account, value, false), 400)
+    searchDebounce.current = setTimeout(() => void loadPane(account, value, sort, false), 400)
+  }
+
+  const onSort = (value: RemoteRepoSort): void => {
+    if (activeAccount === null) return
+    const account = activeAccount
+    const search = panes[account.id]?.search ?? ''
+    void loadPane(account, search, value, false)
   }
 
   const derivedName = folderTouched ? folderName : suggested
@@ -499,8 +528,24 @@ export function CloneDialog(): JSX.Element | null {
           pane={pane?.state ?? EMPTY_PANE}
           search={pane?.search ?? ''}
           onSearch={onSearch}
-          onRefresh={() => void loadPane(activeAccount, pane?.search ?? '', false)}
-          onLoadMore={() => void loadPane(activeAccount, pane?.search ?? '', true)}
+          sort={pane?.sort ?? DEFAULT_SORT}
+          onSort={onSort}
+          onRefresh={() =>
+            void loadPane(
+              activeAccount,
+              pane?.search ?? '',
+              pane?.sort ?? DEFAULT_SORT,
+              false
+            )
+          }
+          onLoadMore={() =>
+            void loadPane(
+              activeAccount,
+              pane?.search ?? '',
+              pane?.sort ?? DEFAULT_SORT,
+              true
+            )
+          }
           onPick={repo => {
             // Choosing a row fills the URL through the same suggestion
             // pipeline as typing one — the footer Clone then works unchanged.
@@ -551,61 +596,133 @@ export function CloneDialog(): JSX.Element | null {
   )
 }
 
+/**
+ * Creates a branch from a chosen base: any local branch, a remote-tracking
+ * branch (which gets local tracking, like a checkout from the branch list),
+ * or — when opened from History — the selected commit. The base defaults to
+ * the checked-out branch / selected commit but is freely switchable.
+ */
 export function NewBranchDialog(): JSX.Element | null {
   const state = useStoreState()
   const store = useStore()
   const [name, setName] = useState('')
+  const [filter, setFilter] = useState('')
+  const commitBase = state.newBranchBase
+  const defaultBase = commitBase ?? state.status?.branch ?? 'HEAD'
+  const [base, setBase] = useState(defaultBase)
 
   useEffect(() => {
-    if (!state.showNewBranch) setName('')
-  }, [state.showNewBranch])
+    if (!state.showNewBranch) {
+      setName('')
+      setFilter('')
+      setBase(defaultBase)
+    }
+    // defaultBase only matters when the dialog closes; re-running is harmless.
+  }, [state.showNewBranch, defaultBase])
 
   if (!state.showNewBranch) return null
 
-  const base = state.newBranchBase ?? state.status?.branch ?? 'HEAD'
+  const needle = filter.toLowerCase().trim()
+  const create = (): void => {
+    if (name.trim().length === 0) return
+    void store.createBranch(name, base === defaultBase ? undefined : base)
+  }
+  const isBase = (ref: string): boolean => ref === base
+  const optionTitle =
+    base === commitBase && commitBase !== null
+      ? `Starting at commit ${commitBase}, and switching to it.`
+      : `Starting at "${base}", and switching to it.`
 
   return (
     <Dialog
-      title={`Create branch from "${base}"`}
+      title="New branch"
       onClose={() => store.setNewBranchOpen(false)}
+      width={480}
       footer={
         <>
           <button className="btn" onClick={() => store.setNewBranchOpen(false)}>
             Cancel
           </button>
-          <button
-            className="btn primary"
-            disabled={name.trim().length === 0}
-            onClick={() =>
-              void store.createBranch(
-                name,
-                state.newBranchBase ?? undefined
-              )
-            }
-          >
+          <button className="btn primary" disabled={name.trim().length === 0} onClick={create}>
             Create branch
           </button>
         </>
       }
     >
-      <Field
-        label="Branch name"
-        hint={
-          state.newBranchBase !== null
-            ? `Starting at commit ${state.newBranchBase}, and switching to it.`
-            : 'From the current branch.'
-        }
-      >
+      <Field label="Branch name" hint={optionTitle}>
         <input
           autoFocus
           placeholder="my-new-branch"
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && name.trim().length > 0)
-              void store.createBranch(name, state.newBranchBase ?? undefined)
+            if (e.key === 'Enter') create()
           }}
         />
+      </Field>
+      <Field label="Create from">
+        <input
+          className="popover-filter"
+          placeholder="Filter branches"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+        />
+        <div className="dialog-branch-list">
+          {commitBase !== null && 'commit'.includes(needle) && (
+            <button
+              key="nb-commit"
+              className={`popover-item${isBase(commitBase) ? ' active' : ''}`}
+              title={`Start the new branch at commit ${commitBase}`}
+              onClick={() => setBase(commitBase)}
+            >
+              <span className="branch-line">Commit {commitBase}</span>
+            </button>
+          )}
+          {state.branches
+            .filter(b => b.name.toLowerCase().includes(needle))
+            .map(b => (
+              <button
+                key={`nb-local-${b.name}`}
+                className={`popover-item${isBase(b.name) ? ' active' : ''}`}
+                title={`Start the new branch at "${b.name}"`}
+                onClick={() => setBase(b.name)}
+              >
+                <span className="branch-line">{b.name}</span>
+                {b.current ? (
+                  <small className="popover-path">current branch</small>
+                ) : null}
+              </button>
+            ))}
+          {state.remoteBranches
+            .filter(
+              b =>
+                !b.name.endsWith('/HEAD') &&
+                `${b.remote}/${b.name}`.toLowerCase().includes(needle)
+            )
+            .map(b => (
+              <button
+                key={`nb-remote-${b.remote}-${b.name}`}
+                className={`popover-item${isBase(`${b.remote}/${b.name}`) ? ' active' : ''}`}
+                title={`Start the new branch at ${b.remote}/${b.name} (sets up tracking)`}
+                onClick={() => setBase(`${b.remote}/${b.name}`)}
+              >
+                <span className="branch-line">{b.name}</span>
+                <small className="popover-path">
+                  {b.remote}/{b.name}
+                </small>
+              </button>
+            ))}
+          {base === 'HEAD' && 'HEAD'.includes(needle) && (
+            <button
+              key="nb-head"
+              className={`popover-item${isBase('HEAD') ? ' active' : ''}`}
+              title="Start the new branch at the current HEAD (detached)"
+              onClick={() => setBase('HEAD')}
+            >
+              <span className="branch-line">HEAD</span>
+            </button>
+          )}
+        </div>
       </Field>
     </Dialog>
   )
@@ -792,11 +909,57 @@ export function RenameBranchDialog(): JSX.Element | null {
   )
 }
 
+/** One honest sentence about where the self-update flow stands. Errors and
+ *  up-to-date verdicts surface the last answer main gave; downloads report
+ *  live progress. Never claims an update Aspen hasn't seen. */
+function updateSummary(update: UpdateState | null, currentVersion: string | null): string {
+  if (update === null) {
+    return 'Aspen checks GitHub releases a few seconds after launch; you can check any time from here.'
+  }
+  switch (update.phase) {
+    case 'checking':
+      return 'Checking GitHub releases…'
+    case 'available':
+      return update.canInstall
+        ? `Aspen ${update.version ?? 'x'} is downloading in the background.`
+        : `Aspen ${update.version ?? 'x'} is available — this build updates from the releases page.`
+    case 'downloading':
+      return `Downloading Aspen ${update.version ?? 'x'} — ${update.percent ?? 0}%.`
+    case 'ready':
+      return `Aspen ${update.version ?? 'x'} is ready — restart to install it.`
+    case 'up-to-date':
+      return `Aspen ${currentVersion ?? ''} is the newest release.`
+    case 'error':
+      return update.error ?? 'The update check failed.'
+  }
+}
+
 export function AboutDialog(): JSX.Element | null {
   const state = useStoreState()
   const store = useStore()
+  const [appVersion, setAppVersion] = useState<string | null>(null)
+
+  // The packaged version, asked from main once per dialog open — the About
+  // card must report what is actually running, not what package.json said
+  // at the last release cut.
+  useEffect(() => {
+    if (!state.showAbout) return
+    let alive = true
+    void call('getAppVersion')
+      .then(v => {
+        if (alive) setAppVersion(v)
+      })
+      .catch(() => {
+        /* the line just keeps showing the ellipsis */
+      })
+    return () => {
+      alive = false
+    }
+  }, [state.showAbout])
 
   if (!state.showAbout) return null
+
+  const update = state.update
 
   return (
     <Dialog
@@ -814,7 +977,7 @@ export function AboutDialog(): JSX.Element | null {
         AI commit-message and merge agent.
       </p>
       <p className="confirm-message">
-        Version 0.1.0 · git operations run through your system{' '}
+        Version {appVersion ?? '…'} · git operations run through your system{' '}
         <code>git</code>; AI requests go to the OpenAI-compatible endpoint
         configured in Preferences.
       </p>
@@ -843,6 +1006,55 @@ export function AboutDialog(): JSX.Element | null {
             <code>Ctrl+,</code> preferences
           </li>
         </ul>
+      </div>
+      <div className="settings-section">
+        <h3>Updates</h3>
+        <p className="confirm-message">{updateSummary(update, appVersion)}</p>
+        {update?.phase === 'downloading' && (
+          <div
+            className="update-progress"
+            role="progressbar"
+            aria-label="Update download progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={update.percent ?? 0}
+          >
+            <div
+              className="update-progress-fill"
+              style={{ width: `${update.percent ?? 0}%` }}
+            />
+          </div>
+        )}
+        <div className="donate-row">
+          {update?.phase === 'ready' ? (
+            <button
+              className="btn primary"
+              onClick={() => void store.checkForUpdatesNow()}
+            >
+              Restart to update
+            </button>
+          ) : (
+            <button
+              className="btn"
+              disabled={update?.phase === 'checking' || update?.phase === 'downloading'}
+              onClick={() => void store.checkForUpdatesNow()}
+            >
+              Check for updates
+            </button>
+          )}
+          {(update === null ||
+            update.phase === 'available' ||
+            update.phase === 'error') && (
+            <button
+              className="btn"
+              onClick={() =>
+                void call('openExternal', update?.releaseUrl ?? RELEASES_URL)
+              }
+            >
+              View releases
+            </button>
+          )}
+        </div>
       </div>
       <div className="settings-section">
         <h3>Support the development</h3>

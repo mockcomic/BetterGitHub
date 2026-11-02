@@ -3084,6 +3084,40 @@ body.desk-resizing.desk-resizing-row {
   flex: 1 1 auto;
 }
 
+/* All / Public / Private visibility chips in the remote-repo toolbar. */
+.repo-filter-chips {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+
+.chip-toggle {
+  font: inherit;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 9px;
+}
+
+.chip-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.chip-toggle.active {
+  background: var(--bg-selected);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.remote-sort {
+  flex: 0 0 auto;
+}
+
 .remote-list {
   max-height: 260px;
   overflow-y: auto;
@@ -3198,6 +3232,12 @@ body.desk-resizing.desk-resizing-row {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* The real avatar (main-proxied data: URL) rides the same circle as the
+   initials fallback. */
+img.account-avatar {
+  object-fit: cover;
 }
 
 .account-who {
@@ -4044,6 +4084,26 @@ body.desk-resizing.desk-resizing-row {
 .donate-row small {
   font-size: 11.5px;
   user-select: text;
+}
+
+/* ---------------------------------------------------------- updates section */
+
+/* The About dialog's download meter: a track the width of the dialog body
+   with a Commit-Green fill, mirroring the token language everywhere else. */
+.update-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-header);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin: 0 0 10px;
+}
+
+.update-progress-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 3px;
+  transition: width 0.4s ease;
 }
 
 .diff-line.split-row td {
