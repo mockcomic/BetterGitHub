@@ -58,6 +58,7 @@ function settings(
     accounts: { hasGitHubClientId: false, hasGitLabClientId: false },
     confirmOverrideWithGeneratedMessage: true,
     autoRefresh: true,
+    scanFolder: '',
     theme: 'system',
     hintsEnabled: true
   }
