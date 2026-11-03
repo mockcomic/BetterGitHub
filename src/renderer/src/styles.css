@@ -2781,9 +2781,11 @@ select {
 /* ---------------------------------------------------------------- chrome bits */
 
 /* -------------------------------------------------- integrated terminal */
-/* The docked terminal: a bar that matches the other pane headers, and a
-   host sized by --term-h (set on .app, written straight during the drag).
-   xterm paints into .terminal-host; its own CSS comes from the package. */
+/* The docked terminal: a bar that matches the other pane headers, and one
+   host per open tab, sized by --term-h (set on .app, written straight during
+   the drag). xterm paints into .terminal-host; its own CSS comes from the
+   package. Only the active tab's host is laid out — the others stay mounted
+   so their shells survive a tab switch. */
 
 .resizer.resizer-horizontal {
   flex: 0 0 5px;
@@ -2847,12 +2849,92 @@ body.desk-resizing.desk-resizing-row {
   gap: 8px;
 }
 
+/* The tabs, in the same segmented tab language as the clone dialog and the
+   desk switcher: the active tab owns the accent and a hairline underline. */
+.terminal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.terminal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px 1px 6px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.terminal-tab:hover {
+  color: var(--text);
+}
+
+.terminal-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.terminal-tab-label {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+}
+
+/* The position in the strip, kept quiet so the shell label stays the lead. */
+.terminal-tab-index {
+  margin-left: 5px;
+  font-weight: 400;
+  opacity: 0.55;
+}
+
+.terminal-tab-close,
+.terminal-new {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  padding: 2px 5px;
+}
+
+.terminal-tab-close:hover,
+.terminal-new:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.terminal-tab-close:hover {
+  color: var(--danger);
+}
+
+/* One row so several hosts share the width instead of stacking; the hidden
+   ones take no space at all, and xterm refits when one comes back. */
+.terminal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
 .terminal-host {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   padding: 4px 0 0 8px;
   overflow: hidden;
+}
+
+.terminal-host.terminal-host-hidden {
+  display: none;
 }
 
 .terminal-host .xterm {
@@ -3295,6 +3377,7 @@ img.account-avatar {
 
 .signin-provider {
   flex: 0 0 auto;
+  width: auto; /* the global 100% would eat the row and push Sign in out */
 }
 
 .signin-token-input {
@@ -3370,6 +3453,191 @@ img.account-avatar {
 
 .signin-apps .field {
   margin-top: 8px;
+}
+
+/* ------------------------------------------------------- preferences two-pane */
+
+/* Preferences: sections on a panel-toned rail, one section's fields in the
+   pane — GitHub Desktop's own preferences shape, drawn in this app's
+   selection grammar: hover wash on the rows, solid accent + white label on
+   the active one. The body stops scrolling for itself; the pane owns scroll
+   so the rail never shifts under the pointer. */
+
+.dialog-body.settings-body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.settings-shell {
+  display: flex;
+  align-items: stretch;
+  height: clamp(380px, 56vh, 560px);
+}
+
+.settings-nav {
+  flex: 0 0 184px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.settings-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 9px;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-instant) ease-out,
+    color var(--motion-instant) ease-out,
+    box-shadow var(--motion-instant) ease-out;
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-hover);
+}
+
+.settings-nav-item .nav-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-nav-item .nav-sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.settings-nav-item.active {
+  background: var(--bg-selected);
+}
+
+.settings-nav-item.active:hover {
+  background: var(--bg-selected-hover);
+}
+
+.settings-nav-item.active .nav-label {
+  color: var(--on-accent);
+}
+
+.settings-nav-item.active .nav-sub {
+  color: color-mix(in srgb, var(--on-accent) 82%, transparent);
+}
+
+.settings-nav-item:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.settings-pane {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden auto; /* vertical scroll without a horizontal track */
+  padding: 14px 16px;
+  outline: none;
+}
+
+/* The rail swap: an opacity fade only, the desk switch's own register. */
+.settings-pane > section {
+  margin-bottom: 0;
+  animation: section-in var(--motion-fast) ease-out both;
+}
+
+@keyframes section-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Info dot + tooltip: the visible hint carries what the field needs; the
+   dot carries the deeper story (registration steps, scopes, privacy notes)
+   on hover or keyboard focus. Bubble in the popover family: canvas face,
+   hairline, Float shadow, fade at a hair of scale. */
+
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  vertical-align: baseline;
+}
+
+.info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 3px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--motion-instant) ease-out,
+    background-color var(--motion-instant) ease-out,
+    box-shadow var(--motion-instant) ease-out;
+}
+
+.info-dot:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.info-dot:focus-visible {
+  outline: none;
+  color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.info-dot svg {
+  display: block;
+}
+
+.info-tip .tip-bubble {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -8px;
+  z-index: 12;
+  width: max-content;
+  max-width: min(300px, 70vw);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  padding: 8px 10px;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-line;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.98);
+  transition:
+    opacity var(--motion-fast) ease-out,
+    transform var(--motion-fast) var(--ease-arrive),
+    visibility var(--motion-fast);
+  pointer-events: none;
+}
+
+.info-tip:hover .tip-bubble,
+.info-tip:focus-within .tip-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
 }
 
 /* ---------------------------------------------------------------- empty state / toasts */

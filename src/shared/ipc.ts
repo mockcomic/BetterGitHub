@@ -258,7 +258,8 @@ export interface RequestResponseChannels {
   // integrated terminal (main pushes TERMINAL_OUTPUT/EXIT channels)
   /**
    * Spawn the platform-priority shell in `repoPath` (validated like every
-   * other repo verb) at the given size; one session at a time per panel.
+   * other repo verb) at the given size. Each call is one more live session —
+   * the panel's tab strip runs as many as it has tabs.
    */
   terminalStart: (repoPath: string, cols: number, rows: number) => TerminalSessionInfo
   /** Feed keystrokes to a live session; an unknown id is a silent no-op. */

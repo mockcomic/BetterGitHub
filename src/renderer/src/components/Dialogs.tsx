@@ -1,11 +1,12 @@
 import type { JSX } from 'react'
 import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { call } from '../api'
 import { useStore, useStoreState } from '../store'
 import type { AccountInfo, RemoteRepoSort } from '../../../shared/models'
 import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
-import { Dialog, Field } from './Dialog'
+import { Dialog, Field, InfoTip } from './Dialog'
 import { BranchDivergence, divergenceTitleSuffix } from './BranchBadges'
 import { AccountList, EMPTY_PANE, RemoteRepoPane, SignInPanel, type RepoPaneState } from './AccountsUi'
 
@@ -15,6 +16,21 @@ import { RELEASES_URL, type UpdateState } from '../../../shared/updates'
 const autoEntries = THEME_ENTRIES.filter(e => e.group === 'auto')
 const lightEntries = THEME_ENTRIES.filter(e => e.group === 'light')
 const darkEntries = THEME_ENTRIES.filter(e => e.group === 'dark')
+
+/** The preferences rail, in panel order. Accounts leads: it is the first
+ *  thing a fresh install needs; the AI pointer note overrides on open. */
+type SettingsSection = 'accounts' | 'ai' | 'appearance' | 'behavior'
+
+const SECTION_ENTRIES: ReadonlyArray<{
+  readonly id: SettingsSection
+  readonly label: string
+  readonly sub: string
+}> = [
+  { id: 'accounts', label: 'Accounts', sub: 'Providers, tokens, OAuth apps' },
+  { id: 'ai', label: 'AI agent', sub: 'The endpoint behind ✨ Generate' },
+  { id: 'appearance', label: 'Appearance', sub: 'Theme and palettes' },
+  { id: 'behavior', label: 'Behavior', sub: 'Refresh, tips, updates' }
+]
 
 export function SettingsDialog(): JSX.Element | null {
   const state = useStoreState()
@@ -34,6 +50,9 @@ export function SettingsDialog(): JSX.Element | null {
   const [theme, setTheme] = useState<ThemeId>('system')
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
+  const [section, setSection] = useState<SettingsSection>('accounts')
+  const [appsOpen, setAppsOpen] = useState(false)
+  const navRefs = useRef<Partial<Record<SettingsSection, HTMLButtonElement | null>>>({})
 
   useEffect(() => {
     if (settings !== null && state.showSettings) {
@@ -49,15 +68,44 @@ export function SettingsDialog(): JSX.Element | null {
       setGitHubClientId('')
       setGitLabClientId('')
       setTestResult(null)
+      // Land where the visitor came for: the AI pointer note opens the AI
+      // rail item; a fresh install (no client ids) opens Accounts with the
+      // sign-in-apps drawer already out, so the greyed buttons explain
+      // themselves instead of being a mystery.
+      setSection(state.settingsAiNote ? 'ai' : 'accounts')
+      setAppsOpen(!settings.accounts.hasGitHubClientId && !settings.accounts.hasGitLabClientId)
     }
-  }, [settings, state.showSettings])
+  }, [settings, state.showSettings, state.settingsAiNote])
 
   if (!state.showSettings || settings === null) return null
+
+  const selectSection = (next: SettingsSection): void => setSection(next)
+
+  const onNavKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const idx = SECTION_ENTRIES.findIndex(s => s.id === section)
+    let next = -1
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      next = (idx + 1) % SECTION_ENTRIES.length
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      next = (idx - 1 + SECTION_ENTRIES.length) % SECTION_ENTRIES.length
+    } else if (e.key === 'Home') {
+      next = 0
+    } else if (e.key === 'End') {
+      next = SECTION_ENTRIES.length - 1
+    }
+    if (next < 0) return
+    e.preventDefault()
+    const entry = SECTION_ENTRIES[next]
+    selectSection(entry.id)
+    navRefs.current[entry.id]?.focus()
+  }
 
   return (
     <Dialog
       title="Preferences"
-      width={560}
+      width={760}
+      maxWidth={760}
+      bodyClass="settings-body"
       onClose={() => store.setSettingsOpen(false)}
       footer={
         <>
@@ -101,6 +149,42 @@ export function SettingsDialog(): JSX.Element | null {
         </>
       }
     >
+      <div className="settings-shell">
+        <div
+          className="settings-nav"
+          role="tablist"
+          aria-orientation="vertical"
+          aria-label="Preference sections"
+          onKeyDown={onNavKeyDown}
+        >
+          {SECTION_ENTRIES.map(entry => (
+            <button
+              key={entry.id}
+              ref={el => {
+                navRefs.current[entry.id] = el
+              }}
+              type="button"
+              role="tab"
+              id={`settings-tab-${entry.id}`}
+              aria-selected={section === entry.id}
+              aria-controls="settings-panel"
+              tabIndex={section === entry.id ? 0 : -1}
+              className={`settings-nav-item${section === entry.id ? ' active' : ''}`}
+              onClick={() => selectSection(entry.id)}
+            >
+              <span className="nav-label">{entry.label}</span>
+              <span className="nav-sub">{entry.sub}</span>
+            </button>
+          ))}
+        </div>
+        <div
+          className="settings-pane"
+          role="tabpanel"
+          id="settings-panel"
+          aria-labelledby={`settings-tab-${section}`}
+          tabIndex={0}
+        >
+      {section === 'ai' && (
       <section className="settings-section">
         <h3>AI agent</h3>
         <p className="field-hint">
@@ -121,10 +205,15 @@ export function SettingsDialog(): JSX.Element | null {
         <Field
           label="Base URL"
           hint="Any OpenAI-compatible server: https://api.openai.com/v1, https://openrouter.ai/api/v1, http://localhost:11434/v1 …"
+          tip={'✨ Generate sends your staged diff and draft message to this one host — no other git content leaves the machine because of the AI.\nLocal servers (Ollama, LM Studio) answer the same shape and need no key.'}
         >
           <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} />
         </Field>
-        <Field label="Model" hint="e.g. gpt-4o-mini, claude-3-5-haiku, llama3.1, qwen2.5-coder">
+        <Field
+          label="Model"
+          hint="e.g. gpt-4o-mini, claude-3-5-haiku, llama3.1, qwen2.5-coder"
+          tip={'Any model id your endpoint serves. Small, fast chat models write good commit messages — a 7–14B coder model locally beats a huge one over the wire.'}
+        >
           <input value={model} onChange={e => setModel(e.target.value)} />
         </Field>
         <Field
@@ -134,6 +223,7 @@ export function SettingsDialog(): JSX.Element | null {
               ? 'Stored securely. Type a new key to replace it.'
               : 'Stored encrypted on this machine (never sent to the UI).'
           }
+          tip={'Encrypted with the Windows credential store and never re-displayed after saving. An empty box keeps the stored key; paste a new one to replace it.\nSent only to the Base URL host, as a plain Authorization header.'}
         >
           <input
             type="password"
@@ -145,6 +235,7 @@ export function SettingsDialog(): JSX.Element | null {
         <Field
           label="Custom commit message rules (optional)"
           hint="Fixed rules added to the AI's instructions for this app, e.g. conventional commits, issue trailer format."
+          tip={'Plain text appended to the agent’s fixed system prompt for every generation in this app. Example: “summary ≤ 50 chars, body wrapped at 72, add Closes #NNN trailers”.'}
         >
           <textarea
             rows={3}
@@ -156,6 +247,7 @@ export function SettingsDialog(): JSX.Element | null {
           <button
             className="btn"
             disabled={testing}
+            title="Sends one minimal chat request to the Base URL with the Model and key above, and reports how the endpoint answers."
             onClick={() => {
               setTesting(true)
               setTestResult(null)
@@ -180,13 +272,22 @@ export function SettingsDialog(): JSX.Element | null {
           )}
         </div>
       </section>
+      )}
 
+      {section === 'accounts' && (
       <section className="settings-section">
         <h3>Accounts</h3>
         <AccountList />
         <SignInPanel />
-        <details className="signin-apps">
-          <summary>Browser sign-in apps</summary>
+        <details
+          className="signin-apps"
+          open={appsOpen}
+          onToggle={e => setAppsOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary>
+            Browser sign-in apps
+            <InfoTip text={'The browser buttons stay greyed until you register one free OAuth application per provider and paste its id here. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
+          </summary>
           <p className="field-hint">
             The browser buttons use an OAuth application you register once, then paste
             here (or bake in via providers/config.ts and rebuild) — Aspen ships no
@@ -195,6 +296,7 @@ export function SettingsDialog(): JSX.Element | null {
           <Field
             label="GitHub OAuth App client id"
             hint="github.com/settings/developers → new OAuth App → Authorization callback URL http://127.0.0.1:8765/callback and tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback. Public by design; leave empty to hide the button."
+            tip={'GitHub → Settings → Developer settings → OAuth Apps → New OAuth App.\nHomepage URL: anything. Authorization callback URL: exactly http://127.0.0.1:8765/callback.\nTick “Enable Device Flow” — the one app covers both the browser sign-in and the code fallback.\nOnly the Client ID is used; Aspen never needs the secret.'}
           >
             <input
               placeholder={
@@ -209,6 +311,7 @@ export function SettingsDialog(): JSX.Element | null {
           <Field
             label="GitLab application id"
             hint="gitlab.com Profile → Applications → confidential OFF, redirect URI exactly http://127.0.0.1:8765/callback, scope api."
+            tip={'GitLab → Preferences → Applications.\nConfidential: OFF — Aspen is a public PKCE client.\nRedirect URI: exactly http://127.0.0.1:8765/callback; tick the api scope.\nPaste the numeric Application ID.'}
           >
             <input
               placeholder={
@@ -222,7 +325,9 @@ export function SettingsDialog(): JSX.Element | null {
           </Field>
         </details>
       </section>
+      )}
 
+      {section === 'behavior' && (
       <section className="settings-section">
         <h3>Behavior</h3>
         <label className="check-row">
@@ -231,7 +336,8 @@ export function SettingsDialog(): JSX.Element | null {
             checked={confirmOverride}
             onChange={e => setConfirmOverride(e.target.checked)}
           />
-          Confirm before replacing a typed commit message with a generated one
+          <span>Confirm before replacing a typed commit message with a generated one</span>
+          <InfoTip text={'When off, ✨ Generate replaces a message you have typed without asking. When on, a typed summary or description makes Aspen confirm first.'} />
         </label>
         <label className="check-row">
           <input
@@ -239,7 +345,8 @@ export function SettingsDialog(): JSX.Element | null {
             checked={autoRefresh}
             onChange={e => setAutoRefresh(e.target.checked)}
           />
-          Refresh the changes list automatically when files change on disk
+          <span>Refresh the changes list automatically when files change on disk</span>
+          <InfoTip text={'When off, the changes list refreshes after git actions and when you press Refresh — handy if watching a very large working tree feels heavy.'} />
         </label>
         <label className="check-row">
           <input
@@ -247,7 +354,8 @@ export function SettingsDialog(): JSX.Element | null {
             checked={hintsEnabled}
             onChange={e => setHintsEnabled(e.target.checked)}
           />
-          Show tips for getting started
+          <span>Show tips for getting started</span>
+          <InfoTip text={'Hides the one-time coach banner, the first-run captions, and the pointer notes in these pages. Git facts, counts and errors stay visible regardless.'} />
         </label>
         <label className="check-row">
           <input
@@ -255,13 +363,20 @@ export function SettingsDialog(): JSX.Element | null {
             checked={autoUpdateChecks}
             onChange={e => setAutoUpdateChecks(e.target.checked)}
           />
-          Check GitHub releases for updates at startup
+          <span>Check GitHub releases for updates at startup</span>
+          <InfoTip text={'Aspen asks the public releases page of this app’s GitHub repository whether a newer version exists. Nothing identifies you, and nothing downloads or installs itself.'} />
         </label>
       </section>
+      )}
 
+      {section === 'appearance' && (
       <section className="settings-section">
         <h3>Appearance</h3>
-        <Field label="Theme">
+        <Field
+          label="Theme"
+          hint="Applies the moment you press Save; Cancel leaves the current theme alone."
+          tip={'System follows the OS light/dark setting.\nCommunity palettes re-ink every colour role at once — they change how the app looks, never how it behaves.'}
+        >
           <select
             value={theme}
             onChange={e => {
@@ -291,6 +406,9 @@ export function SettingsDialog(): JSX.Element | null {
           </select>
         </Field>
       </section>
+      )}
+        </div>
+      </div>
     </Dialog>
   )
 }

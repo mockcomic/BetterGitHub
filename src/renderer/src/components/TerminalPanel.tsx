@@ -1,31 +1,65 @@
 import type { JSX } from 'react'
 import type { ITerminalOptions, Terminal as XtermTerminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { call, onTerminalExit, onTerminalOutput } from '../api'
+import {
+  closeTab,
+  emptyStrip,
+  openTab,
+  selectTab,
+  type TabStrip
+} from '../terminal-tabs'
 
 /**
- * The integrated terminal panel: one docked xterm.js surface bound to one
- * PTY session in main (src/main/terminal.ts + the channels in
- * src/shared/ipc.ts). Everything here is component-local on purpose — the
- * store only knows whether the panel is open; keystrokes and PTY output
- * never travel through React state.
+ * The integrated terminal panel: a strip of tabs, each one a docked xterm.js
+ * surface bound to its own PTY session in main (src/main/terminal.ts + the
+ * channels in src/shared/ipc.ts). Everything here is component-local on
+ * purpose — the store only knows whether the panel is open; keystrokes, PTY
+ * output and which tab is in front never travel through the git state.
  *
- * Lifecycle: the session spawns when this component mounts (the panel
- * opening, the repo switching, or the Restart button re-running the effect)
- * and dies on unmount, so closing the panel or swapping repositories never
- * leaves a stray shell. If the shell exits by itself the last output stays
- * readable under a Restart bar.
+ * Lifecycle: the panel opens with exactly one shell; `+` spawns another and
+ * × ends that one (its view unmounting is what kills the session, never a
+ * leftover shell). Closing the last tab undocks the panel, and a repository
+ * switch remounts the whole thing (App.tsx keys the panel by repo), so every
+ * session of the old folder dies with it.
+ *
+ * The strip rules themselves live in src/renderer/src/terminal-tabs.ts — pure
+ * data, unit-tested there, so this file is only wiring.
  */
 interface TerminalPanelProps {
   readonly repoPath: string
   readonly repoName: string
 }
 
-/** Same stack as the styles.css --mono token (xterm needs a literal string). */
-const TERMINAL_FONT =
-  "'Cascadia Code', 'Consolas', 'SFMono-Regular', Menlo, monospace"
+/**
+ * The terminal's own font stack — deliberately *not* the app's `--mono`.
+ *
+ * A prompt theme (oh-my-posh and friends) draws its segment separators and
+ * icons from the Unicode private-use area ( — U+E0B0, — U+E0A0,
+ * — U+F044, …), and neither Cascadia Code nor Consolas carries a single one
+ * of those, so a Cascadia-first stack renders the whole prompt as tofu boxes
+ * no matter what the shell sends. The Nerd Font families lead and xterm falls
+ * back glyph by glyph; the `Mono` spellings come before the others because
+ * their icons are single-width, which is what a cell grid needs. The plain
+ * families and the generic tail keep this working on a machine that has none
+ * of them installed.
+ */
+const TERMINAL_FONT = [
+  "'MesloLGS Nerd Font Mono'",
+  "'Meslo LG S Nerd Font Mono'",
+  "'JetBrainsMono Nerd Font Mono'",
+  "'JetBrainsMono Nerd Font'",
+  "'FiraCode Nerd Font Mono'",
+  "'Hack Nerd Font Mono'",
+  "'Cascadia Code'",
+  "'Cascadia Mono'",
+  "'Consolas'",
+  "'SFMono-Regular'",
+  'Menlo',
+  'monospace'
+].join(', ')
 
 /** xterm's classic ANSI 16, tuned to sit on Primer's light and dark grounds. */
 const ANSI_LIGHT = [
@@ -67,16 +101,191 @@ function terminalTheme(): ITerminalOptions['theme'] {
   }
 }
 
+/** What a view tells the strip about its session, and nothing else. */
+interface TabInfo {
+  readonly label: string
+  /** Mirrored to the panel's data-session for the QA probes. */
+  readonly sessionId: string | null
+  readonly exitCode: number | null
+  readonly error: string | null
+}
+
+const initialInfo: TabInfo = {
+  label: 'Terminal',
+  sessionId: null,
+  exitCode: null,
+  error: null
+}
+
+/** The bar's buttons, reaching the live terminal of one tab. */
+interface TerminalViewApi {
+  readonly clear: () => void
+  readonly restart: () => void
+}
+
 export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.Element {
   const store = useStore()
+  /** One tab from the first render: the panel always opens with a shell. */
+  const [strip, setStrip] = useState<TabStrip>(() => openTab(emptyStrip).strip)
+  const [infos, setInfos] = useState<Readonly<Record<number, TabInfo>>>({})
+  /** The views' handles, keyed by tab id; a ref so the buttons never go
+   *  stale between the spawn and the next render. */
+  const apis = useRef(new Map<number, TerminalViewApi>()).current
+
+  const reportInfo = useCallback((id: number, patch: Partial<TabInfo>): void => {
+    setInfos(prev => ({ ...prev, [id]: { ...(prev[id] ?? initialInfo), ...patch } }))
+  }, [])
+
+  const active = strip.activeId === null ? null : strip.tabs.find(tab => tab.id === strip.activeId) ?? null
+  const activeInfo = active === null ? null : (infos[active.id] ?? initialInfo)
+  /** Looked up at click time, not render time — the view registers its
+   *  handle some time after this markup exists. */
+  const apiOfActive = (): TerminalViewApi | null =>
+    strip.activeId === null ? null : apis.get(strip.activeId) ?? null
+
+  // The last tab closed: undock the panel. App.tsx only mounts this component
+  // while the panel is open, so toggling here can only mean closing, and the
+  // unmount is the teardown that would have killed the sessions anyway.
+  useEffect(() => {
+    if (strip.tabs.length === 0) store.toggleTerminal()
+  }, [strip, store])
+
+  const tabTitle = (id: number): string => (infos[id] ?? initialInfo).label
+
+  return (
+    <section
+      className="terminal-panel"
+      aria-label="Integrated terminal"
+      {...(activeInfo?.sessionId !== null && activeInfo !== null
+        ? { 'data-session': activeInfo.sessionId }
+        : {})}
+    >
+      <header className="terminal-bar">
+        <span className="terminal-tabs" role="tablist" aria-label="Terminal sessions">
+          {strip.tabs.map((tab, index) => {
+            const isActive = tab.id === strip.activeId
+            return (
+              <span
+                key={tab.id}
+                className={isActive ? 'terminal-tab active' : 'terminal-tab'}
+                role="tab"
+                aria-selected={isActive}
+              >
+                <button
+                  className="terminal-tab-label"
+                  type="button"
+                  title={repoPath}
+                  onClick={() => setStrip(current => selectTab(current, tab.id))}
+                >
+                  {tabTitle(tab.id)}
+                  <span className="terminal-tab-index">{index + 1}</span>
+                </button>
+                <button
+                  className="terminal-tab-close"
+                  type="button"
+                  aria-label={`Close ${tabTitle(tab.id)} session`}
+                  title="Close this terminal"
+                  onClick={() => setStrip(current => closeTab(current, tab.id).strip)}
+                >
+                  ×
+                </button>
+              </span>
+            )
+          })}
+          <button
+            className="terminal-new"
+            type="button"
+            title="New terminal"
+            aria-label="New terminal"
+            onClick={() => setStrip(current => openTab(current).strip)}
+          >
+            +
+          </button>
+        </span>
+        <span className="terminal-repo">{repoName}</span>
+        {activeInfo !== null && activeInfo.exitCode !== null && (
+          <span className="terminal-exit">
+            process exited with code {activeInfo.exitCode} —{' '}
+            <button className="mini" onClick={() => apiOfActive()?.restart()}>
+              Restart session
+            </button>
+          </span>
+        )}
+        {activeInfo !== null && activeInfo.error !== null && (
+          <span className="terminal-error">{activeInfo.error}</span>
+        )}
+        <span className="terminal-actions">
+          <button
+            className="mini"
+            title="Clear the scrollback"
+            onClick={() => apiOfActive()?.clear()}
+          >
+            Clear
+          </button>
+          <button
+            className="mini"
+            title="Start a new shell for this tab (the old one is ended)"
+            onClick={() => apiOfActive()?.restart()}
+          >
+            Restart
+          </button>
+          <button
+            className="mini"
+            title="Close the terminal panel"
+            onClick={() => store.toggleTerminal()}
+          >
+            Close
+          </button>
+        </span>
+      </header>
+      <div className="terminal-body">
+        {strip.tabs.map(tab => (
+          <TerminalView
+            key={tab.id}
+            repoPath={repoPath}
+            active={tab.id === strip.activeId}
+            tabId={tab.id}
+            onInfo={patch => reportInfo(tab.id, patch)}
+            onApi={api => {
+              if (api === null) apis.delete(tab.id)
+              else apis.set(tab.id, api)
+            }}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+interface TerminalViewProps {
+  readonly repoPath: string
+  readonly tabId: number
+  readonly active: boolean
+  readonly onInfo: (patch: Partial<TabInfo>) => void
+  readonly onApi: (api: TerminalViewApi | null) => void
+}
+
+/**
+ * One tab: the xterm instance, its session, and the resize/theme plumbing that
+ * keeps them honest. Inactive tabs stay mounted (hidden with CSS) so switching
+ * back is instant and the shell never notices; the ResizeObserver that is
+ * already watching the host refits it when it becomes visible again.
+ */
+function TerminalView({
+  repoPath,
+  tabId,
+  active,
+  onInfo,
+  onApi
+}: TerminalViewProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
-  /** The live xterm instance, for the toolbar buttons. */
   const termRef = useRef<XtermTerminal | null>(null)
-  const [label, setLabel] = useState('Terminal')
-  const [error, setError] = useState<string | null>(null)
-  const [exitCode, setExitCode] = useState<number | null>(null)
-  /** The live session id, mirrored to the DOM (data-session) for QA probes. */
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  /** Latest-callback refs: the spawn effect below must not restart because an
+   *  inline arrow in the parent changed identity. */
+  const infoRef = useRef(onInfo)
+  const apiRef = useRef(onApi)
+  infoRef.current = onInfo
+  apiRef.current = onApi
   /** Bumped by Restart; the effect below treats it as a spawn key. */
   const [spawnNonce, setSpawnNonce] = useState(0)
 
@@ -91,8 +300,7 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
     let resizeObserver: ResizeObserver | null = null
     let themeWatcher: MutationObserver | null = null
     let resizeTimer: ReturnType<typeof setTimeout> | null = null
-    setExitCode(null)
-    setError(null)
+    infoRef.current({ ...initialInfo })
 
     // Right-click pastes, the way Windows users expect a terminal to; the
     // window suppresses the native menu, so there is nothing to lose. The
@@ -160,10 +368,15 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
         return true
       })
       terminal.open(host)
+      apiRef.current({
+        clear: () => terminal.clear(),
+        restart: () => setSpawnNonce(n => n + 1)
+      })
       try {
         fit.fit()
       } catch {
-        /* a zero-size host (mid-animation) just falls back below */
+        /* a zero-size host (mid-animation, or a background tab) just falls
+           back below */
       }
       const dims = fit.proposeDimensions() ?? { cols: 80, rows: 24 }
 
@@ -174,8 +387,7 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
           return
         }
         sessionId = info.id
-        setSessionId(info.id)
-        setLabel(info.shellLabel)
+        infoRef.current({ label: info.shellLabel, sessionId: info.id })
         terminal.focus()
         // The input leg of the round trip: everything xterm encodes from a
         // keystroke (printables, Enter, arrows, paste, IME commits) leaves
@@ -190,17 +402,22 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
         unsubExit = onTerminalExit((id, code) => {
           if (id === sessionId) {
             sessionId = null
-            setSessionId(null)
-            setExitCode(code)
+            infoRef.current({ exitCode: code, sessionId: null })
           }
         })
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err))
+        infoRef.current({
+          error: err instanceof Error ? err.message : String(err),
+          sessionId: null
+        })
         return
       }
 
       const refit = (): void => {
         if (sessionId === null) return
+        // A hidden host measures 0×0; fitting that would hand the PTY a
+        // one-cell grid for a shell that is merely in another tab.
+        if (host.offsetParent === null) return
         try {
           fit.fit()
         } catch {
@@ -211,6 +428,8 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
       }
       // Resize events stream fast while dragging; one PTY resize per settle
       // is all the shell needs (the render grid follows the host regardless).
+      // Returning to the foreground is a size change too, which is how a
+      // background tab catches up on a resized panel.
       resizeObserver = new ResizeObserver(() => {
         if (resizeTimer !== null) clearTimeout(resizeTimer)
         resizeTimer = setTimeout(refit, 100)
@@ -237,56 +456,23 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
       resizeObserver?.disconnect()
       themeWatcher?.disconnect()
       if (termRef.current === term) termRef.current = null
+      apiRef.current(null)
       term?.dispose()
       if (sessionId !== null) void call('terminalKill', sessionId)
       sessionId = null
     }
   }, [repoPath, spawnNonce])
 
+  // Clicking a tab should put the caret in it, the way every terminal does.
+  useEffect(() => {
+    if (active) termRef.current?.focus()
+  }, [active])
+
   return (
-    <section
-      className="terminal-panel"
-      aria-label="Integrated terminal"
-      {...(sessionId !== null ? { 'data-session': sessionId } : {})}
-    >
-      <header className="terminal-bar">
-        <span className="terminal-title" title={repoPath}>
-          {label} <span className="terminal-repo">— {repoName}</span>
-        </span>
-        {exitCode !== null && (
-          <span className="terminal-exit">
-            process exited with code {exitCode} —{' '}
-            <button className="mini" onClick={() => setSpawnNonce(n => n + 1)}>
-              Restart session
-            </button>
-          </span>
-        )}
-        {error !== null && <span className="terminal-error">{error}</span>}
-        <span className="terminal-actions">
-          <button
-            className="mini"
-            title="Clear the scrollback"
-            onClick={() => termRef.current?.clear()}
-          >
-            Clear
-          </button>
-          <button
-            className="mini"
-            title="Start a new shell (the old one is ended)"
-            onClick={() => setSpawnNonce(n => n + 1)}
-          >
-            Restart
-          </button>
-          <button
-            className="mini"
-            title="Close the terminal panel"
-            onClick={() => store.toggleTerminal()}
-          >
-            Close
-          </button>
-        </span>
-      </header>
-      <div className="terminal-host" ref={hostRef} />
-    </section>
+    <div
+      className={active ? 'terminal-host' : 'terminal-host terminal-host-hidden'}
+      ref={hostRef}
+      data-terminal-tab={tabId}
+    />
   )
 }
