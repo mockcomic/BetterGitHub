@@ -305,10 +305,13 @@ export async function beginSignIn(
   const config = await getAccountsConfig()
   const clientId = provider === 'github' ? config.githubClientId : config.gitlabClientId
   if (clientId.length === 0) {
+    // Reached only when the id vanished after the panel looked at it (or an
+    // IPC caller skipped the panel): the panel's own setup step normally
+    // asks for the id before a sign-in ever starts here.
     throw new Error(
       provider === 'github'
-        ? 'GitHub browser sign-in needs an OAuth App client id (Device Flow enabled, callback http://127.0.0.1:8765/callback) — enter it in Preferences → Accounts, or sign in with a personal access token.'
-        : 'GitLab browser sign-in needs an application id (redirect URI http://127.0.0.1:8765/callback) — enter it in Preferences → Accounts, or sign in with a personal access token.'
+        ? 'GitHub browser sign-in needs an OAuth App client id (Device Flow enabled, callback http://127.0.0.1:8765/callback) — press “Sign in with GitHub” again and paste it in the setup step, add one under Preferences → Accounts → Browser sign-in apps, or sign in with a personal access token.'
+        : 'GitLab browser sign-in needs an application id (redirect URI http://127.0.0.1:8765/callback) — press “Sign in with GitLab” again and paste it in the setup step, add one under Preferences → Accounts → Browser sign-in apps, or sign in with a personal access token.'
     )
   }
   // The stored apiBase follows each provider's token sign-in convention

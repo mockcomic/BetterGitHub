@@ -110,9 +110,12 @@ export async function amendCommit(
 }
 
 /**
- * GitHub Desktop's "Undo": move HEAD back one commit while keeping the
- * changes staged, so the commit box can be refilled. Refuses when the tip is
- * no longer the commit we just created (someone else committed/pulled).
+ * GitHub Desktop's "Undo" / the history view's "Uncommit": move HEAD back one
+ * commit while keeping the changes staged, so the commit box can be refilled.
+ * Refuses when the tip is no longer the commit we promised to remove
+ * (someone else committed/pulled while the dialog was open), for merge
+ * commits (the soft reset would silently flatten the merge), and for the
+ * root commit (HEAD^ does not exist).
  */
 export async function undoLastCommit(
   repoPath: string,
@@ -128,13 +131,21 @@ export async function undoLastCommit(
     )
   }
 
-  const parents = await execGit(
-    ['rev-list', '--max-count=2', 'HEAD'],
+  const lineage = await execGit(
+    ['rev-list', '--parents', '-n', '1', 'HEAD'],
     { cwd: repoPath, timeoutMs: 10_000 }
   ).catch(() => null)
-  const hasParent =
-    parents !== null && parents.stdout.split(/\s+/).filter(l => l.length > 0).length > 1
-  if (!hasParent) {
+  // `rev-list --parents` prints "<commit> <parent>…"; the tail is the parents.
+  const parentShas =
+    lineage === null
+      ? []
+      : lineage.stdout.trim().split(/\s+/).filter(l => l.length > 0).slice(1)
+  if (parentShas.length > 1) {
+    throw new Error(
+      'This is a merge commit; undoing it would flatten the merge. Revert it instead.'
+    )
+  }
+  if (parentShas.length === 0) {
     throw new Error(
       'This is the first commit in the repository; it cannot be undone.'
     )

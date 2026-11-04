@@ -6,14 +6,25 @@
  * - GitHub: Settings → Developer settings → OAuth Apps → new app, homepage
  *   URL anything, **Authorization callback URL**
  *   `http://127.0.0.1:<OAUTH_REDIRECT_PORT>/callback`, and tick
- *   "Enable Device Flow"; one app serves both flows. Paste the Client ID
- *   into Preferences → Accounts (or rebuild with this constant).
- * - GitLab: User settings → Applications, confidential **off**, redirect
- *   URI exactly `http://127.0.0.1:<OAUTH_REDIRECT_PORT>/callback`; scopes
- *   `api`. Paste the Application ID into Preferences → Accounts.
+ *   "Enable Device Flow"; one app serves both flows.
+ * - GitLab: User settings → Applications, confidential **off** (Aspen is a
+ *   public PKCE client), redirect URI exactly
+ *   `http://127.0.0.1:<OAUTH_REDIRECT_PORT>/callback`, scope `api`.
  *
- * Empty means "not configured": the browser buttons hide and token sign-in
- * (which also covers self-hosted instances) remains.
+ * Only the id is ever used — no client secret exists in this app, which is
+ * why the ids are safe to ship. Paste yours into either of two places:
+ *
+ *   1. the constants below, then rebuild → every install signs in out of the
+ *      box (this is the file to edit for that);
+ *   2. Preferences → Accounts, either in the sign-in panel's one-step setup
+ *      or in the Browser sign-in apps fields → no rebuild; a value entered
+ *      there wins over the constant, and clearing it falls back here.
+ *
+ * Empty means "not configured": both buttons stay clickable and open that
+ * one-step setup instead of a dead greyed click, and token sign-in (which
+ * also covers self-hosted instances) remains. A GitHub Enterprise or
+ * self-hosted GitLab server needs an application registered **there** —
+ * one id per provider is stored, so switching servers means re-pasting.
  */
 export const DEFAULT_GITHUB_CLIENT_ID = ''
 export const DEFAULT_GITLAB_CLIENT_ID = ''

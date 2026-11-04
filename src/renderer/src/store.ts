@@ -11,6 +11,7 @@ import type {
   ExternalApp,
   FilePreview,
   FileStatus,
+  GeneratedCommitMessage,
   GitConfigInfo,
   GitHubTarget,
   GitignoreResult,
@@ -231,6 +232,8 @@ export interface AppState {
   readonly hints: HintFlags
   readonly showClone: boolean
   readonly showRepoManager: boolean
+  /** The "Stash changes" dialog, opened by the Review toolbar's Stash verb. */
+  readonly showStash: boolean
   readonly showNewBranch: boolean
   readonly newBranchBase: string | null
   readonly renameBranchTarget: string | null
@@ -304,6 +307,7 @@ const initialState: AppState = {
   toasts: [],
   showSettings: false,
   settingsAiNote: false,
+  showStash: false,
   hints: {
     firstCommitDone: false,
     firstPushDone: false,
@@ -726,6 +730,7 @@ export class AppStore {
       view: 'review',
       deskFilter: '',
       mergeBranchOpen: false,
+      showStash: false,
       selectedStashIndex: null,
   scopeAdds: 0,
   scopeDels: 0,
@@ -1941,34 +1946,118 @@ export class AppStore {
   }
 
   undoCommit(): void {
-    const repo = this.state.selectedRepo
     const last = this.state.lastCommit
-    if (repo === null || last === null) {
-      this.toast('error', 'There is no Aspen commit to undo.')
+    if (last !== null) {
+      this.confirmUncommit(last.sha, last.summary, last.description, last.paths)
       return
     }
+    // No just-created Aspen commit: Undo still works as a generic
+    // "uncommit the tip" over whatever the history shows first. The
+    // expected-sha guard in main rejects a stale listing before touching
+    // history, so a moved tip just surfaces as its own refusal.
+    const tip = this.state.commits[0]
+    if (tip === undefined) {
+      this.toast('error', 'There is no commit to undo.')
+      return
+    }
+    if (tip.isMerge) {
+      this.toast(
+        'error',
+        'The latest commit is a merge — revert it instead of undoing it.'
+      )
+      return
+    }
+    this.confirmUncommit(tip.sha, tip.summary, tip.body, null)
+  }
+
+  /**
+   * Uncommits the selected commit — the history view's counterpart to
+   * Revert: the commit leaves the branch and its changes land in the commit
+   * box, instead of a new inverse commit being added.
+   */
+  uncommitSelectedCommit(): void {
+    const commit = this.state.selectedCommit
+    if (this.state.selectedRepo === null || commit === null) {
+      this.toast('error', 'Select a commit first.')
+      return
+    }
+    if (this.state.commits[0]?.sha !== commit.sha) {
+      this.toast(
+        'error',
+        'Only the latest commit can be uncommitted — older commits need Revert or a rebase.'
+      )
+      return
+    }
+    if (commit.isMerge) {
+      this.toast(
+        'error',
+        'This is a merge commit; uncommitting it would flatten the merge. Revert it instead.'
+      )
+      return
+    }
+    this.confirmUncommit(commit.sha, commit.summary, commit.body, null)
+  }
+
+  /**
+   * Shared confirm → guarded soft-reset → refill-the-commit-box flow behind
+   * Undo and Uncommit. `paths` rides along when Aspen just produced the
+   * commit (the toast's Undo); otherwise the scope is read from the commit
+   * itself when the dialog is confirmed.
+   */
+  private confirmUncommit(
+    sha: string,
+    summary: string,
+    description: string,
+    paths: ReadonlyArray<string> | null
+  ): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) {
+      this.toast('error', 'Open a repository first.')
+      return
+    }
+    const status = this.state.status
+    const pushed =
+      status !== null && status.upstream !== undefined && status.ahead === 0
     this.update({
       confirm: {
-        title: 'Undo this commit?',
-        message: `"${last.summary}" will be undone. Its changes stay in your working directory, ready to commit again.`,
-        confirmLabel: 'Undo commit',
+        title: 'Uncommit this commit?',
+        message:
+          `"${summary.slice(0, 70)}" will be removed from history. Its changes stay staged and its message goes back to the commit box` +
+          (pushed
+            ? ' — it was already pushed, so your next push will need a force-push.'
+            : '.'),
+        confirmLabel: 'Uncommit',
         onConfirm: () => {
           this.update({ confirm: null })
-          // runGit reports failure via its boolean, not a rejection: on a
-          // refused undo (tip moved, repo moved on) the user's current draft
-          // must survive untouched and the Undo offer must stay alive.
-          void this.runGit(async () => {
-            await call('undoLastCommit', repo.path, last.sha)
-          }, 'undo').then(ok => {
+          void (async () => {
+            let scope = paths
+            if (scope === null) {
+              try {
+                const files = await call('getCommitFiles', repo.path, sha)
+                scope = files.map(f => f.path)
+              } catch (err) {
+                this.toast(
+                  'error',
+                  err instanceof Error ? err.message : String(err)
+                )
+                return
+              }
+            }
+            // runGit reports failure via its boolean, not a rejection: on a
+            // refused uncommit (tip moved, repo moved on) the user's current
+            // draft must survive untouched and the Undo offer must stay alive.
+            const ok = await this.runGit(async () => {
+              await call('undoLastCommit', repo.path, sha)
+            }, 'undo')
             if (!ok) return
             this.setDraft(repo.path, {
-              summary: last.summary,
-              description: last.description,
-              checked: new Set(last.paths)
+              summary,
+              description,
+              checked: new Set(scope)
             })
-            this.update({ lastCommit: null, amend: null })
+            this.update({ lastCommit: null, amend: null, view: 'review' })
             void this.loadLog(false)
-          })
+          })()
         }
       }
     })
@@ -2489,6 +2578,7 @@ export class AppStore {
 
   // --------------------------------------------------------------- stash
 
+  /** Opens the stash dialog; the verb itself lives in StashDialog. */
   stashAllChanges(): void {
     const repo = this.state.selectedRepo
     if (repo === null) return
@@ -2497,18 +2587,135 @@ export class AppStore {
       this.toast('error', 'There is nothing to stash.')
       return
     }
+    this.update({ showStash: true })
+  }
+
+  setStashOpen(open: boolean): void {
+    this.update({ showStash: open })
+  }
+
+  /**
+   * Stash every working change under an optional message (subject plus
+   * body become the stash commit's message). Resolves true on success so
+   * the dialog can close itself; failures already carry an error toast.
+   */
+  async stashWithMessage(
+    title: string,
+    description: string
+  ): Promise<boolean> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return false
+    const subject = title.trim()
+    const body = description.trim()
+    const message =
+      subject.length === 0
+        ? undefined
+        : body.length === 0
+          ? subject
+          : `${subject}\n\n${body}`
+    const ok = await this.runGit(async () => {
+      await call('stashAll', repo.path, message)
+    }, 'stash')
+    if (ok) {
+      await this.refreshStashes()
+      this.update({
+        showStash: false,
+        view: 'stash',
+        selectedStashIndex: 0
+      })
+    }
+    return ok
+  }
+
+  /**
+   * ✨ inside the stash dialog: describe *all* dirty paths (the stash takes
+   * everything), returning the draft for the dialog's fields. Shares the
+   * commit flow's config guard, busy flag and cancel channel.
+   */
+  async generateStashDraft(): Promise<GeneratedCommitMessage | null> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return null
+    const settings = this.state.settings
+    if (aiLooksUnconfigured(settings)) {
+      if (settings?.hintsEnabled === true) {
+        this.update({ showSettings: true, settingsAiNote: true })
+      } else {
+        this.toast(
+          'error',
+          'The AI agent has no endpoint configured — set one in Preferences first.'
+        )
+      }
+      return null
+    }
+    const scope = (this.state.status?.files ?? []).map(f => f.path)
+    if (scope.length === 0) {
+      this.toast('error', 'There is nothing to describe.')
+      return null
+    }
+    this.update({ aiBusy: true })
+    try {
+      return await call('generateCommitMessage', repo.path, scope)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message !== 'cancelled') this.toast('error', message)
+      return null
+    } finally {
+      this.update({ aiBusy: false })
+    }
+  }
+
+  /**
+   * ✨ on an existing stash: ask the agent to describe that entry's stored
+   * diff, then — after a preview confirm — rewrite the entry's message in
+   * place. Cancel or a failed confirm leaves the stash untouched.
+   */
+  async summarizeStash(entry: StashEntry): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null || this.state.busy !== null) return
+    const settings = this.state.settings
+    if (aiLooksUnconfigured(settings)) {
+      if (settings?.hintsEnabled === true) {
+        this.update({ showSettings: true, settingsAiNote: true })
+      } else {
+        this.toast(
+          'error',
+          'The AI agent has no endpoint configured — set one in Preferences first.'
+        )
+      }
+      return
+    }
+    this.update({ aiBusy: true })
+    let result: GeneratedCommitMessage
+    try {
+      result = await call('summarizeStash', repo.path, entry.index)
+    } catch (err) {
+      this.update({ aiBusy: false })
+      const message = err instanceof Error ? err.message : String(err)
+      if (message !== 'cancelled') this.toast('error', message)
+      return
+    }
+    this.update({ aiBusy: false })
     this.update({
       confirm: {
-        title: 'Stash your changes?',
-        message: `All ${count} changed file${count === 1 ? '' : 's'} will be moved to the stash and your working directory will be clean. Restore them later from the stash panel.`,
-        confirmLabel: 'Stash all',
-        onConfirm: async () => {
+        title: 'Replace this stash message?',
+        message: `${result.title}${
+          result.description.length > 0 ? `\n\n${result.description}` : ''
+        }`,
+        confirmLabel: 'Replace message',
+        onConfirm: () => {
           this.update({ confirm: null })
-          await this.runGit(async () => {
-            await call('stashAll', repo.path)
-          }, 'stash')
-          await this.refreshStashes()
-          this.update({ view: 'stash', selectedStashIndex: 0 })
+          void this.runGit(async () => {
+            await call(
+              'setStashMessage',
+              repo.path,
+              entry.index,
+              result.title,
+              result.description,
+              entry.branch
+            )
+          }, 'stash-set-message').then(ok => {
+            if (ok) void this.refreshStashes()
+          })
         }
       }
     })

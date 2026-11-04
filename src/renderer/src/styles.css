@@ -3369,6 +3369,56 @@ img.account-avatar {
   gap: 8px;
 }
 
+/* First-run OAuth-app setup, opened in place by a browser sign-in button:
+   the callback URL to type (selectable + copyable, because one wrong
+   character silently loses the redirect), the registration steps, and one
+   paste box. Role tokens only, so every community palette re-inks it. */
+.signin-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.signin-setup-lede {
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.signin-setup-callback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.signin-setup-callback code {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-inset);
+  user-select: all;
+}
+
+.signin-setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.signin-setup-id {
+  flex: 1 1 auto;
+  width: auto; /* the global 100% would eat the row and push Save out */
+}
+
 .signin-token {
   display: flex;
   flex-direction: column;
@@ -4036,6 +4086,14 @@ img.account-avatar {
   color: var(--text-muted);
   font-size: 12px;
   margin-top: 4px;
+}
+
+/* The stash commit's message body, as stored (multi-line, plain text). */
+.stash-detail-description {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  user-select: text;
 }
 
 .stash-detail-note {

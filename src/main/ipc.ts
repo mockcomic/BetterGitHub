@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
 import type {
   ExternalApp,
+  GeneratedCommitMessage,
   GitHubTarget,
   IgnoreRequest,
   IpcResult,
@@ -52,8 +53,10 @@ import { abortOperation, continueOperation } from './git/workflow'
 import {
   applyStash,
   dropStash,
+  getStashDiff,
   listStashes,
   popStash,
+  setStashMessage,
   stashAll
 } from './git/stash'
 import {
@@ -125,6 +128,61 @@ type Handlers = {
 }
 
 const generationControllers = new Map<string, AbortController>()
+
+/** AI config with a usable key, or the same error the commit flow throws. */
+async function requireAiConfig(): Promise<{
+  baseUrl: string
+  model: string
+  customInstructions: string
+  apiKey: string
+}> {
+  const cfg = await getAiConfig()
+  if (cfg.apiKey === null || cfg.apiKey.length === 0) {
+    throw new Error(
+      'No API key configured. Open Preferences → AI agent and add one.'
+    )
+  }
+  const { apiKey } = cfg
+  return { ...cfg, apiKey }
+}
+
+/**
+ * One AI message request (commit or stash summary) under the per-repo abort
+ * controller, so the existing cancelGenerateCommitMessage channel covers
+ * every generation the desk starts.
+ */
+async function runMessageGeneration(
+  repoPath: string,
+  diff: string,
+  cfg: { baseUrl: string; model: string; customInstructions: string; apiKey: string }
+): Promise<GeneratedCommitMessage> {
+  generationControllers.get(repoPath)?.abort()
+  const controller = new AbortController()
+  generationControllers.set(repoPath, controller)
+
+  try {
+    return await generateCommitMessage({
+      diff,
+      baseUrl: cfg.baseUrl,
+      model: cfg.model,
+      apiKey: cfg.apiKey,
+      customInstructions: cfg.customInstructions,
+      signal: controller.signal
+    })
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.name === 'AbortError' || controller.signal.aborted)
+    ) {
+      throw new Error('cancelled')
+    }
+    throw err
+  } finally {
+    if (generationControllers.get(repoPath) === controller) {
+      generationControllers.delete(repoPath)
+    }
+  }
+}
 
 /** In-flight AI merge requests, keyed by `repoPath\npath`. */
 const mergeControllers = new Map<string, AbortController>()
@@ -787,12 +845,7 @@ const handlers: Handlers = {
     repoPath: string,
     paths: ReadonlyArray<string>
   ) {
-    const cfg = await getAiConfig()
-    if (cfg.apiKey === null || cfg.apiKey.length === 0) {
-      throw new Error(
-        'No API key configured. Open Preferences → AI agent and add one.'
-      )
-    }
+    const cfg = await requireAiConfig()
 
     const status = await getStatus(repoPath)
     const statusByPath = new Map(
@@ -803,32 +856,21 @@ const handlers: Handlers = {
       throw new Error('There are no changes in the selected files to describe.')
     }
 
-    generationControllers.get(repoPath)?.abort()
-    const controller = new AbortController()
-    generationControllers.set(repoPath, controller)
-
-    try {
-      return await generateCommitMessage({
-        diff,
-        baseUrl: cfg.baseUrl,
-        model: cfg.model,
-        apiKey: cfg.apiKey,
-        customInstructions: cfg.customInstructions,
-        signal: controller.signal
-      })
-    } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.name === 'AbortError' || controller.signal.aborted)
-      ) {
-        throw new Error('cancelled')
-      }
-      throw err
-    } finally {
-      if (generationControllers.get(repoPath) === controller) {
-        generationControllers.delete(repoPath)
-      }
-    }
+    return await runMessageGeneration(repoPath, diff, cfg)
+  },
+  async summarizeStash(repoPath: string, index: number) {
+    const cfg = await requireAiConfig()
+    const diff = await getStashDiff(repoPath, index)
+    return await runMessageGeneration(repoPath, diff, cfg)
+  },
+  async setStashMessage(
+    repoPath: string,
+    index: number,
+    title: string,
+    description: string,
+    branch?: string
+  ) {
+    await setStashMessage(repoPath, index, title, description, branch)
   },
   async cancelGenerateCommitMessage(repoPath: string) {
     generationControllers.get(repoPath)?.abort()

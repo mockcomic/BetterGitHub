@@ -26,7 +26,8 @@ import {
   MergeBranchDialog,
   NewBranchDialog,
   RenameBranchDialog,
-  SettingsDialog
+  SettingsDialog,
+  StashDialog
 } from './components/Dialogs'
 import { RepoManagerDialog } from './components/RepoManagerDialog'
 import { EmptyState } from './components/EmptyState'
@@ -174,6 +175,7 @@ export function App(): JSX.Element {
         <NewBranchDialog />
         <MergeBranchDialog />
         <RenameBranchDialog />
+        <StashDialog />
         <AboutDialog />
         <ConfirmDialog />
         <AiMergeDialog />
@@ -328,6 +330,7 @@ export function App(): JSX.Element {
       <NewBranchDialog />
       <MergeBranchDialog />
       <RenameBranchDialog />
+      <StashDialog />
       <AboutDialog />
       <ConfirmDialog />
       <AiMergeDialog />
@@ -474,6 +477,7 @@ const BUSY_LABELS: Record<string, string> = {
   'stash-apply': 'Applying stash…',
   'stash-pop': 'Popping stash…',
   'stash-drop': 'Dropping stash…',
+  'stash-set-message': 'Updating stash message…',
   reveal: 'Revealing in Explorer…',
   open: 'Opening…',
   copy: 'Copying…',

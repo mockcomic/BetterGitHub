@@ -69,11 +69,12 @@ export function SettingsDialog(): JSX.Element | null {
       setGitLabClientId('')
       setTestResult(null)
       // Land where the visitor came for: the AI pointer note opens the AI
-      // rail item; a fresh install (no client ids) opens Accounts with the
-      // sign-in-apps drawer already out, so the greyed buttons explain
-      // themselves instead of being a mystery.
+      // rail item. The sign-in-apps drawer stays closed by default — an
+      // unconfigured browser button now explains itself by opening the
+      // one-step setup right in the sign-in panel, so nothing here has to
+      // pre-emptively apologise for a greyed button.
       setSection(state.settingsAiNote ? 'ai' : 'accounts')
-      setAppsOpen(!settings.accounts.hasGitHubClientId && !settings.accounts.hasGitLabClientId)
+      setAppsOpen(false)
     }
   }, [settings, state.showSettings, state.settingsAiNote])
 
@@ -286,16 +287,18 @@ export function SettingsDialog(): JSX.Element | null {
         >
           <summary>
             Browser sign-in apps
-            <InfoTip text={'The browser buttons stay greyed until you register one free OAuth application per provider and paste its id here. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
+            <InfoTip text={'Both browser buttons are always clickable. With an id here they go straight to your browser for authorization; without one the button first asks for the id, in place. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
           </summary>
           <p className="field-hint">
-            The browser buttons use an OAuth application you register once, then paste
-            here (or bake in via providers/config.ts and rebuild) — Aspen ships no
-            shared id so your sign-ins never ride on someone else's rate limits.
+            The browser buttons sign you in through an OAuth application you register
+            once and paste here (or bake into providers/config.ts and rebuild) — the
+            sign-in panel walks you through the same registration when a box is empty.
+            Aspen ships no shared id so your sign-ins never ride on someone else's
+            rate limits.
           </p>
           <Field
             label="GitHub OAuth App client id"
-            hint="github.com/settings/developers → new OAuth App → Authorization callback URL http://127.0.0.1:8765/callback and tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback. Public by design; leave empty to hide the button."
+            hint="github.com/settings/developers → new OAuth App → Authorization callback URL http://127.0.0.1:8765/callback and tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback. Public by design; leave empty to fall back to the id baked in at build time."
             tip={'GitHub → Settings → Developer settings → OAuth Apps → New OAuth App.\nHomepage URL: anything. Authorization callback URL: exactly http://127.0.0.1:8765/callback.\nTick “Enable Device Flow” — the one app covers both the browser sign-in and the code fallback.\nOnly the Client ID is used; Aspen never needs the secret.'}
           >
             <input
@@ -1023,6 +1026,114 @@ export function RenameBranchDialog(): JSX.Element | null {
           }}
         />
       </Field>
+    </Dialog>
+  )
+}
+
+/**
+ * "Stash your changes": park every working change — untracked included —
+ * under an optional message. ✨ describes all dirty paths with the same
+ * agent (and cancel channel) as the commit box; leaving the fields empty
+ * stashes under git's plain "Aspen on <branch>" label.
+ */
+export function StashDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+
+  useEffect(() => {
+    if (!state.showStash) {
+      setTitle('')
+      setDescription('')
+    }
+  }, [state.showStash])
+
+  if (!state.showStash) return null
+
+  const count = state.status?.files.length ?? 0
+  const busy = state.busy !== null
+  const stash = (): void => {
+    void store.stashWithMessage(title, description)
+  }
+
+  return (
+    <Dialog
+      title="Stash your changes"
+      onClose={() => store.setStashOpen(false)}
+      width={480}
+      footer={
+        <>
+          <button className="btn" onClick={() => store.setStashOpen(false)}>
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            disabled={busy || count === 0}
+            onClick={stash}
+          >
+            {state.busy === 'stash' ? <span className="spinner" /> : null} Stash all
+          </button>
+        </>
+      }
+    >
+      <p className="confirm-message">
+        All {count} changed file{count === 1 ? '' : 's'} will be moved to the
+        stash and your working directory will be clean. Restore them later from
+        the stash panel.
+      </p>
+      <Field
+        label="Message"
+        hint="Optional. Names the stash in the list so you can find it again."
+      >
+        <input
+          autoFocus
+          placeholder="work-in-progress on the parser"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') stash()
+          }}
+        />
+      </Field>
+      <Field
+        label="Description"
+        tip="Stored as the stash commit's message body — visible in the stash detail pane and in git log."
+      >
+        <textarea
+          rows={3}
+          placeholder="What these changes are about"
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
+      </Field>
+      <div className="commit-actions">
+        {state.aiBusy ? (
+          <button
+            className="btn ai"
+            onClick={() => store.cancelGeneration()}
+            title="Cancel generation"
+          >
+            <span className="spinner" /> Cancel
+          </button>
+        ) : (
+          <button
+            className="btn ai"
+            disabled={busy || count === 0}
+            onClick={() =>
+              void store.generateStashDraft().then(draft => {
+                if (draft !== null) {
+                  setTitle(draft.title)
+                  setDescription(draft.description)
+                }
+              })
+            }
+            title="Describe all working changes with the AI agent"
+          >
+            ✨ Describe
+          </button>
+        )}
+      </div>
     </Dialog>
   )
 }

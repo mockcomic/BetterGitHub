@@ -216,6 +216,23 @@ export interface RequestResponseChannels {
   applyStash: (repoPath: string, index: number) => void
   popStash: (repoPath: string, index: number) => void
   dropStash: (repoPath: string, index: number) => void
+  /**
+   * Ask the AI agent to describe one stash entry's changes. Read-only: it
+   * returns the proposed message; `setStashMessage` applies it. Aborted by
+   * the same cancelGenerateCommitMessage channel the commit flow uses.
+   */
+  summarizeStash: (repoPath: string, index: number) => GeneratedCommitMessage
+  /**
+   * Rewrite one entry's message (subject + body), keeping its changes.
+   * `branch` re-applies git's `On <branch>: ` subject prefix when known.
+   */
+  setStashMessage: (
+    repoPath: string,
+    index: number,
+    title: string,
+    description: string,
+    branch?: string
+  ) => void
 
   // branches
   getBranches: (repoPath: string) => BranchList

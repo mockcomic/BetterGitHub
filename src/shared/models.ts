@@ -138,6 +138,9 @@ export interface StashEntry {
   readonly label: string
   /** The stash subject, e.g. `On main: my changes`. */
   readonly message: string
+  /** The stash commit-message body (paragraphs after the subject); empty
+   *  when the stash carries only a subject — every pre-existing stash. */
+  readonly description: string
   /** ISO 8601 commit date of the stash commit. */
   readonly date: string
   /** Branch the stash was created on. */
@@ -313,9 +316,10 @@ export interface PublicSettings {
     readonly hasApiKey: boolean
   }
   /**
-   * Whether browser sign-in can be offered per provider. Device flow and
-   * OAuth PKCE need an app client id (see providers/config.ts); without one
-   * the UI offers token sign-in only.
+   * Whether browser sign-in can start immediately per provider. Device flow
+   * and OAuth PKCE need an app client id (see providers/config.ts); without
+   * one the buttons still work — they open the sign-in panel's one-step
+   * setup that asks for the id — and token sign-in is always offered.
    */
   readonly accounts: {
     readonly hasGitHubClientId: boolean

@@ -6,14 +6,21 @@ import type {
   RemoteRepository,
   RemoteRepoSort
 } from '../../../shared/models'
+import {
+  appRegistrationUrl,
+  appSetupSteps,
+  oauthInstanceLabel,
+  OAUTH_CALLBACK_URL
+} from '../../../shared/oauth-setup'
 import { call } from '../api'
 import { useStore, useStoreState } from '../store'
 import { relativeTime } from '../time'
 
 /**
  * Shared hosted-account UI: the settings rows, the sign-in panel (browser
- * flows + token fallback), and the clone dialog's account repository pane.
- * Tokens never appear here — only logins, badges, and one-way inputs.
+ * flows, the one-step OAuth-app setup they need, and the token fallback), and
+ * the clone dialog's account repository pane. Tokens never appear here — only
+ * logins, badges, and one-way inputs.
  */
 
 const TOKEN_PAGES: Record<AccountProvider, string> = {
@@ -140,10 +147,12 @@ export function AccountList(): JSX.Element {
 }
 
 /**
- * Sign-in panel: browser buttons when client ids are configured, and the
- * token form that works everywhere (self-hosted included). Pending browser
- * sign-ins render their waiting state here; polling lives in the store so
- * closing the dialog never strands the flow.
+ * Sign-in panel: the two browser buttons — always clickable, running the real
+ * OAuth flow when an application id is configured and opening the one-step
+ * setup in place when it is not — plus the token form that works everywhere
+ * (self-hosted included). Pending browser sign-ins render their waiting state
+ * here; polling lives in the store so closing the dialog never strands the
+ * flow.
  */
 export function SignInPanel({
   onSuccess
@@ -157,6 +166,7 @@ export function SignInPanel({
   const [instance, setInstance] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [setupFor, setSetupFor] = useState<AccountProvider | null>(null)
 
   const support = state.settings?.accounts
   const challenge = state.signIn
@@ -169,12 +179,28 @@ export function SignInPanel({
     setNotice(null)
   }, [challenge])
 
-  const startBrowser = (which: AccountProvider): void => {
-    setNotice(null)
+  /** Hand the flow to main: authorize page (or device code) + polling. */
+  const runFlow = (which: AccountProvider): void => {
     // The optional instance line doubles as the enterprise/self-hosted
     // root for both providers' browser flows.
     const trimmed = instance.trim()
     void store.startBrowserSignIn(which, trimmed.length > 0 ? trimmed : undefined)
+  }
+
+  const startBrowser = (which: AccountProvider): void => {
+    setNotice(null)
+    const configured =
+      support != null &&
+      (which === 'github' ? support.hasGitHubClientId : support.hasGitLabClientId)
+    // No id means the provider has nothing to authorize against yet, so the
+    // click asks for the id here instead of doing nothing: a greyed button
+    // reads as "Aspen can't sign in", which is not the truth.
+    if (!configured) {
+      setSetupFor(which)
+      return
+    }
+    setSetupFor(null)
+    runFlow(which)
   }
 
   const submitToken = (): void => {
@@ -197,32 +223,42 @@ export function SignInPanel({
     <div className="signin-panel">
       {challenge === null ? (
         <>
-          <div className="signin-browser">
-            <button
-              className="btn"
-              disabled={support ? !support.hasGitHubClientId : true}
-              onClick={() => startBrowser('github')}
-              title={
-                support && !support.hasGitHubClientId
-                  ? 'Needs an OAuth App client id (Device Flow enabled, callback http://127.0.0.1:8765/callback) in Browser sign-in apps below — or use a token.'
-                  : 'Sign in in your browser (GitHub authorization); falls back to the one-time code if the local port is busy.'
-              }
-            >
-              Sign in with GitHub
-            </button>
-            <button
-              className="btn"
-              disabled={support ? !support.hasGitLabClientId : true}
-              onClick={() => startBrowser('gitlab')}
-              title={
-                support && !support.hasGitLabClientId
-                  ? 'Needs an application id (redirect http://127.0.0.1:8765/callback) in Browser sign-in apps below — or use a token.'
-                  : 'GitLab OAuth with PKCE; the instance is the URL below when you fill it in.'
-              }
-            >
-              Sign in with GitLab
-            </button>
-          </div>
+          {setupFor === null ? (
+            <div className="signin-browser">
+              <button
+                className="btn"
+                onClick={() => startBrowser('github')}
+                title={
+                  support && !support.hasGitHubClientId
+                    ? 'Signs you in in your browser (GitHub authorization, one-time-code fallback) — needs a free OAuth App id first, which the next step asks for.'
+                    : 'Sign in in your browser (GitHub authorization); falls back to the one-time code if the local port is busy.'
+                }
+              >
+                Sign in with GitHub
+              </button>
+              <button
+                className="btn"
+                onClick={() => startBrowser('gitlab')}
+                title={
+                  support && !support.hasGitLabClientId
+                    ? 'GitLab OAuth with PKCE — needs a free application id first, which the next step asks for.'
+                    : 'GitLab OAuth with PKCE; the instance is the URL below when you fill it in.'
+                }
+              >
+                Sign in with GitLab
+              </button>
+            </div>
+          ) : (
+            <SignInAppSetup
+              provider={setupFor}
+              instance={instance}
+              onCancel={() => setSetupFor(null)}
+              onSaved={() => {
+                setSetupFor(null)
+                runFlow(setupFor)
+              }}
+            />
+          )}
           {error !== null && <p className="signin-error">{error}</p>}
           {notice !== null && <p className="signin-notice">{notice}</p>}
         </>
@@ -287,6 +323,126 @@ export function SignInPanel({
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The one-step OAuth-app setup a browser sign-in needs the first time: the
+ * registration page for the server being signed into, the callback URL to
+ * type in (copyable, since a single wrong character silently breaks the
+ * redirect), the two traps, and one paste box. Saving is the same settings
+ * write the Browser-sign-in-apps drawer does, so the id shows up there
+ * afterwards; the caller then starts the browser flow immediately.
+ */
+function SignInAppSetup({
+  provider,
+  instance,
+  onCancel,
+  onSaved
+}: {
+  provider: AccountProvider
+  instance: string
+  onCancel: () => void
+  onSaved: () => void
+}): JSX.Element {
+  const store = useStore()
+  const [id, setId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const save = (): void => {
+    const trimmed = id.trim()
+    if (trimmed.length === 0 || busy) return
+    setBusy(true)
+    setNotice(null)
+    void store
+      .saveSettings({
+        accounts:
+          provider === 'github'
+            ? { githubClientId: trimmed }
+            : { gitlabClientId: trimmed }
+      })
+      .then(saved => {
+        if (saved === null) {
+          setNotice(
+            'Aspen could not store that id. Try again, or sign in with a token below.'
+          )
+          return
+        }
+        onSaved()
+      })
+      .finally(() => setBusy(false))
+  }
+
+  return (
+    <div className="signin-setup">
+      <p className="signin-setup-lede">
+        {provider === 'github' ? 'GitHub' : 'GitLab'} sign-in needs one free OAuth
+        application on <strong>{oauthInstanceLabel(provider, instance)}</strong> —
+        about a minute, once, and Aspen never needs the secret.
+      </p>
+      <div className="signin-setup-callback">
+        <code>{OAUTH_CALLBACK_URL}</code>
+        <button
+          className="mini"
+          title="Copy the callback/redirect URL to type into the registration form"
+          onClick={() =>
+            void call('writeClipboard', OAUTH_CALLBACK_URL).then(() =>
+              setNotice('Callback URL copied.')
+            )
+          }
+        >
+          Copy
+        </button>
+        <button
+          className="mini link"
+          onClick={() =>
+            void call('openExternal', appRegistrationUrl(provider, instance))
+          }
+        >
+          Open the registration page
+        </button>
+      </div>
+      <ol className="signin-setup-steps">
+        {appSetupSteps(provider, instance).map(step => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+      <div className="row">
+        <input
+          className="signin-setup-id"
+          placeholder={provider === 'github' ? 'Iv23li…' : 'app id…'}
+          aria-label={
+            provider === 'github'
+              ? 'GitHub OAuth App client id'
+              : 'GitLab application id'
+          }
+          value={id}
+          onChange={e => setId(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') save()
+          }}
+        />
+        <button
+          className="btn primary"
+          disabled={busy || id.trim().length === 0}
+          onClick={save}
+        >
+          {busy ? 'Saving…' : 'Save & sign in'}
+        </button>
+        <button className="mini" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      <span className="field-hint">
+        One id per provider: the optional instance field below picks the server
+        this sign-in runs against, so a GitHub Enterprise or self-hosted GitLab
+        server needs an application registered there (paste it here when you
+        have one — it replaces the stored id). A personal access token needs
+        none of this.
+      </span>
+      {notice !== null && <p className="signin-notice">{notice}</p>}
     </div>
   )
 }

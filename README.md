@@ -41,8 +41,11 @@ parsing → cancellable request).
 - **Merge-conflict handling** — a banner for an in-progress merge / rebase /
   cherry-pick / revert with conflict count and **Continue** / **Abort**;
   per-file *ours / theirs / done* resolution buttons.
-- **Stash** — stash all changes (including untracked), and apply / pop / drop
-  entries from the sidebar.
+- **Stash** — stash all changes (including untracked) under an optional
+  message (subject + description, stored on the stash commit itself), and
+  apply / pop / drop entries from the sidebar. ✨ **Summarize** describes an
+  existing entry's stored diff with the AI agent and rewrites its message in
+  place, replaying the original author, committer and date.
 - **Diff viewer** — unified **or split** view, line wrap toggle, word-level
   highlighting of what actually changed inside a modified line, syntax
   highlighting (Prism), a large-diff guard, distinct binary / error / empty
@@ -218,13 +221,19 @@ Open **Clone a repository → Accounts** (or Preferences → Accounts).
   then kept encrypted next to the settings file.
 
 Browser sign-in needs an OAuth application you register once (or bake into
-`src/main/providers/config.ts` and rebuild) and paste into **Preferences →
-Accounts → Browser sign-in apps**: GitHub — an OAuth App whose Authorization
-callback URL is `http://127.0.0.1:8765/callback` with *Enable Device Flow*
-ticked, one app serving both GitHub flows; GitLab — an application,
-confidential **off**, redirect URI exactly `http://127.0.0.1:8765/callback`,
-scope `api`. The ids are public, so they ship empty: without them the
-browser buttons stay hidden and the token path works everywhere.
+`src/main/providers/config.ts` and rebuild): GitHub — an OAuth App whose
+Authorization callback URL is `http://127.0.0.1:8765/callback` with *Enable
+Device Flow* ticked, one app serving both GitHub flows; GitLab — an
+application, confidential **off**, redirect URI exactly
+`http://127.0.0.1:8765/callback`, scope `api`. The ids are public, so they
+ship empty — and both sign-in buttons are always clickable either way: with
+an id on file they go straight to your browser for authorization, and without
+one they first open a one-step setup **in the sign-in panel** (registration
+page, copyable callback URL, the steps, one paste box) and start the same
+authorization the moment you paste and press **Save & sign in**. The
+**Browser sign-in apps** fields in Preferences are the same two ids, for
+replacing them later; the token path needs none of this and covers servers
+whose application you cannot register.
 
 Once signed in, the Clone dialog gets one tab per account listing your
 repositories (owner, visibility, last push) with provider-side search,

@@ -446,6 +446,14 @@ export function HistoryQueue(): JSX.Element {
                   label: 'Create branch from commit…',
                   onSelect: () => store.createBranchFromSelectedCommit()
                 },
+                ...(state.commits[0]?.sha === c.sha && !c.isMerge
+                  ? [
+                      {
+                        label: 'Uncommit latest commit…',
+                        onSelect: () => store.uncommitSelectedCommit()
+                      }
+                    ]
+                  : []),
                 {
                   label: 'Cherry-pick commit…',
                   onSelect: () => store.cherryPickSelectedCommit()
@@ -693,6 +701,7 @@ export function StashQueue(): JSX.Element {
 
 export function StashDetail(): JSX.Element {
   const state = useStoreState()
+  const store = useStore()
   const entry = state.stashes.find(s => s.index === state.selectedStashIndex)
   if (entry === undefined) {
     return (
@@ -715,6 +724,31 @@ export function StashDetail(): JSX.Element {
       <div className="stash-detail-meta">
         {entry.branch.length > 0 ? `Stashed from ${entry.branch}` : 'Stashed'}
         {entry.date.length > 0 ? ` · ${new Date(entry.date).toLocaleString()}` : ''}
+      </div>
+      {entry.description.length > 0 && (
+        <p className="confirm-message stash-detail-description">
+          {entry.description}
+        </p>
+      )}
+      <div className="commit-actions">
+        {state.aiBusy && state.selectedStashIndex === entry.index ? (
+          <button
+            className="btn ai"
+            onClick={() => store.cancelGeneration()}
+            title="Cancel generation"
+          >
+            <span className="spinner" /> Cancel
+          </button>
+        ) : (
+          <button
+            className="btn ai"
+            disabled={state.busy !== null}
+            onClick={() => void store.summarizeStash(entry)}
+            title="Describe these stashed changes with the AI agent and store the summary on the entry"
+          >
+            ✨ Summarize
+          </button>
+        )}
       </div>
       <p className="stash-detail-note">
         <b>Apply</b> restores these changes and keeps the entry; <b>Pop</b>{' '}
