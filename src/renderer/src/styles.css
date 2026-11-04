@@ -4539,6 +4539,32 @@ img.account-avatar {
   white-space: nowrap;
 }
 
+/* One quiet rail under the toolbar: the watch-folder state and its verbs. */
+.repo-scan-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.repo-scan-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.repo-scan-path {
+  font-family: var(--mono);
+  color: var(--text);
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
 /* Bulk actions exist only while a selection exists — no reserved dead row. */
 .repo-manager-selectbar {
   display: flex;

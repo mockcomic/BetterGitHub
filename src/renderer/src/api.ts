@@ -1,4 +1,4 @@
-import type { IpcResult } from '../../shared/models'
+import type { IpcResult, RepoScanOutcome } from '../../shared/models'
 import type { UpdateState } from '../../shared/updates'
 import type {
   MenuAction,
@@ -16,6 +16,9 @@ declare global {
       ): Promise<unknown>
       onMenuAction(callback: (action: MenuAction) => void): () => void
       onRepoChanged(callback: (repoPath: string) => void): () => void
+      onReposChanged(
+        callback: (outcome: RepoScanOutcome) => void
+      ): () => void
       onTerminalOutput(
         callback: (id: string, data: string) => void
       ): () => void
@@ -53,6 +56,12 @@ export function onRepoChanged(
   callback: (repoPath: string) => void
 ): () => void {
   return window.aspen.onRepoChanged(callback)
+}
+
+export function onReposChanged(
+  callback: (outcome: RepoScanOutcome) => void
+): () => void {
+  return window.aspen.onReposChanged(callback)
 }
 
 export function onTerminalOutput(

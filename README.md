@@ -16,6 +16,12 @@ parsing → cancellable request).
   GitHub/GitLab account** (sign in, browse and search your repositories, pick
   one and clone; folder name and destination suggested by main), recent list,
   remove from the app.
+- **Watch folder** — point the manager at the folder that holds your repos
+  (e.g. `~/Documents/GitHub`) and the list follows it: new git folders are
+  added, folders you moved or trashed drop out, and repos you added from
+  anywhere else are left alone. Manual removals stick (the folder is
+  remembered as dismissed until it leaves the disk); rescans run on startup,
+  on folder changes, and on window focus.
 - **Hosted accounts** — sign in with **GitHub** (browser OAuth, the device
   code, or a personal access token) and **GitLab** (OAuth PKCE for gitlab.com,
   token for self-hosted instances too); the Clone dialog grows a tab per
@@ -109,7 +115,9 @@ parsing → cancellable request).
 
 ## Requirements
 
-- Windows (works on macOS/Linux with minor menu tweaks)
+- Windows, macOS or Linux (macOS/Linux use the native menu bar and shell
+  detection; `scripts/dev.sh` and `scripts/Aspen.sh` mirror the `.cmd`
+  launchers)
 - [Node.js](https://nodejs.org) 20+
 - `git` on `PATH` (any recent version; Git Credential Manager recommended)
 - An AI endpoint for ✨ Generate only (an OpenAI-compatible API key, or a

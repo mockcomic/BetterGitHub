@@ -23,6 +23,7 @@ import type {
   RemoteRepoQuery,
   RemoveRepositoriesResult,
   RepoSummaryEntry,
+  RepoScanOutcome,
   Repository,
   RepositoryStatus,
   SettingsPatch,
@@ -53,6 +54,12 @@ export interface RequestResponseChannels {
   selectDirectories: () => ReadonlyArray<string> | null
   /** Bulk add used by the repository manager (validates each folder). */
   addRepositories: (paths: ReadonlyArray<string>) => AddRepositoriesResult
+  /**
+   * Reconcile the repository list with the watch folder's direct child git
+   * repos (no-op when no folder is set). Runs on startup, on watch-folder
+   * changes, on window focus, and from the manager's Rescan button.
+   */
+  scanRepositories: () => RepoScanOutcome
   /** Live status for the manager hub list; one bounded batch per call. */
   getRepoSummaries: (paths: ReadonlyArray<string>) => RepoSummaryEntry[]
   /**
@@ -408,3 +415,10 @@ export const TERMINAL_EXIT_CHANNEL = 'terminal-exit'
  * the transitions that deserve attention.
  */
 export const UPDATE_STATE_CHANNEL = 'update-state'
+
+/**
+ * Main -> renderer push: the watch-folder scan changed the repository list.
+ * Carries the {@link RepoScanOutcome} so the store can refresh and name the
+ * folders in a toast.
+ */
+export const REPOS_CHANGED_CHANNEL = 'repos-changed'
