@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { constants as fsConstants } from 'fs'
 import { access, stat } from 'fs/promises'
-import { join } from 'path'
+import { win32 as pathWin32 } from 'path'
 import type { TerminalSessionInfo } from '../shared/models'
 import { TERMINAL_EXIT_CHANNEL, TERMINAL_OUTPUT_CHANNEL } from '../shared/ipc'
 import { findCommand, type CommandRules, type ExternalPlatform } from './external-apps'
@@ -41,7 +41,13 @@ export interface ChosenShell {
 
 /** The Windows PowerShell v1.0 directory under %SystemRoot%. */
 const WIN_POWERSHELL_FALLBACK = (env: NodeJS.ProcessEnv): string =>
-  join(env.SystemRoot ?? 'C:\\WINDOWS', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  pathWin32.join(
+    env.SystemRoot ?? 'C:\\WINDOWS',
+    'System32',
+    'WindowsPowerShell',
+    'v1.0',
+    'powershell.exe'
+  )
 
 /**
  * The platform-priority shell, resolved without spawning anything:

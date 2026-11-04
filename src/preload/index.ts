@@ -4,11 +4,13 @@ import type { UpdateState } from '../shared/updates'
 import {
   MENU_ACTION_CHANNEL,
   REPO_CHANGED_CHANNEL,
+  REPOS_CHANGED_CHANNEL,
   TERMINAL_EXIT_CHANNEL,
   TERMINAL_OUTPUT_CHANNEL,
   UPDATE_STATE_CHANNEL,
   type MenuAction
 } from '../shared/ipc'
+import type { RepoScanOutcome } from '../shared/models'
 
 /**
  * The only surface exposed to the renderer. The renderer-side wrapper in
@@ -42,6 +44,22 @@ const api = {
     ipcRenderer.on(REPO_CHANGED_CHANNEL, listener)
     return () => {
       ipcRenderer.removeListener(REPO_CHANGED_CHANNEL, listener)
+    }
+  },
+  /**
+   * Main pushes the outcome when a watch-folder scan changed the repository
+   * list (added/removed repos) without the renderer asking.
+   */
+  onReposChanged: (
+    callback: (outcome: RepoScanOutcome) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      outcome: RepoScanOutcome
+    ) => callback(outcome)
+    ipcRenderer.on(REPOS_CHANGED_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(REPOS_CHANGED_CHANNEL, listener)
     }
   },
   /** Main pushes one PTY output chunk for a terminal session. */

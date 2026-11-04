@@ -98,6 +98,10 @@ export function RepoManagerDialog(): JSX.Element | null {
     }
     setSummaries(new Map())
     run()
+    // Opening the hub is also a chance to reconcile with the watch folder;
+    // if the scan changes the list, REPOS_CHANGED repopulates state and this
+    // effect re-runs — the follow-up scan finds no changes and settles.
+    void call('scanRepositories').catch(() => undefined)
     // Fill once on open and refresh when the window regains focus — no
     // polling; the hub is a snapshot, not a dashboard.
     window.addEventListener('focus', run)
@@ -109,6 +113,7 @@ export function RepoManagerDialog(): JSX.Element | null {
 
   if (!state.showRepoManager) return null
 
+  const scanFolder = state.settings?.scanFolder ?? ''
   const needle = filter.trim().toLowerCase()
   const matchesFilter = (r: ManagedRepository): boolean =>
     needle.length === 0 ||
@@ -503,6 +508,46 @@ export function RepoManagerDialog(): JSX.Element | null {
         >
           Clone…
         </button>
+      </div>
+
+      <div className="repo-scan-bar">
+        {scanFolder.length > 0 ? (
+          <>
+            <span className="repo-scan-note" title={scanFolder}>
+              Watching <span className="repo-scan-path">{scanFolder}</span>{' '}
+              for added and removed repositories
+            </span>
+            <button
+              className="mini"
+              onClick={() => void store.rescanWatchFolder()}
+              title="Check the folder again now — new git folders are added, vanished ones dropped from the list"
+            >
+              Rescan
+            </button>
+            <button
+              className="mini"
+              onClick={() => void store.chooseScanFolder()}
+              title="Watch a different folder"
+            >
+              Change folder…
+            </button>
+            <button
+              className="mini"
+              onClick={() => void store.clearScanFolder()}
+              title="Keep the list as it is; stop following the folder"
+            >
+              Stop watching
+            </button>
+          </>
+        ) : (
+          <button
+            className="mini"
+            onClick={() => void store.chooseScanFolder()}
+            title="Point Aspen at the folder that holds your repositories — new git folders appear here automatically, folders that leave are dropped from the list"
+          >
+            Watch a folder for added and removed repositories…
+          </button>
+        )}
       </div>
 
       {!selNone && (

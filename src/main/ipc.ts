@@ -85,10 +85,18 @@ import {
   addRepository,
   getAiConfig,
   getPublicSettings,
+  getScanSettings,
   listRepositories,
+  rememberScanDismissals,
   removeRepositoriesByIds,
   saveSettings
 } from './settings'
+import {
+  onScannedRemoval,
+  resyncScanFolder,
+  scanRepositories
+} from './repo-scan'
+import { parentKey, pathKey } from './repo-scan-plan'
 import {
   accountAvatar,
   addAccount,
@@ -128,6 +136,15 @@ const generationControllers = new Map<string, AbortController>()
 
 /** In-flight AI merge requests, keyed by `repoPath\npath`. */
 const mergeControllers = new Map<string, AbortController>()
+
+// A watch-folder pass that drops a repository must abort its in-flight
+// generation just like the manual removeRepositories verb below does.
+onScannedRemoval(removed => {
+  for (const repo of removed) {
+    generationControllers.get(repo.path)?.abort()
+    generationControllers.delete(repo.path)
+  }
+})
 
 async function openUrl(url: string): Promise<void> {
   if (!/^https?:\/\//i.test(url)) {
@@ -239,6 +256,9 @@ const handlers: Handlers = {
     }
     return { added, skipped, failed }
   },
+  async scanRepositories() {
+    return scanRepositories()
+  },
   async getRepoSummaries(paths) {
     // Bounded fan-out: the manager may list dozens of repos and each summary
     // runs real git. A folder that fails reports unreadable cells, never
@@ -304,6 +324,19 @@ const handlers: Handlers = {
         }
       }
     }
+    // A repo removed from the list that still sits in the watch folder must
+    // be remembered as dismissed, or the next scan pass would undo the
+    // removal. Folders that left the disk (Recycle Bin) need nothing — a
+    // restored folder legitimately reads as "repo added" again.
+    const { folder } = await getScanSettings()
+    if (folder.length > 0) {
+      const folderKey = pathKey(folder)
+      const underWatch = removed
+        .filter(r => existsSync(r.path))
+        .map(r => resolve(r.path))
+        .filter(p => parentKey(pathKey(p)) === folderKey)
+      if (underWatch.length > 0) await rememberScanDismissals(underWatch)
+    }
     const watched = getWatchedPath()
     if (
       watched !== null &&
@@ -322,6 +355,12 @@ const handlers: Handlers = {
   },
   async saveSettings(patch) {
     const settings = await saveSettings(patch)
+    if (patch.scanFolder !== undefined) {
+      // Apply the new watch folder immediately: (re)arm the folder watcher
+      // and reconcile once so the renderer's list is right by the time the
+      // save resolves.
+      await resyncScanFolder()
+    }
     // A theme patch must re-skin the OS-drawn chrome (nativeTheme source,
     // background, and win32 frame) immediately, not just on next launch; a
     // no-op repaint is cheap when the patch touched something else.

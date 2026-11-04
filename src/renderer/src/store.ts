@@ -22,6 +22,7 @@ import type {
   PublicSettings,
   RemoteRepoPage,
   RemoteRepoSort,
+  RepoScanOutcome,
   Repository,
   RepositoryStatus,
   SettingsPatch,
@@ -36,7 +37,7 @@ import { DONATE_URL } from '../../shared/links'
 import { RELEASES_URL, type UpdateState } from '../../shared/updates'
 import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
 import { aiLooksUnconfigured } from './progressive'
-import { call, onMenuAction, onRepoChanged, onUpdateState } from './api'
+import { call, onMenuAction, onRepoChanged, onReposChanged, onUpdateState } from './api'
 
 export interface ToastAction {
   readonly label: string
@@ -523,6 +524,8 @@ export class AppStore {
       void this.handleMenuAction(action)
     })
 
+    onReposChanged(outcome => this.applyRepoScan(outcome))
+
     onRepoChanged(repoPath => {
       if (
         this.state.selectedRepo !== null &&
@@ -881,6 +884,114 @@ export class AppStore {
     const repo = this.state.selectedRepo
     if (repo === null) return
     this.removeRepositories([repo.id], false)
+  }
+
+  // ------------------------------------------------ watch-folder scanning
+
+  /**
+   * In-flight store-initiated scans; the REPOS_CHANGED push they trigger
+   * still refreshes the list, but the calling action owns the toast so the
+   * same folders are never announced twice.
+   */
+  private quietRepoPushes = 0
+
+  private applyRepoScan(outcome: RepoScanOutcome): void {
+    // Captured synchronously: the refresh below crosses an IPC boundary, by
+    // which time a store-initiated scan has long since decremented the
+    // counter and toasted its own summary.
+    const quiet = this.quietRepoPushes > 0
+    void (async (): Promise<void> => {
+      try {
+        const repositories = await call('listRepositories')
+        const patch: Partial<AppState> = { repositories }
+        const selected = this.state.selectedRepo
+        if (
+          selected !== null &&
+          outcome.removed.some(r => r.id === selected.id)
+        ) {
+          Object.assign(patch, {
+            selectedRepo: null,
+            status: null,
+            statusError: null,
+            commits: [],
+            branches: [],
+            remoteBranches: []
+          })
+          localStorage.removeItem('aspen.lastRepo')
+        }
+        this.update(patch)
+        if (quiet) return
+        const names = (
+          repos: ReadonlyArray<Repository>
+        ): string =>
+          repos
+            .slice(0, 3)
+            .map(r => r.name)
+            .join(', ') +
+          (repos.length > 3 ? ` and ${repos.length - 3} more` : '')
+        const parts: string[] = []
+        if (outcome.added.length > 0)
+          parts.push(`added ${names(outcome.added)}`)
+        if (outcome.removed.length > 0)
+          parts.push(`removed ${names(outcome.removed)}`)
+        if (parts.length > 0)
+          this.toast('info', `Watch folder — ${parts.join(' and ')}.`)
+      } catch {
+        // A failed refresh retries on the next push or app focus.
+      }
+    })()
+  }
+
+  /** Pick (or change) the folder the repository list follows. */
+  async chooseScanFolder(): Promise<void> {
+    const dir = await call('selectDirectory')
+    if (dir === null) return
+    this.quietRepoPushes++
+    try {
+      const settings = await call('saveSettings', { scanFolder: dir })
+      const outcome = await call('scanRepositories')
+      this.update({
+        settings,
+        repositories: await call('listRepositories')
+      })
+      const leaf = dir.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? dir
+      this.toast(
+        'success',
+        outcome.added.length > 0
+          ? `Now watching "${leaf}" — added ${outcome.added.length} repository${outcome.added.length === 1 ? '' : 's'}.`
+          : `Now watching "${leaf}" for added and removed repositories.`
+      )
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    } finally {
+      this.quietRepoPushes--
+    }
+  }
+
+  async clearScanFolder(): Promise<void> {
+    try {
+      const settings = await call('saveSettings', { scanFolder: '' })
+      this.update({ settings })
+      this.toast('info', 'Stopped watching the repository folder.')
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Reconcile now — the manager's Rescan button. */
+  async rescanWatchFolder(): Promise<void> {
+    this.quietRepoPushes++
+    try {
+      const outcome = await call('scanRepositories')
+      this.update({ repositories: await call('listRepositories') })
+      if (outcome.added.length === 0 && outcome.removed.length === 0) {
+        this.toast('info', 'No changes — the list matches the folder.')
+      }
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    } finally {
+      this.quietRepoPushes--
+    }
   }
 
   /** Fetch several repositories in a row; reports a per-repo tally. */
