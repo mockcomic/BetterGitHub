@@ -175,3 +175,17 @@ grid. Also fixed: the ✨ emoji on the Generate buttons rendered as a missing-
 glyph box in the render — replaced with an inline gold sparkle SVG; confetti
 over the commit verb marked intentional occlusion. The "renames" collision
 fix from addendum 2 verified again at t=11.2s on the final render.
+
+## Addendum 4 (2026-11-06): 0.2.0 feature pass
+
+The film now shows what shipped in 0.2.0. In the desk scene the sync strip
+reads `Pull & Push` (the combined verb), and a terminal drawer — the release's
+headline feature — rises from the bottom of the window on scene-local 2.35
+(global 5.76, on the bed grid) with a `bash` tab, types `git push` and prints
+`main...origin/main [ahead 1] — pushed.` The desk caption became "with your
+terminal inside it" and the end-card fact line leads with `Integrated terminal`.
+Contrast fixes forced by the new layout: caption
+`#3d4b41` moved to top:942 so it sits inside the white content column instead
+of over the new drawer, status `M` badge `#7d6318`, terminal
+output `#a8e0b4`. Drawer SFX: drop_001 at 5.75. Check: 0 errors, 0 lint
+warnings, the same 8 end-card advisories as the shipped 10-31 cut.

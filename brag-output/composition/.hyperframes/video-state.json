@@ -1,7 +1,7 @@
 {
   "version": 1,
   "historyId": "acaf4cfa-1aab-4820-9361-f4df113a1cf7",
-  "currentRevision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
+  "currentRevision": "0f363303-f1ab-4190-8881-661dc53b66aa",
   "pendingChanges": false,
   "files": {
     "AGENTS.md": {
@@ -137,12 +137,12 @@
       "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/b0/b08e0a460aeacd5398e6c46e0d37489d89a4bc29b4c4a71d954c9ecbece95f41"
     },
     "compositions/desk.html": {
-      "hash": "72dadb8befb16b534969450785f9082a1cb3356d0db76e7449dd67c981b52127",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/72/72dadb8befb16b534969450785f9082a1cb3356d0db76e7449dd67c981b52127"
+      "hash": "a140ff28f21aa886c45a539e607c0b35aff393bf21ba2e5b717b6a8abdd0d5f4",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/a1/a140ff28f21aa886c45a539e607c0b35aff393bf21ba2e5b717b6a8abdd0d5f4"
     },
     "compositions/endcard.html": {
-      "hash": "3b89ff8e8b383d7e4f2ee2015cf3bf74fef71226e3fcb2398716f5fb7b5582fb",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/3b/3b89ff8e8b383d7e4f2ee2015cf3bf74fef71226e3fcb2398716f5fb7b5582fb"
+      "hash": "34521ac32d34fd463463bbcd1f611d97305ebe04feb908e93c7d686a032f4165",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/34/34521ac32d34fd463463bbcd1f611d97305ebe04feb908e93c7d686a032f4165"
     },
     "compositions/hook.html": {
       "hash": "fd72482a8ac7a7fb6794341e048f7103344063534802b520bce4f30e9f8db65a",
@@ -157,8 +157,8 @@
       "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/5b/5b1f8e63f90577982146177a52a066aec3341cf6724a67244bef9baa97332658"
     },
     "index.html": {
-      "hash": "47114ae05ba8088133bcfa2c9be00b5555d81f6b8557784d18f739c8b6afba38",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/47/47114ae05ba8088133bcfa2c9be00b5555d81f6b8557784d18f739c8b6afba38"
+      "hash": "2324f60bec2b194532e229ee70bf9254ef60615ac40086e8a641e4c5b707e492",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/23/2324f60bec2b194532e229ee70bf9254ef60615ac40086e8a641e4c5b707e492"
     },
     "meta.json": {
       "hash": "54c687dce9825f75f6276c519d997926406230e60b3331d0a26a8ef0248e34cc",
@@ -168,13 +168,13 @@
       "hash": "579de1a233e904bc3c70297d84cfac7c23b6d26031e04ecb0585f7e227eda525",
       "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/57/579de1a233e904bc3c70297d84cfac7c23b6d26031e04ecb0585f7e227eda525"
     },
-    "assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3": {
-      "hash": "364a546834db4c0c2e3b3240eb6df03e98b7362230154b04c5c614442f6660d7",
-      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/36/364a546834db4c0c2e3b3240eb6df03e98b7362230154b04c5c614442f6660d7"
-    },
     "assets/music/aspen-bed.wav": {
       "hash": "d649f8333e00f83cfbeaf854ff6c9ecc5ab984cbf9971476e7f7a60db35a0f7f",
       "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/d6/d649f8333e00f83cfbeaf854ff6c9ecc5ab984cbf9971476e7f7a60db35a0f7f"
+    },
+    "assets/music/aspen-bed.music-cues.json": {
+      "hash": "1ee7a9bdf70938bce7b3d315acae5f80ce2eacaebd915fb6d2d1193da789e4ea",
+      "content": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/1e/1ee7a9bdf70938bce7b3d315acae5f80ce2eacaebd915fb6d2d1193da789e4ea"
     }
   },
   "revisions": {
@@ -377,12 +377,141 @@
           "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/b0/b08e0a460aeacd5398e6c46e0d37489d89a4bc29b4c4a71d954c9ecbece95f41"
         }
       }
+    },
+    "b7e9786d-991b-4120-aa47-2a8a1ff4bddb": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793921567680,
+      "endedAt": 1793921567685,
+      "files": {
+        "assets/music/aspen-bed.music-cues.json": {
+          "before": null,
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/1e/1ee7a9bdf70938bce7b3d315acae5f80ce2eacaebd915fb6d2d1193da789e4ea"
+        },
+        "assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/36/364a546834db4c0c2e3b3240eb6df03e98b7362230154b04c5c614442f6660d7",
+          "after": null
+        },
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/72/72dadb8befb16b534969450785f9082a1cb3356d0db76e7449dd67c981b52127",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/5e/5ed4fa162e88d4c97a399b99c7d8faf218b1fc59ce532311c3f36b45f57e656d"
+        },
+        "compositions/endcard.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/3b/3b89ff8e8b383d7e4f2ee2015cf3bf74fef71226e3fcb2398716f5fb7b5582fb",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/34/34521ac32d34fd463463bbcd1f611d97305ebe04feb908e93c7d686a032f4165"
+        },
+        "index.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/47/47114ae05ba8088133bcfa2c9be00b5555d81f6b8557784d18f739c8b6afba38",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/c4/c49660e8f7c2f59d025195c946ddeae439eccebc759d7e8803f9dc314514d977"
+        }
+      }
+    },
+    "e7209ce6-9930-4587-a4d7-be58e295f5b8": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793921595661,
+      "endedAt": 1793921595666,
+      "files": {
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/5e/5ed4fa162e88d4c97a399b99c7d8faf218b1fc59ce532311c3f36b45f57e656d",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/26/26eda40858a820df13be8456ecea5f21996b377e9c566b1261966bccbcd103db"
+        },
+        "index.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/c4/c49660e8f7c2f59d025195c946ddeae439eccebc759d7e8803f9dc314514d977",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/43/437791734fc1636a2d48cafe98fef7218ed5c1ed0f507dff020d1eedb402231f"
+        }
+      }
+    },
+    "b8f3bb66-34cb-400b-bb34-456346aac9e7": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793921610551,
+      "endedAt": 1793921610552,
+      "files": {
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/26/26eda40858a820df13be8456ecea5f21996b377e9c566b1261966bccbcd103db",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/1b/1b70380df0d85b9953cff9649a8bd04d8ec9dc6b1434fb8e7860545cce95f09a"
+        }
+      }
+    },
+    "3d527f52-71b2-446b-91b1-c959060e2df9": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793921619447,
+      "endedAt": 1793921619448,
+      "files": {
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/1b/1b70380df0d85b9953cff9649a8bd04d8ec9dc6b1434fb8e7860545cce95f09a",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/6a/6af4424e996baaf502ac503822b740ac055fd8d8b619c03e0bcc44ec4c6f3f1f"
+        }
+      }
+    },
+    "5cd76c2e-35f5-43b1-bc6e-0c4ffe3ef09a": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793921631347,
+      "endedAt": 1793921631351,
+      "files": {
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/6a/6af4424e996baaf502ac503822b740ac055fd8d8b619c03e0bcc44ec4c6f3f1f",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/49/490f20217030ac93a13fc6c58e78ef6f1fc5ce8a0bd42913dd58f3bc588ea1e6"
+        },
+        "index.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/43/437791734fc1636a2d48cafe98fef7218ed5c1ed0f507dff020d1eedb402231f",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/23/2324f60bec2b194532e229ee70bf9254ef60615ac40086e8a641e4c5b707e492"
+        }
+      }
+    },
+    "b0727f5a-fb56-4b36-a2b1-2a174979366a": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793921677890,
+      "endedAt": 1793921677891,
+      "files": {
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/49/490f20217030ac93a13fc6c58e78ef6f1fc5ce8a0bd42913dd58f3bc588ea1e6",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/d1/d170ef243457326506ceec24eeac17949b96d345dc5607ab1b7337b254832e87"
+        }
+      }
+    },
+    "0f363303-f1ab-4190-8881-661dc53b66aa": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793921712692,
+      "endedAt": 1793921712693,
+      "files": {
+        "compositions/desk.html": {
+          "before": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/d1/d170ef243457326506ceec24eeac17949b96d345dc5607ab1b7337b254832e87",
+          "after": "/home/mockcomic/.cache/hyperframes/history/acaf4cfa-1aab-4820-9361-f4df113a1cf7/blobs/a1/a140ff28f21aa886c45a539e607c0b35aff393bf21ba2e5b717b6a8abdd0d5f4"
+        }
+      }
     }
   },
   "checks": {
     "latest": {
-      "revision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
-      "id": "6f0d11a0-0e68-4f4e-90dd-209ff37e6edb"
+      "revision": "0f363303-f1ab-4190-8881-661dc53b66aa",
+      "id": "c8c6c3a2-ca9b-4d6a-abf0-85732996591a"
     },
     "revisions": {
       "a8226ad9-77ef-4a0a-8db2-163977e0b400": [
@@ -509,7 +638,6 @@
         {
           "id": "2fd22212-5f44-4292-bb63-62c0a2981025",
           "scope": "project",
-          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/2fd22212-5f44-4292-bb63-62c0a2981025.json",
           "metadata": {
             "ok": false,
             "browserSkipped": false,
@@ -531,14 +659,15 @@
           "revision": "b196d8d3-c2bf-400d-98b1-6010e1d9d25b",
           "inputFingerprint": "ab37c5b3b59f9f09210ede5d3f940d2a05f5fc7d4821a5434ef08acfe1be9e68",
           "inputScope": "local-project-files",
-          "attribution": "recorded-revision"
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "51d87e28-169d-454e-b19d-03da0074089b"
         }
       ],
       "f1363116-cab8-4f6e-bd2d-3558a7f2bab7": [
         {
           "id": "6f0d11a0-0e68-4f4e-90dd-209ff37e6edb",
           "scope": "project",
-          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/6f0d11a0-0e68-4f4e-90dd-209ff37e6edb.json",
           "metadata": {
             "ok": true,
             "browserSkipped": false,
@@ -559,6 +688,299 @@
           "contentHash": "abd4e8ef98bbcae3d349c7e33e8a6c129a9b7a4db05a4b566ad618975c56b8da",
           "revision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
           "inputFingerprint": "2cb8a0d4c8bc4b44e4e7bfa03a1e2bb118e6f51b5edf1a93c8840cfe2b2e4295",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "9d54100f-c119-47bd-af92-83407d765b09"
+        }
+      ],
+      "b7e9786d-991b-4120-aa47-2a8a1ff4bddb": [
+        {
+          "id": "2747701e-c473-418b-9a90-f95552ff23bf",
+          "scope": "project",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921571365,
+          "contentHash": "317eb1ba4406ee8ec0b815d48e49f62efd2836f9328b30c3cfeeb43dcdb249ba",
+          "revision": "b7e9786d-991b-4120-aa47-2a8a1ff4bddb",
+          "inputFingerprint": "cafc78b7cabb2e5aefa561176ba9c22cd51cef52d208c007223a0ce20b03b1f7",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "51d87e28-169d-454e-b19d-03da0074089b"
+        },
+        {
+          "id": "96eedbfc-51ca-4861-aa4b-b707ad79018f",
+          "scope": "project",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921579449,
+          "contentHash": "3e14e6a2f71e686359056efee38da0cd9859c4369886ec0e46047bba01c3e569",
+          "revision": "b7e9786d-991b-4120-aa47-2a8a1ff4bddb",
+          "inputFingerprint": "cafc78b7cabb2e5aefa561176ba9c22cd51cef52d208c007223a0ce20b03b1f7",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "51d87e28-169d-454e-b19d-03da0074089b"
+        }
+      ],
+      "e7209ce6-9930-4587-a4d7-be58e295f5b8": [
+        {
+          "id": "a718ec9b-ca00-4702-a449-cc5de9b9f763",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921598926,
+          "contentHash": "0956b0f778ffeda23bb289e3e5621b85859144cc8d0fcfc3f987cb7f3a038058",
+          "revision": "e7209ce6-9930-4587-a4d7-be58e295f5b8",
+          "inputFingerprint": "1471a49cd2a5baafa5c4e5aba97d35e9a01aa2ea877f3f82b79733054e391b0c",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "51d87e28-169d-454e-b19d-03da0074089b"
+        }
+      ],
+      "b8f3bb66-34cb-400b-bb34-456346aac9e7": [
+        {
+          "id": "9947e9f9-4653-4e44-98ae-c42b8b2bb72c",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921613742,
+          "contentHash": "395dd93225f6874038bcaf8a55b288caf1366c532b5e209512bab4b03a27ac77",
+          "revision": "b8f3bb66-34cb-400b-bb34-456346aac9e7",
+          "inputFingerprint": "37ec23f5df8765b263cba7473bda148d468e54f5a0535671bf43e48811cb2308",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "51d87e28-169d-454e-b19d-03da0074089b"
+        }
+      ],
+      "3d527f52-71b2-446b-91b1-c959060e2df9": [
+        {
+          "id": "0db0f044-11a6-4b87-b4c4-ad57e22a1aa5",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921622640,
+          "contentHash": "eddd5fb0f66986be9f6bc0a439351b59fba2be60149c5fe829edbd6af117679d",
+          "revision": "3d527f52-71b2-446b-91b1-c959060e2df9",
+          "inputFingerprint": "b472fd21e1142dd3449f995fa8a830156082fd12efa6ff9df3cbc1f8f6c20d60",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "51d87e28-169d-454e-b19d-03da0074089b"
+        }
+      ],
+      "5cd76c2e-35f5-43b1-bc6e-0c4ffe3ef09a": [
+        {
+          "id": "111de6fb-f151-479f-8b88-e4bdaa1be4a4",
+          "scope": "project",
+          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/111de6fb-f151-479f-8b88-e4bdaa1be4a4.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921634441,
+          "contentHash": "2d5d437bdbb2a7c9152f7db9cbb270077545e0610a9131c476672548e77926d6",
+          "revision": "5cd76c2e-35f5-43b1-bc6e-0c4ffe3ef09a",
+          "inputFingerprint": "c6e8d7f0dcff0ac670b8177367966e966e1f2b2120539d499e3b312efef93d3c",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        },
+        {
+          "id": "1efbe9c6-73ca-4c1b-9ae9-bb3daaf905e7",
+          "scope": "project",
+          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/1efbe9c6-73ca-4c1b-9ae9-bb3daaf905e7.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921639383,
+          "contentHash": "4c333491661e7a35f6caae3b909fc0604ad8d369de9bf20577887723d1927396",
+          "revision": "5cd76c2e-35f5-43b1-bc6e-0c4ffe3ef09a",
+          "inputFingerprint": "c6e8d7f0dcff0ac670b8177367966e966e1f2b2120539d499e3b312efef93d3c",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
+      ],
+      "b0727f5a-fb56-4b36-a2b1-2a174979366a": [
+        {
+          "id": "3187f514-a794-4fcf-9c46-64ea0efc7b37",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921680974,
+          "contentHash": "65efd2439a6d681edb652a60f2f174be81e5c1e3512128b4e96d20cfd353bc9f",
+          "revision": "b0727f5a-fb56-4b36-a2b1-2a174979366a",
+          "inputFingerprint": "2365bb0583e2fa2ef50255652971f043019d3c0e2a41d26cd44a3277eb13d419",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "9d54100f-c119-47bd-af92-83407d765b09"
+        },
+        {
+          "id": "e374c639-93b2-4bdd-b59d-7898edf5b119",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921702754,
+          "contentHash": "79ab78cf39bbc9eb352aaa1ab7998a5a5716ed74c3dbd437e0573a6383d41661",
+          "revision": "b0727f5a-fb56-4b36-a2b1-2a174979366a",
+          "inputFingerprint": "2365bb0583e2fa2ef50255652971f043019d3c0e2a41d26cd44a3277eb13d419",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "9d54100f-c119-47bd-af92-83407d765b09"
+        }
+      ],
+      "0f363303-f1ab-4190-8881-661dc53b66aa": [
+        {
+          "id": "c8c6c3a2-ca9b-4d6a-abf0-85732996591a",
+          "scope": "project",
+          "report": "/home/mockcomic/projects/BetterGitHub/brag-output/composition/.hyperframes/artifacts/checks/c8c6c3a2-ca9b-4d6a-abf0-85732996591a.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793921715953,
+          "contentHash": "1ab90e4da2ad9f2556d6a593b0da047621acbff8a79467eed5de9721514f92d6",
+          "revision": "0f363303-f1ab-4190-8881-661dc53b66aa",
+          "inputFingerprint": "72226c6299ba26d609c7ab3723cf2baf127345f842228a8a8da601d71c9e4d24",
           "inputScope": "local-project-files",
           "attribution": "recorded-revision"
         }
@@ -628,15 +1050,15 @@
   },
   "renders": {
     "latest": {
-      "id": "9357a6b4-db6d-4b05-ae08-6e999d8d88a9",
-      "completedAt": 1793415049691,
+      "id": "9d54100f-c119-47bd-af92-83407d765b09",
+      "completedAt": 1793921730623,
       "output": "/home/mockcomic/projects/BetterGitHub/brag-output/brag.mp4",
       "status": "completed",
-      "revision": "f1363116-cab8-4f6e-bd2d-3558a7f2bab7"
+      "revision": "0f363303-f1ab-4190-8881-661dc53b66aa"
     },
     "retainedRevisions": [
-      "f1363116-cab8-4f6e-bd2d-3558a7f2bab7",
-      "b196d8d3-c2bf-400d-98b1-6010e1d9d25b"
+      "0f363303-f1ab-4190-8881-661dc53b66aa",
+      "5cd76c2e-35f5-43b1-bc6e-0c4ffe3ef09a"
     ]
   },
   "pendingArtifactCleanup": []
