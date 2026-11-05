@@ -348,6 +348,10 @@ function executeGit(req) {
       }
     })
     child.stderr?.on('error', () => undefined)
+    // git may exit before reading stdin (e.g. `git --version`); a write to
+    // the closed pipe surfaces as EPIPE on the stdin socket. Swallow it —
+    // the result is reported from stdout/stderr/exit code anyway.
+    child.stdin?.on('error', () => undefined)
     child.stdin?.end(typeof req.input === 'string' ? req.input : '')
 
     child.on('error', e => {
