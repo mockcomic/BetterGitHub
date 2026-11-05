@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'events'
-import { delimiter, join } from 'path'
+import { join, posix as pathPosix, win32 as pathWin32 } from 'path'
 import { spawn } from 'child_process'
 import {
   detectExternalApps,
@@ -242,9 +242,12 @@ describe('openDetected — cmdShim launch', () => {
 })
 
 describe('findCommand', () => {
-  /** Host-portable candidate paths (the walker uses path.join/PATH delimiter). */
-  const j = (...segments: string[]): string => join(...segments)
-  const pathVar = (...dirs: string[]): string => dirs.join(delimiter)
+  /** Candidate paths follow the *rules'* platform, never the host's: the
+   *  walker joins win32 rules with win32 semantics and POSIX rules with
+   *  POSIX, so these expectations hold on every host. */
+  const j = (...segments: string[]): string => pathPosix.join(...segments)
+  const jw = (...segments: string[]): string => pathWin32.join(...segments)
+  const pathVar = (...dirs: string[]): string => dirs.join(':')
 
   const posix = (files: ReadonlySet<string>, exec: ReadonlySet<string>, path: string): CommandRules => ({
     platform: 'linux',
@@ -288,28 +291,28 @@ describe('findCommand', () => {
   it('skips the unspawnable extensionless shim and takes the .cmd', async () => {
     // VS Code's bin ships `code`, `code.cmd` and `Code.exe`; only the
     // extensionless file on disk must not count as the command.
-    const rules = win(new Set([j('C:\\bin', 'code'), j('C:\\bin', 'code.cmd')]))
-    expect(await findCommand('code', [], rules)).toBe(j('C:\\bin', 'code.cmd'))
+    const rules = win(new Set([jw('C:\\bin', 'code'), jw('C:\\bin', 'code.cmd')]))
+    expect(await findCommand('code', [], rules)).toBe(jw('C:\\bin', 'code.cmd'))
   })
 
   it('honours PATHEXT order (.exe before .cmd when the env says so)', async () => {
-    const rules = win(new Set([j('C:\\bin', 'code.cmd'), j('C:\\bin', 'code.exe')]), '.EXE;.CMD')
-    expect(await findCommand('code', [], rules)).toBe(j('C:\\bin', 'code.exe'))
+    const rules = win(new Set([jw('C:\\bin', 'code.cmd'), jw('C:\\bin', 'code.exe')]), '.EXE;.CMD')
+    expect(await findCommand('code', [], rules)).toBe(jw('C:\\bin', 'code.exe'))
   })
 
   it('matches an already-extensioned command exactly', async () => {
-    const rules = win(new Set([j('C:\\bin', 'Code.exe')]))
-    expect(await findCommand('Code.exe', [], rules)).toBe(j('C:\\bin', 'Code.exe'))
+    const rules = win(new Set([jw('C:\\bin', 'Code.exe')]))
+    expect(await findCommand('Code.exe', [], rules)).toBe(jw('C:\\bin', 'Code.exe'))
   })
 
   it('reads the Path (mixed-case) variable Windows uses', async () => {
     const rules: CommandRules = {
       platform: 'win32',
       env: { Path: 'C:\\bin', PATHEXT: '.CMD' },
-      isFile: async p => p === j('C:\\bin', 'cursor.cmd'),
+      isFile: async p => p === jw('C:\\bin', 'cursor.cmd'),
       isExecutable: async () => true
     }
-    expect(await findCommand('cursor', [], rules)).toBe(j('C:\\bin', 'cursor.cmd'))
+    expect(await findCommand('cursor', [], rules)).toBe(jw('C:\\bin', 'cursor.cmd'))
   })
 
   it('treats an empty PATH as no directories', async () => {

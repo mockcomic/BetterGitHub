@@ -22,12 +22,14 @@ import type {
   RemoteRepoQuery,
   RemoveRepositoriesResult,
   RepoSummaryEntry,
+  RepoScanOutcome,
   Repository,
   RepositoryStatus,
   SettingsPatch,
   SignInChallenge,
   SignInStatus,
   StashEntry,
+  TerminalSessionInfo,
   WorkflowKind
 } from './models'
 
@@ -50,6 +52,12 @@ export interface RequestResponseChannels {
   selectDirectories: () => ReadonlyArray<string> | null
   /** Bulk add used by the repository manager (validates each folder). */
   addRepositories: (paths: ReadonlyArray<string>) => AddRepositoriesResult
+  /**
+   * Reconcile the repository list with the watch folder's direct child git
+   * repos (no-op when no folder is set). Runs on startup, on watch-folder
+   * changes, on window focus, and from the manager's Rescan button.
+   */
+  scanRepositories: () => RepoScanOutcome
   /** Live status for the manager hub list; one bounded batch per call. */
   getRepoSummaries: (paths: ReadonlyArray<string>) => RepoSummaryEntry[]
   /**
@@ -219,6 +227,17 @@ export interface RequestResponseChannels {
   /** Launch a detected target with the repository root (by catalog id). */
   openInExternalApp: (repoPath: string, appId: string) => void
 
+  // integrated terminal (main pushes TERMINAL_OUTPUT/EXIT channels)
+  /**
+   * Spawn the platform-priority shell in `repoPath` (validated like every
+   * other repo verb) at the given size; one session at a time per panel.
+   */
+  terminalStart: (repoPath: string, cols: number, rows: number) => TerminalSessionInfo
+  /** Feed keystrokes to a live session; an unknown id is a silent no-op. */
+  terminalWrite: (id: string, data: string) => void
+  terminalResize: (id: string, cols: number, rows: number) => void
+  terminalKill: (id: string) => void
+
   // Window-frame menu (win32 WCO title band, components/TitleBar.tsx):
   // main owns the menu data (src/main/menu.ts); the band asks for the
   // declarative menu bar, forwards plain actions exactly like the native
@@ -282,6 +301,7 @@ export type MenuAction =
   | 'delete-branch'
   | 'rename-branch'
   | 'view-on-github'
+  | 'toggle-terminal'
   | 'show-about'
   | 'donate'
 
@@ -328,3 +348,16 @@ export interface MenuBarSpec {
 
 /** Main -> renderer push: the working tree of a watched repository changed. */
 export const REPO_CHANGED_CHANNEL = 'repo-changed'
+
+/** Main -> renderer push: one chunk of PTY output for a terminal session. */
+export const TERMINAL_OUTPUT_CHANNEL = 'terminal-output'
+
+/** Main -> renderer push: a terminal session's shell exited (id, code). */
+export const TERMINAL_EXIT_CHANNEL = 'terminal-exit'
+
+/**
+ * Main -> renderer push: the watch-folder scan changed the repository list.
+ * Carries the {@link RepoScanOutcome} so the store can refresh and name the
+ * folders in a toast.
+ */
+export const REPOS_CHANGED_CHANNEL = 'repos-changed'

@@ -21,6 +21,7 @@ import type {
   MergeQuestion,
   PublicSettings,
   RemoteRepoPage,
+  RepoScanOutcome,
   Repository,
   RepositoryStatus,
   SettingsPatch,
@@ -34,7 +35,7 @@ import { themeBase } from '../../shared/themes'
 import { DONATE_URL } from '../../shared/links'
 import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
 import { aiLooksUnconfigured } from './progressive'
-import { call, onMenuAction, onRepoChanged } from './api'
+import { call, onMenuAction, onRepoChanged, onReposChanged } from './api'
 
 export interface ToastAction {
   readonly label: string
@@ -193,6 +194,13 @@ export interface AppState {
    * list simply means no supported editors were found.
    */
   readonly externalApps: ReadonlyArray<ExternalApp>
+  /**
+   * Whether the integrated terminal panel is docked under the desk. Kept
+   * in localStorage like the layout widths — it records a preference, not
+   * git state. The session itself lives in main (src/main/terminal.ts);
+   * the panel component owns its xterm instance and IPC.
+   */
+  readonly terminalOpen: boolean
   readonly busy: string | null
   readonly aiBusy: boolean
   /** The AI merge agent's live conversation about one conflicted file. */
@@ -274,6 +282,7 @@ const initialState: AppState = {
   identity: null,
   remoteUrl: null,
   externalApps: [],
+  terminalOpen: false,
   busy: null,
   aiBusy: false,
   aiMerge: null,
@@ -340,6 +349,24 @@ function readStoredDraft(repoPath: string): RepoDraft | null {
  * AppStore/Dispatcher split observed in the shipped app; per-repository
  * commit drafts mirror its repository state cache and also survive restarts.
  */
+const TERMINAL_OPEN_KEY = 'aspen.terminalOpen'
+
+function readTerminalOpen(): boolean {
+  try {
+    return localStorage.getItem(TERMINAL_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeTerminalOpen(value: boolean): void {
+  try {
+    localStorage.setItem(TERMINAL_OPEN_KEY, value ? '1' : '0')
+  } catch {
+    /* storage unavailable: the panel just starts closed next time */
+  }
+}
+
 export class AppStore {
   private state: AppState = initialState
   private listeners = new Set<() => void>()
@@ -454,7 +481,8 @@ export class AppStore {
         repositories,
         accounts,
         initError: null,
-        hints: readHintFlags()
+        hints: readHintFlags(),
+        terminalOpen: readTerminalOpen()
       })
       this.applyTheme(settings.theme)
 
@@ -479,6 +507,8 @@ export class AppStore {
     onMenuAction(action => {
       void this.handleMenuAction(action)
     })
+
+    onReposChanged(outcome => this.applyRepoScan(outcome))
 
     onRepoChanged(repoPath => {
       if (
@@ -555,6 +585,7 @@ export class AppStore {
     if (
       action !== 'refresh' &&
       action !== 'donate' &&
+      action !== 'toggle-terminal' &&
       this.state.busy !== null
     ) {
       this.toast('info', 'Wait for the current operation to finish.')
@@ -602,6 +633,9 @@ export class AppStore {
         break
       case 'show-about':
         this.update({ showAbout: true })
+        break
+      case 'toggle-terminal':
+        this.toggleTerminal()
         break
       case 'donate':
         void call('openExternal', DONATE_URL)
@@ -824,6 +858,114 @@ export class AppStore {
     const repo = this.state.selectedRepo
     if (repo === null) return
     this.removeRepositories([repo.id], false)
+  }
+
+  // ------------------------------------------------ watch-folder scanning
+
+  /**
+   * In-flight store-initiated scans; the REPOS_CHANGED push they trigger
+   * still refreshes the list, but the calling action owns the toast so the
+   * same folders are never announced twice.
+   */
+  private quietRepoPushes = 0
+
+  private applyRepoScan(outcome: RepoScanOutcome): void {
+    // Captured synchronously: the refresh below crosses an IPC boundary, by
+    // which time a store-initiated scan has long since decremented the
+    // counter and toasted its own summary.
+    const quiet = this.quietRepoPushes > 0
+    void (async (): Promise<void> => {
+      try {
+        const repositories = await call('listRepositories')
+        const patch: Partial<AppState> = { repositories }
+        const selected = this.state.selectedRepo
+        if (
+          selected !== null &&
+          outcome.removed.some(r => r.id === selected.id)
+        ) {
+          Object.assign(patch, {
+            selectedRepo: null,
+            status: null,
+            statusError: null,
+            commits: [],
+            branches: [],
+            remoteBranches: []
+          })
+          localStorage.removeItem('aspen.lastRepo')
+        }
+        this.update(patch)
+        if (quiet) return
+        const names = (
+          repos: ReadonlyArray<Repository>
+        ): string =>
+          repos
+            .slice(0, 3)
+            .map(r => r.name)
+            .join(', ') +
+          (repos.length > 3 ? ` and ${repos.length - 3} more` : '')
+        const parts: string[] = []
+        if (outcome.added.length > 0)
+          parts.push(`added ${names(outcome.added)}`)
+        if (outcome.removed.length > 0)
+          parts.push(`removed ${names(outcome.removed)}`)
+        if (parts.length > 0)
+          this.toast('info', `Watch folder — ${parts.join(' and ')}.`)
+      } catch {
+        // A failed refresh retries on the next push or app focus.
+      }
+    })()
+  }
+
+  /** Pick (or change) the folder the repository list follows. */
+  async chooseScanFolder(): Promise<void> {
+    const dir = await call('selectDirectory')
+    if (dir === null) return
+    this.quietRepoPushes++
+    try {
+      const settings = await call('saveSettings', { scanFolder: dir })
+      const outcome = await call('scanRepositories')
+      this.update({
+        settings,
+        repositories: await call('listRepositories')
+      })
+      const leaf = dir.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? dir
+      this.toast(
+        'success',
+        outcome.added.length > 0
+          ? `Now watching "${leaf}" — added ${outcome.added.length} repository${outcome.added.length === 1 ? '' : 's'}.`
+          : `Now watching "${leaf}" for added and removed repositories.`
+      )
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    } finally {
+      this.quietRepoPushes--
+    }
+  }
+
+  async clearScanFolder(): Promise<void> {
+    try {
+      const settings = await call('saveSettings', { scanFolder: '' })
+      this.update({ settings })
+      this.toast('info', 'Stopped watching the repository folder.')
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Reconcile now — the manager's Rescan button. */
+  async rescanWatchFolder(): Promise<void> {
+    this.quietRepoPushes++
+    try {
+      const outcome = await call('scanRepositories')
+      this.update({ repositories: await call('listRepositories') })
+      if (outcome.added.length === 0 && outcome.removed.length === 0) {
+        this.toast('info', 'No changes — the list matches the folder.')
+      }
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    } finally {
+      this.quietRepoPushes--
+    }
   }
 
   /** Fetch several repositories in a row; reports a per-repo tally. */
@@ -1606,6 +1748,21 @@ export class AppStore {
       () => call('openInExternalApp', repo.path, appId),
       'open-in'
     )
+  }
+
+  /**
+   * Dock or undock the integrated terminal panel (⋯ menu, View menu,
+   * Ctrl+`). The session itself is the panel component's business: it
+   * spawns on mount and kills on unmount, so closing here is what tears
+   * the PTY down. Closing also asks for a silent refresh — a shell that
+   * just ran `npm test` or edited files must not leave a stale desk.
+   */
+  toggleTerminal(): void {
+    if (this.state.selectedRepo === null) return
+    const next = !this.state.terminalOpen
+    writeTerminalOpen(next)
+    this.update({ terminalOpen: next })
+    if (!next) void this.refresh({ silent: true })
   }
 
   async openFile(path: string): Promise<void> {

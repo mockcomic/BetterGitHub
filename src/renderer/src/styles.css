@@ -2780,6 +2780,86 @@ select {
 
 /* ---------------------------------------------------------------- chrome bits */
 
+/* -------------------------------------------------- integrated terminal */
+/* The docked terminal: a bar that matches the other pane headers, and a
+   host sized by --term-h (set on .app, written straight during the drag).
+   xterm paints into .terminal-host; its own CSS comes from the package. */
+
+.resizer.resizer-horizontal {
+  flex: 0 0 5px;
+  margin: -3px 0;
+  cursor: row-resize;
+}
+
+.resizer.resizer-horizontal::after {
+  inset: 1px 0;
+}
+
+body.desk-resizing.desk-resizing-row {
+  cursor: row-resize;
+}
+
+.terminal-panel {
+  flex: 0 0 var(--term-h, 260px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.terminal-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 3px 10px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.terminal-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.terminal-repo {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.terminal-exit,
+.terminal-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-error {
+  color: var(--danger);
+}
+
+.terminal-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.terminal-host {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 4px 0 0 8px;
+  overflow: hidden;
+}
+
+.terminal-host .xterm {
+  height: 100%;
+}
+
+/* ----------------------------------------------------------- status bar */
 .status-bar {
   position: relative;
   flex: 0 0 auto;
@@ -4071,6 +4151,32 @@ select {
   color: var(--accent);
   font-size: 11.5px;
   white-space: nowrap;
+}
+
+/* One quiet rail under the toolbar: the watch-folder state and its verbs. */
+.repo-scan-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.repo-scan-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.repo-scan-path {
+  font-family: var(--mono);
+  color: var(--text);
+  direction: rtl;
+  unicode-bidi: plaintext;
 }
 
 /* Bulk actions exist only while a selection exists — no reserved dead row. */

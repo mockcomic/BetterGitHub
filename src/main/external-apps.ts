@@ -2,7 +2,7 @@ import { spawn } from 'child_process'
 import { constants as fsConstants } from 'fs'
 import { access, stat } from 'fs/promises'
 import { homedir } from 'os'
-import { delimiter, extname, join } from 'path'
+import { posix as pathPosix, win32 as pathWin32 } from 'path'
 import type { ExternalApp } from '../shared/models'
 
 /**
@@ -85,9 +85,9 @@ interface CatalogRow {
 
 /** User-scope and machine-scope install roots, per platform conventions. */
 const WINDOWS_INSTALL_DIRS = (deps: DetectDeps): string[] => {
-  const local = deps.env.LOCALAPPDATA ?? join(deps.home, 'AppData', 'Local')
+  const local = deps.env.LOCALAPPDATA ?? pathWin32.join(deps.home, 'AppData', 'Local')
   const pf = deps.env['ProgramFiles'] ?? 'C:\\Program Files'
-  return [join(local, 'Programs'), join(pf)]
+  return [pathWin32.join(local, 'Programs'), pathWin32.join(pf)]
 }
 
 /**
@@ -100,21 +100,21 @@ const winInstallPaths = (
   exes: ReadonlyArray<string>
 ): ((deps: DetectDeps) => string[]) => deps =>
   WINDOWS_INSTALL_DIRS(deps).flatMap(dir => [
-    ...exes.map(exe => join(dir, folder, 'bin', exe)),
-    join(dir, folder, `${folder}.exe`),
-    ...exes.map(exe => join(dir, folder, exe))
+    ...exes.map(exe => pathWin32.join(dir, folder, 'bin', exe)),
+    pathWin32.join(dir, folder, `${folder}.exe`),
+    ...exes.map(exe => pathWin32.join(dir, folder, exe))
   ])
 
 const JETBRAINS_MAC_SCRIPTS = (deps: DetectDeps): string[] => [
-  join(deps.home, 'Library', 'Application Support', 'JetBrains', 'Toolbox', 'scripts')
+  pathPosix.join(deps.home, 'Library', 'Application Support', 'JetBrains', 'Toolbox', 'scripts')
 ]
 
 const LINUX_EXTRA_BINS = (deps: DetectDeps): string[] => [
-  join(deps.home, '.local', 'bin'),
+  pathPosix.join(deps.home, '.local', 'bin'),
   '/usr/local/bin',
   '/snap/bin',
   '/var/lib/flatpak/exports/bin',
-  join(deps.home, '.local', 'share', 'flatpak', 'exports', 'bin')
+  pathPosix.join(deps.home, '.local', 'share', 'flatpak', 'exports', 'bin')
 ]
 
 const MAC_EDITOR_BINS = (): string[] => ['/usr/local/bin', '/opt/homebrew/bin']
@@ -240,8 +240,8 @@ export const LINUX_FILE_MANAGERS: ReadonlyArray<{
 
 function macAppBundle(name: string, deps: DetectDeps): string[] {
   return [
-    join('/Applications', `${name}.app`),
-    join(deps.home, 'Applications', `${name}.app`)
+    pathPosix.join('/Applications', `${name}.app`),
+    pathPosix.join(deps.home, 'Applications', `${name}.app`)
   ]
 }
 
@@ -294,7 +294,7 @@ function winLaunch(
 }
 
 function isWindowsShim(path: string): boolean {
-  const ext = extname(path).toLowerCase()
+  const ext = pathWin32.extname(path).toLowerCase()
   return ext === '.cmd' || ext === '.bat'
 }
 
@@ -385,23 +385,29 @@ export async function findCommand(
   extraDirs: ReadonlyArray<string>,
   rules: CommandRules
 ): Promise<string | null> {
+  // The path grammar follows the *rules'* platform, never the host's: this
+  // module probes a win32 catalog from a macOS/Linux dev machine (and could
+  // the other way round), where the host's `path.join`/`path.delimiter`
+  // would mis-split `C:\bin` and mis-join candidates like `C:\bin/code.exe`.
+  const isWin = rules.platform === 'win32'
+  const joinPath = isWin ? pathWin32.join : pathPosix.join
   const rawPath = rules.env.PATH ?? rules.env.Path ?? ''
-  const dirs = [...rawPath.split(delimiter).filter(d => d.length > 0), ...extraDirs]
-  const pathExts = rules.platform === 'win32'
+  const dirs = [...rawPath.split(isWin ? ';' : ':').filter(d => d.length > 0), ...extraDirs]
+  const pathExts = isWin
     ? (rules.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(e => e.length > 0)
     : []
   const commandHasExeExt = pathExts.some(e => command.toLowerCase().endsWith(e.toLowerCase()))
   const candidatesOf = (base: string): string[] =>
-    rules.platform !== 'win32'
+    !isWin
       ? [base]
       : commandHasExeExt
         ? [base]
         : pathExts.map(ext => base + ext.toLowerCase())
 
   for (const dir of dirs) {
-    for (const candidate of candidatesOf(join(dir, command))) {
+    for (const candidate of candidatesOf(joinPath(dir, command))) {
       if (!(await rules.isFile(candidate))) continue
-      if (rules.platform !== 'win32' && !(await rules.isExecutable(candidate))) continue
+      if (!isWin && !(await rules.isExecutable(candidate))) continue
       return candidate
     }
   }
@@ -555,17 +561,6 @@ export async function getDetectedApps(refresh: boolean): Promise<DetectedApp[]> 
  */
 export async function openRepoInApp(repoPath: string, appId: string): Promise<void> {
   const detected = (await getDetectedApps(false)).find(a => a.app.id === appId)
-  // [dbg-42] temporary probe
-  try {
-    const { appendFileSync } = await import('fs')
-    appendFileSync(
-      process.cwd() + '/_dbg_openin.log',
-      `${new Date().toISOString()} appId=${appId} repoPath=${JSON.stringify(repoPath)} ` +
-        `detected=${detected ? JSON.stringify(detected.launch) : 'NONE'}\n`
-    )
-  } catch {
-    /* probe must not break the launch */
-  }
   if (detected === undefined) {
     throw new Error('That application is not available on this machine.')
   }

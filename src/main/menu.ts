@@ -73,6 +73,12 @@ const MENUS: ReadonlyArray<TopMenu> = [
   {
     label: 'View',
     items: [
+      {
+        label: 'Toggle Terminal',
+        accelerator: 'CmdOrCtrl+`',
+        action: 'toggle-terminal'
+      },
+      { separator: true },
       { label: 'Reload', role: 'reload', accelerator: 'Ctrl+R' },
       { label: 'Toggle Developer Tools', role: 'toggleDevTools', accelerator: 'F12' },
       { separator: true },

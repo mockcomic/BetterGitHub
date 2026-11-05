@@ -190,6 +190,18 @@ export interface AddRepositoriesResult {
   readonly failed: ReadonlyArray<{ path: string; error: string }>
 }
 
+/**
+ * What one watch-folder pass did to the repository list: git repos found in
+ * the watched folder that were added, and formerly-watched entries whose
+ * folders left the watch folder (moved, trashed, or no longer git repos) that
+ * were dropped from the list. Also pushed main → renderer when a background
+ * rescan changes the list without the renderer asking.
+ */
+export interface RepoScanOutcome {
+  readonly added: ReadonlyArray<Repository>
+  readonly removed: ReadonlyArray<Repository>
+}
+
 /** Outcome of a bulk `removeRepositories` call. */
 export interface RemoveRepositoriesResult {
   /** How many entries left the settings list. */
@@ -291,6 +303,19 @@ export interface ExternalApp {
   readonly kind: 'files' | 'editor'
 }
 
+/**
+ * A live integrated-terminal session, created by the main process when the
+ * panel opens (src/main/terminal.ts). The renderer addresses every later
+ * write/resize/kill and both push channels by `id`, so a panel that was
+ * already closed simply stops being listened to — main ignores unknown ids.
+ */
+export interface TerminalSessionInfo {
+  /** Opaque main-side session id. */
+  readonly id: string
+  /** Shell display name for the panel title (e.g. 'PowerShell 7', 'zsh'). */
+  readonly shellLabel: string
+}
+
 /** Public (renderer-visible) settings. Tokens (AI + accounts) never leave main. */
 export interface PublicSettings {
   readonly ai: {
@@ -311,6 +336,11 @@ export interface PublicSettings {
   readonly confirmOverrideWithGeneratedMessage: boolean
   readonly autoRefresh: boolean
   readonly theme: ThemeId
+  /**
+   * Folder whose direct child git repos Aspen keeps its list in step with
+   * (see src/main/repo-scan.ts). '' = watching is off.
+   */
+  readonly scanFolder: string
   /**
    * One-time coaching affordances for people new to git (the queue's
    * 3-step banner, the tray's tick-a-file hint, the Generate → Preferences
@@ -337,6 +367,8 @@ export interface SettingsPatch {
   readonly confirmOverrideWithGeneratedMessage?: boolean
   readonly autoRefresh?: boolean
   readonly theme?: ThemeId
+  /** undefined = leave unchanged, '' = stop watching a folder. */
+  readonly scanFolder?: string
   readonly hintsEnabled?: boolean
 }
 

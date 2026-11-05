@@ -396,6 +396,17 @@ function OverflowButton(): JSX.Element {
               </button>
             )
           ) : null}
+          <button
+            className="popover-item"
+            title="Dock or close the integrated terminal in this repository"
+            onClick={() => {
+              closeAll()
+              store.toggleTerminal()
+            }}
+          >
+            {state.terminalOpen ? 'Hide' : 'Show'} terminal
+            <span className="menu-accel">Ctrl+`</span>
+          </button>
           <div className="popover-sep" />
           <div className="popover-heading">Open in</div>
           {firstProbePending ? (

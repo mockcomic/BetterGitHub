@@ -5,6 +5,7 @@ import { basename, join } from 'path'
 import { app, safeStorage } from 'electron'
 import type { ThemeId } from '../shared/themes'
 import { isThemeId } from '../shared/themes'
+import { pathKey } from './repo-scan-plan'
 import type {
   ManagedRepository,
   PublicSettings,
@@ -35,6 +36,14 @@ interface StoredSettings {
   confirmOverrideWithGeneratedMessage: boolean
   autoRefresh: boolean
   theme: ThemeId
+  /** Watch folder for the repository scan; '' = watching off. */
+  scanFolder: string
+  /**
+   * Folders under the watch folder the user removed from the list by hand.
+   * The scan honours these so a removal is not undone on the next pass; an
+   * entry is forgotten once its folder leaves the disk.
+   */
+  scanDismissed: string[]
   hintsEnabled: boolean
 }
 
@@ -52,6 +61,8 @@ const DEFAULTS: StoredSettings = {
   confirmOverrideWithGeneratedMessage: true,
   autoRefresh: true,
   theme: 'light',
+  scanFolder: '',
+  scanDismissed: [],
   hintsEnabled: true
 }
 
@@ -78,6 +89,9 @@ async function load(): Promise<StoredSettings> {
         accounts: { ...DEFAULTS.accounts, ...(parsed.accounts ?? {}) },
         repositories: Array.isArray(parsed.repositories)
           ? parsed.repositories
+          : [],
+        scanDismissed: Array.isArray(parsed.scanDismissed)
+          ? parsed.scanDismissed.filter(x => typeof x === 'string')
           : []
       }
       // The settings file is user-editable and theme ids are a closed
@@ -122,6 +136,7 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     confirmOverrideWithGeneratedMessage: s.confirmOverrideWithGeneratedMessage,
     autoRefresh: s.autoRefresh,
     theme: s.theme,
+    scanFolder: s.scanFolder,
     hintsEnabled: s.hintsEnabled
   }
 }
@@ -173,6 +188,10 @@ export async function saveSettings(patch: SettingsPatch): Promise<PublicSettings
       patch.confirmOverrideWithGeneratedMessage
   }
   if (patch.autoRefresh !== undefined) s.autoRefresh = patch.autoRefresh
+  if (patch.scanFolder !== undefined) {
+    const trimmed = patch.scanFolder.trim()
+    s.scanFolder = trimmed.length === 0 ? '' : join(trimmed)
+  }
   if (patch.hintsEnabled !== undefined) s.hintsEnabled = patch.hintsEnabled
   if (patch.theme !== undefined && isThemeId(patch.theme)) s.theme = patch.theme
   await persist()
@@ -196,8 +215,18 @@ export async function listRepositories(): Promise<ManagedRepository[]> {
 export async function addRepository(path: string): Promise<Repository> {
   const s = await load()
   const normalized = join(path)
+  // Re-adding a folder the user had removed from under the watch folder is a
+  // deliberate take-back-over: the scan manages it again from here on.
+  const key = pathKey(normalized)
+  const wasDismissed = s.scanDismissed.some(d => pathKey(d) === key)
+  if (wasDismissed) {
+    s.scanDismissed = s.scanDismissed.filter(d => pathKey(d) !== key)
+  }
   const existing = s.repositories.find(r => r.path === normalized)
-  if (existing !== undefined) return existing
+  if (existing !== undefined) {
+    if (wasDismissed) await persist()
+    return existing
+  }
   const repo: Repository = {
     id: randomUUID(),
     path: normalized,
@@ -222,6 +251,43 @@ export async function removeRepositoriesByIds(
   s.repositories = s.repositories.filter(r => !idSet.has(r.id))
   await persist()
   return removed
+}
+
+/** The watch folder and the paths the scan must not re-add. */
+export async function getScanSettings(): Promise<{
+  folder: string
+  dismissed: string[]
+}> {
+  const s = await load()
+  return { folder: s.scanFolder, dismissed: [...s.scanDismissed] }
+}
+
+/** Remember hand-removals so the next scan pass does not undo them. */
+export async function rememberScanDismissals(
+  paths: ReadonlyArray<string>
+): Promise<void> {
+  const s = await load()
+  const keys = new Set(s.scanDismissed.map(d => pathKey(d)))
+  let changed = false
+  for (const p of paths) {
+    if (keys.has(pathKey(p))) continue
+    s.scanDismissed.push(p)
+    keys.add(pathKey(p))
+    changed = true
+  }
+  if (changed) await persist()
+}
+
+/** Forget dismissals whose folder left the disk (paths compared by key). */
+export async function forgetScanDismissals(
+  keys: ReadonlyArray<string>
+): Promise<void> {
+  const s = await load()
+  const drop = new Set(keys)
+  const next = s.scanDismissed.filter(d => !drop.has(pathKey(d)))
+  if (next.length === s.scanDismissed.length) return
+  s.scanDismissed = next
+  await persist()
 }
 
 export async function getThemeSetting(): Promise<ThemeId> {

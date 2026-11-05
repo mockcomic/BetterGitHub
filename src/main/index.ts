@@ -6,6 +6,8 @@ import { applyTheme, createMainWindow, getMainWindow } from './windows'
 import { getThemeSetting } from './settings'
 import { initCrashLogging } from './diagnostics'
 import { stopWatching } from './watcher'
+import { initRepoScan, scheduleScan, stopRepoScan } from './repo-scan'
+import { terminalManager } from './terminal'
 import { configureGitBroker } from './git/sandbox'
 import { migrateFromGitDesk } from './migrate'
 
@@ -62,7 +64,13 @@ if (!app.requestSingleInstanceLock()) {
     configureGitBroker({ queueDir: join(app.getPath('userData'), 'git-broker') })
     registerIpc()
     buildAppMenu()
-    createMainWindow(process.env['ELECTRON_RENDERER_URL'])
+    const mainWindow = createMainWindow(process.env['ELECTRON_RENDERER_URL'])
+
+    // Repository watch folder (src/main/repo-scan.ts): reconcile once on
+    // startup, then on every focus — a clone done outside the app shows up
+    // the first time the window comes back, no polling.
+    void initRepoScan()
+    mainWindow.on('focus', () => scheduleScan())
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -77,5 +85,8 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     stopWatching()
+    stopRepoScan()
+    // No orphaned shells: every live terminal session dies with the app.
+    terminalManager.killAll()
   })
 }
