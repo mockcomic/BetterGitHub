@@ -1,13 +1,24 @@
-import { spawn } from 'child_process'
-import { readFile, stat } from 'fs/promises'
-import type { FilePreview, PreviewKind } from '../../shared/models'
-import { safeJoin } from './repo-path'
+import type { FilePreview, PreviewKind, PreviewResource } from '../../shared/models'
+import {
+  MODEL_FORMATS,
+  type ModelFormat,
+  extensionOf,
+  modelSidecarRefs,
+  mtlSidecarRefs,
+  normalizeRepoPath
+} from '../../shared/model-resources'
+import { readRepoFileBytes } from './file-bytes'
 
 /**
- * Media previews for the diff pane. Git reports image/video/audio changes as
- * binary, so the text diff has nothing to show; this module reads the actual
- * bytes — from the working tree, or from a commit's tree when a sha is given —
- * so the renderer can wrap them in a blob URL and play them.
+ * Media previews for the diff pane. Git reports image/video/audio/model
+ * changes as binary, so the text diff has nothing to show; this module reads
+ * the actual bytes — from the working tree, or from a commit's tree when a sha
+ * is given — so the renderer can wrap them in a blob URL and play them.
+ *
+ * For 3D models it also follows the file's own references (.gltf buffers and
+ * images, .obj material libraries and the textures they map, Collada images,
+ * FBX texture paths) and ships those alongside, because a model on its own is
+ * usually an empty shell.
  */
 
 /**
@@ -16,6 +27,11 @@ import { safeJoin } from './repo-path'
  * actually commit (raw footage aside). The panel explains and offers Open.
  */
 export const PREVIEW_SIZE_LIMIT = 128 * 1024 * 1024
+
+/** Caps on the sidecars a model drags in, so one .gltf cannot read the repo. */
+export const MODEL_RESOURCE_LIMIT = 48
+export const MODEL_RESOURCE_SIZE_LIMIT = 32 * 1024 * 1024
+export const MODEL_RESOURCE_TOTAL_LIMIT = 96 * 1024 * 1024
 
 const MEDIA_TYPES: ReadonlyMap<string, { kind: PreviewKind; mime: string }> = new Map([
   // images
@@ -48,20 +64,24 @@ const MEDIA_TYPES: ReadonlyMap<string, { kind: PreviewKind; mime: string }> = ne
   ['flac', { kind: 'audio', mime: 'audio/flac' }],
   ['m4a', { kind: 'audio', mime: 'audio/mp4' }],
   ['aac', { kind: 'audio', mime: 'audio/aac' }],
-  ['weba', { kind: 'audio', mime: 'audio/webm' }]
+  ['weba', { kind: 'audio', mime: 'audio/webm' }],
+  // 3D models, from the one format table the viewer shares with the renderer
+  ...modelTypes()
 ])
+
+function modelTypes(): [string, { kind: PreviewKind; mime: string }][] {
+  return (Object.keys(MODEL_FORMATS) as ModelFormat[]).map(format => [
+    MODEL_FORMATS[format].extension,
+    { kind: 'model' as const, mime: MODEL_FORMATS[format].mime }
+  ])
+}
 
 /** The media type for a repository path, or null if it is not previewable. */
 export function previewKindFor(
   path: string
 ): { kind: PreviewKind; mime: string } | null {
-  const dot = path.lastIndexOf('.')
-  if (dot === -1 || dot === path.length - 1) return null
-  // A dot inside the last segment only counts as the extension boundary
-  // ("dir.old/file" has no extension).
-  const lastSep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  if (dot < lastSep) return null
-  return MEDIA_TYPES.get(path.slice(dot + 1).toLowerCase()) ?? null
+  const ext = extensionOf(path)
+  return ext === null ? null : MEDIA_TYPES.get(ext) ?? null
 }
 
 /**
@@ -77,97 +97,90 @@ export async function getPreview(
   const type = previewKindFor(path)
   if (type === null) return null
 
-  let byteLength: number
-  let bytes: Buffer | null
+  const file = await readRepoFileBytes(repoPath, path, sha, PREVIEW_SIZE_LIMIT)
+  if (file === null) return null
+  // An oversized model reports its size without bytes, exactly as a video does.
+  if (file.bytes === null) return { kind: type.kind, mime: type.mime, byteLength: file.byteLength }
 
-  if (sha === undefined) {
-    try {
-      // safeJoin also answers the containment question; a deleted file or a
-      // path with `..` segments simply yields no preview.
-      const info = await stat(safeJoin(repoPath, path))
-      if (!info.isFile()) return null
-      byteLength = info.size
-      bytes = byteLength > PREVIEW_SIZE_LIMIT ? null : await readFile(safeJoin(repoPath, path))
-    } catch {
-      return null
-    }
-  } else {
-    // Read the blob straight out of the object store — byte-exact regardless
-    // of checkout state, working-tree filters or line endings. `cat-file -s`
-    // is the cheap size probe so oversized videos are refused without being
-    // streamed through the pipe.
-    const size = await gitCatFileSize(repoPath, sha, path)
-    if (size === null) return null
-    byteLength = size
-    bytes =
-      byteLength > PREVIEW_SIZE_LIMIT ? null : await gitCatFileBlob(repoPath, sha, path)
-    if (bytes === null && byteLength <= PREVIEW_SIZE_LIMIT) return null
-  }
-
-  if (bytes === null) return { kind: type.kind, mime: type.mime, byteLength }
   // Hand over an exact-size ArrayBuffer copy; a Buffer slice's shared pool
   // would otherwise transfer its whole 8 KiB block over IPC.
-  const data = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength
-  ) as ArrayBuffer
-  return { kind: type.kind, mime: type.mime, byteLength, data }
+  const preview: FilePreview = {
+    kind: type.kind,
+    mime: type.mime,
+    byteLength: file.byteLength,
+    data: toArrayBuffer(file.bytes)
+  }
+  if (type.kind !== 'model') return preview
+  return { ...preview, ...(await collectModelResources(repoPath, path, sha, file.bytes)) }
+}
+
+export interface ModelResources {
+  readonly resources: PreviewResource[]
+  /** True when a cap stopped the walk; the caption says the set is partial. */
+  readonly resourcesTruncated?: boolean
 }
 
 /**
- * Minimal raw-output git runner: execGit decodes stdout as UTF-8, which
- * destroys blob bytes. Read-only plumbing, so no sandbox rerun is needed.
+ * Breadth-first walk of the files a model references, read from the same place
+ * as the model itself (working tree, or the same commit's tree). Unreadable
+ * references are dropped quietly — the viewer shows the model without whatever
+ * the repository does not contain.
  */
-function runGitRaw(
+export async function collectModelResources(
   repoPath: string,
-  args: ReadonlyArray<string>
-): Promise<{ status: number; stdout: Buffer; stderr: Buffer }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('git', ['-c', 'core.quotepath=false', ...args], {
-      cwd: repoPath,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe']
-    })
-    const out: Buffer[] = []
-    const err: Buffer[] = []
-    child.stdout.on('data', (d: Buffer) => out.push(d))
-    child.stderr.on('data', (d: Buffer) => err.push(d))
-    child.on('error', reject)
-    child.on('close', status => {
-      resolve({ status: status ?? -1, stdout: Buffer.concat(out), stderr: Buffer.concat(err) })
-    })
-  })
-}
+  path: string,
+  sha: string | undefined,
+  modelBytes: Buffer
+): Promise<ModelResources> {
+  const resources: PreviewResource[] = []
+  const seen = new Set<string>()
+  const root = normalizeRepoPath(path)
+  if (root !== null) seen.add(root)
 
-function objectName(sha: string, path: string): string {
-  return `${sha}:${path}`
-}
+  let queue = refsOf(path, modelBytes)
+  let total = 0
+  let truncated = false
 
-async function gitCatFileSize(
-  repoPath: string,
-  sha: string,
-  path: string
-): Promise<number | null> {
-  try {
-    const r = await runGitRaw(repoPath, ['cat-file', '-s', objectName(sha, path)])
-    if (r.status !== 0) return null
-    const size = Number.parseInt(r.stdout.toString('utf8').trim(), 10)
-    return Number.isFinite(size) && size >= 0 ? size : null
-  } catch {
-    return null
+  // Two hops is all the formats in use need: model → library → images. A
+  // .gltf inside a .gltf, or a .mtl naming another .mtl, is out of scope.
+  for (let depth = 0; depth < 2 && queue.length > 0; depth++) {
+    const next: string[] = []
+    for (const ref of queue) {
+      if (seen.has(ref)) continue
+      if (resources.length >= MODEL_RESOURCE_LIMIT) {
+        truncated = true
+        break
+      }
+      seen.add(ref)
+      const file = await readRepoFileBytes(repoPath, ref, sha, MODEL_RESOURCE_SIZE_LIMIT)
+      if (file === null) continue
+      if (file.bytes === null || total + file.byteLength > MODEL_RESOURCE_TOTAL_LIMIT) {
+        // Too big to ship, or it would push the set past its budget: the model
+        // renders without it and the caption marks the set incomplete.
+        truncated = true
+        continue
+      }
+      total += file.byteLength
+      resources.push({ path: ref, byteLength: file.byteLength, data: toArrayBuffer(file.bytes) })
+      next.push(...refsOf(ref, file.bytes))
+    }
+    queue = next
   }
+  return truncated
+    ? { resources, resourcesTruncated: true }
+    : { resources }
 }
 
-async function gitCatFileBlob(
-  repoPath: string,
-  sha: string,
-  path: string
-): Promise<Buffer | null> {
-  try {
-    const r = await runGitRaw(repoPath, ['cat-file', 'blob', objectName(sha, path)])
-    return r.status === 0 ? r.stdout : null
-  } catch {
-    return null
-  }
+/** Sidecar references of a model or of one of its sidecars, by format. */
+function refsOf(path: string, bytes: Buffer): string[] {
+  const view = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (extensionOf(path) === 'mtl') return mtlSidecarRefs(path, view)
+  return modelSidecarRefs(path, view)
+}
+
+function toArrayBuffer(bytes: Buffer): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength
+  ) as ArrayBuffer
 }

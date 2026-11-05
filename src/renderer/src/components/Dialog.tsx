@@ -1,6 +1,36 @@
 import type { JSX, ReactNode } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useId } from 'react'
 import { contextMenuIsOpen } from './ContextMenu'
+
+/**
+ * The deeper-detail tooltip: the visible hint under a field carries what
+ * the setting needs; the dot carries the full story (registration steps,
+ * scopes, privacy notes) on hover or keyboard focus. Text-only by design —
+ * a link inside would die the moment the pointer leaves the dot.
+ */
+export function InfoTip({ text }: { text: string }): JSX.Element {
+  const id = useId()
+  return (
+    <span className="info-tip">
+      <button
+        type="button"
+        className="info-dot"
+        aria-label="More information"
+        aria-describedby={id}
+        onClick={e => e.preventDefault()}
+      >
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.75" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <circle cx="8" cy="4.8" r="1.05" fill="currentColor" />
+          <rect x="7.25" y="7.2" width="1.5" height="4.4" rx="0.75" fill="currentColor" />
+        </svg>
+      </button>
+      <span role="tooltip" id={id} className="tip-bubble">
+        {text}
+      </span>
+    </span>
+  )
+}
 
 export function Dialog({
   title,
@@ -8,7 +38,8 @@ export function Dialog({
   footer,
   onClose,
   width = 480,
-  maxWidth
+  maxWidth,
+  bodyClass
 }: {
   title: string
   children: ReactNode
@@ -17,6 +48,8 @@ export function Dialog({
   width?: number
   /** Raises the .dialog cap for wide surfaces (documented variant). */
   maxWidth?: number
+  /** Replaces the body's scroll/padding (the preferences two-pane). */
+  bodyClass?: string
 }): JSX.Element {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -45,7 +78,9 @@ export function Dialog({
             ×
           </button>
         </div>
-        <div className="dialog-body">{children}</div>
+        <div className={bodyClass !== undefined ? `dialog-body ${bodyClass}` : 'dialog-body'}>
+          {children}
+        </div>
         {footer !== undefined && <div className="dialog-foot">{footer}</div>}
       </div>
     </div>
@@ -55,15 +90,21 @@ export function Dialog({
 export function Field({
   label,
   children,
-  hint
+  hint,
+  tip
 }: {
   label: string
   children: ReactNode
   hint?: string
+  /** Deeper detail behind the info dot, on top of the visible hint. */
+  tip?: string
 }): JSX.Element {
   return (
     <label className="field">
-      <span className="field-label">{label}</span>
+      <span className="field-label">
+        {label}
+        {tip !== undefined && <InfoTip text={tip} />}
+      </span>
       {children}
       {hint !== undefined && <span className="field-hint">{hint}</span>}
     </label>

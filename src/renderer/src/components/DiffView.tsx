@@ -24,6 +24,8 @@ import 'prismjs/components/prism-ini'
 import 'prismjs/components/prism-toml'
 import type { DiffLine } from '../diff-parse'
 import { buildSplitRows, isBinaryDiff, parseDiff } from '../diff-parse'
+import { formatBytes } from '../format'
+import { ModelPreview } from './ModelPreview'
 
 const EXT_LANGUAGES = new Map<string, string>([
   ['ts', 'typescript'],
@@ -138,7 +140,7 @@ export function DiffView({
   emptyHint: string
   /** Distinct from "nothing selected": fetching or rendering failed. */
   error?: string | null
-  /** Media bytes when the selected file is an image/video/audio. */
+  /** Media bytes when the selected file is an image/video/audio/model. */
   preview?: FilePreview | null
   onRetry?: () => void
   onOpenFile?: () => void
@@ -147,10 +149,14 @@ export function DiffView({
   const lines = useMemo(() => (diff !== null && diff !== '…' ? parseDiff(diff) : []), [diff])
   const [view, setView] = useState<DiffViewState>(readViewState)
   const [showAll, setShowAll] = useState(false)
+  // An .obj, .gltf, .dae or ASCII .fbx is a model *and* readable text, so the
+  // pane offers both and remembers which one was asked for.
+  const [modelAsText, setModelAsText] = useState(false)
 
   useEffect(() => {
     setShowAll(false)
-  }, [diff])
+    setModelAsText(false)
+  }, [diff, title])
 
   if (diff === '…') {
     return <div className="diff-view empty-diff">Loading diff…</div>
@@ -181,9 +187,10 @@ export function DiffView({
     )
   }
 
+  const isModel = preview?.kind === 'model'
   if (isBinaryDiff(diff)) {
-    // Image/video/audio changes: play the file instead of announcing it is
-    // binary (store.ts fills `preview` from the getPreview channel).
+    // Image/video/audio/model changes: show the file instead of announcing it
+    // is binary (store.ts fills `preview` from the getPreview channel).
     if (preview !== undefined && preview !== null) {
       return <MediaPreview preview={preview} title={title} onOpenFile={onOpenFile} />
     }
@@ -199,12 +206,30 @@ export function DiffView({
   const truncated = !showAll && lines.length > RENDER_LIMIT
   const visible = truncated ? lines.slice(0, RENDER_LIMIT) : lines
 
+  // A model whose diff is readable text (.obj, .gltf, .dae, ASCII .fbx) still
+  // leads with the stage: a triangle soup is a poor way to review an asset.
+  if (isModel === true && preview !== undefined && preview !== null && modelAsText === false) {
+    return (
+      <MediaPreview
+        preview={preview}
+        title={title}
+        onOpenFile={onOpenFile}
+        onShowText={() => setModelAsText(true)}
+      />
+    )
+  }
+
   return (
     <div className={`diff-view${view.wrap ? '' : ' nowrap'}`}>
       {title !== null && (
         <div className="diff-title">
           <span className="diff-title-path">{title}</span>
           <span className="diff-title-actions">
+            {isModel === true && (
+              <button className="mini" onClick={() => setModelAsText(false)} title="Show the 3D model">
+                3D view
+              </button>
+            )}
             <button
               className="mini"
               title="Show changes side by side"
@@ -272,22 +297,11 @@ function updateView(
   }
 }
 
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  const units = ['KB', 'MB', 'GB']
-  let value = n
-  let unit = -1
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit++
-  }
-  return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`
-}
-
 const KIND_LABELS: Record<FilePreview['kind'], string> = {
   image: 'Image',
   video: 'Video',
-  audio: 'Audio'
+  audio: 'Audio',
+  model: 'Model'
 }
 
 /**
@@ -295,16 +309,21 @@ const KIND_LABELS: Record<FilePreview['kind'], string> = {
  * bytes arrive from main (working tree or commit tree) as an ArrayBuffer and
  * are wrapped in a blob URL — revoked when the selection changes. Chromium's
  * own <video>/<audio> decoding decides playability; a codec it lacks (HEVC
- * .mov…) surfaces as the fallback note rather than a broken frame.
+ * .mov…) surfaces as the fallback note rather than a broken frame. 3D models
+ * hand their bytes straight to the WebGL stage instead, with the sidecar files
+ * main followed for them.
  */
 function MediaPreview({
   preview,
   title,
-  onOpenFile
+  onOpenFile,
+  onShowText
 }: {
   preview: FilePreview
   title: string | null
   onOpenFile?: () => void
+  /** Only for a model whose diff is readable text: switch to the line diff. */
+  onShowText?: () => void
 }): JSX.Element {
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
@@ -312,7 +331,9 @@ function MediaPreview({
   useEffect(() => {
     setUrl(null)
     setFailed(false)
-    if (preview.data === undefined) return
+    // The model viewer reads the ArrayBuffer directly; a URL it cannot use
+    // would only have to be revoked again.
+    if (preview.data === undefined || preview.kind === 'model') return
     const objectUrl = URL.createObjectURL(new Blob([preview.data], { type: preview.mime }))
     setUrl(objectUrl)
     return () => {
@@ -326,6 +347,11 @@ function MediaPreview({
         <div className="diff-title">
           <span className="diff-title-path">{title}</span>
           <span className="diff-title-actions">
+            {onShowText !== undefined && (
+              <button className="mini" onClick={onShowText} title="Show the line diff instead">
+                Text diff
+              </button>
+            )}
             {onOpenFile !== undefined && (
               <button className="mini" onClick={onOpenFile} title="Open in default program">
                 Open
@@ -340,6 +366,8 @@ function MediaPreview({
             {KIND_LABELS[preview.kind]} is {formatBytes(preview.byteLength)} — too large to
             preview here.
           </p>
+        ) : preview.kind === 'model' ? (
+          <ModelPreview preview={preview} path={title} />
         ) : failed ? (
           <p className="muted">
             This {preview.kind} could not be played here — Aspen's viewer only ships the

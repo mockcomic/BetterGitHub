@@ -660,6 +660,12 @@ export function RepoManagerDialog(): JSX.Element | null {
                 <div className="onboarding-actions">
                   <button
                     className="btn"
+                    onClick={() => store.setRepoDialog('new')}
+                  >
+                    Create repository…
+                  </button>
+                  <button
+                    className="btn"
                     onClick={() => void store.addRepositoriesBulk()}
                   >
                     Add repositories…

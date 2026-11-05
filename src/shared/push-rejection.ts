@@ -3,8 +3,9 @@
  * remote branch moved ahead while our local branch did not, so the push is
  * rejected as a non-fast-forward (git's "`! [rejected] … (fetch first)`" and
  * "the tip of your current branch is behind" family). Both mean the same
- * thing to the user — pull first, then push again — so the app answers with
- * a toast that offers exactly that.
+ * thing to the user — pull first, then push again — so the app answers not
+ * with an error but by converting its sync buttons into the compound
+ * Pull & Push verb, which runs exactly that recovery on the next click.
  */
 
 /**

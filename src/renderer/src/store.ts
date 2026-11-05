@@ -8,9 +8,11 @@ import type {
   AccountProvider,
   BranchInfo,
   CommitInfo,
+  CreateRepoRequest,
   ExternalApp,
   FilePreview,
   FileStatus,
+  GeneratedCommitMessage,
   GitConfigInfo,
   GitHubTarget,
   GitignoreResult,
@@ -20,7 +22,10 @@ import type {
   MergeExchange,
   MergeQuestion,
   PublicSettings,
+  ProviderOwner,
   RemoteRepoPage,
+  RemoteRepoSort,
+  RemoteRepository,
   RepoScanOutcome,
   Repository,
   RepositoryStatus,
@@ -33,9 +38,10 @@ import type { MenuAction } from '../../shared/ipc'
 import type { ThemeId } from '../../shared/themes'
 import { themeBase } from '../../shared/themes'
 import { DONATE_URL } from '../../shared/links'
+import { RELEASES_URL, type UpdateState } from '../../shared/updates'
 import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
 import { aiLooksUnconfigured } from './progressive'
-import { call, onMenuAction, onRepoChanged, onReposChanged } from './api'
+import { call, onMenuAction, onRepoChanged, onReposChanged, onUpdateState } from './api'
 
 export interface ToastAction {
   readonly label: string
@@ -171,7 +177,7 @@ export interface AppState {
   readonly selectedFilePath: string | null
   readonly selectedFileDiff: string | null
   readonly selectedFileError: string | null
-  /** Media preview bytes when the selected file is an image/video/audio. */
+  /** Media preview bytes when the selected file is an image/video/audio/model. */
   readonly selectedFilePreview: FilePreview | null
   readonly selectedCommit: CommitInfo | null
   readonly commitFiles: ReadonlyArray<FileStatus>
@@ -202,6 +208,15 @@ export interface AppState {
    */
   readonly terminalOpen: boolean
   readonly busy: string | null
+  /**
+   * The last `git push` here was rejected because the remote branch moved
+   * ahead — a state with exactly one recovery (pull, then push), so the sync
+   * buttons convert into the compound Pull & Push verb instead of answering
+   * with an error toast. Transient renderer state: any successful sync op, a
+   * failed pull, or a repo/branch change retires it, and once a fresh status
+   * shows the branch genuinely diverged the verb persists on git truth alone.
+   */
+  readonly pushNeedsPull: boolean
   readonly aiBusy: boolean
   /** The AI merge agent's live conversation about one conflicted file. */
   readonly aiMerge: AiMergeState | null
@@ -210,6 +225,12 @@ export interface AppState {
   readonly settings: PublicSettings | null
   /** Signed-in hosted accounts (GitHub/GitLab); tokens never cross the bridge. */
   readonly accounts: ReadonlyArray<AccountInfo>
+  /**
+   * Account avatars as data: URLs (main fetches them so the CSP stays
+   * local-only), keyed by account id; absent = not fetched yet, null =
+   * unavailable (initials render instead).
+   */
+  readonly avatars: Readonly<Record<string, string | null>>
   /** An in-flight browser sign-in (device code / PKCE redirect), if any. */
   readonly signIn: SignInChallenge | null
   /** Last sign-in failure, shown inline by the sign-in panel. */
@@ -223,12 +244,23 @@ export interface AppState {
   readonly settingsAiNote: boolean
   readonly hints: HintFlags
   readonly showClone: boolean
+  /**
+   * The create/publish dialog: `'new'` builds a local repo (and can publish
+   * it right away), `'publish'` takes the selected origin-less repository
+   * online. One dialog, two modes — the account/owner/visibility picker is
+   * identical.
+   */
+  readonly repoDialog: 'new' | 'publish' | null
   readonly showRepoManager: boolean
+  /** The "Stash changes" dialog, opened by the Review toolbar's Stash verb. */
+  readonly showStash: boolean
   readonly showNewBranch: boolean
   readonly newBranchBase: string | null
   readonly renameBranchTarget: string | null
   readonly mergeBranchOpen: boolean
   readonly showAbout: boolean
+  /** The self-update flow's latest phase (main pushes UPDATE_STATE_CHANNEL). */
+  readonly update: UpdateState | null
   readonly confirm: ConfirmRequest | null
   readonly initError: string | null
   readonly lastRefreshedAt: number | null
@@ -284,28 +316,33 @@ const initialState: AppState = {
   externalApps: [],
   terminalOpen: false,
   busy: null,
+  pushNeedsPull: false,
   aiBusy: false,
   aiMerge: null,
   celebration: null,
   settings: null,
   accounts: [],
+  avatars: {},
   signIn: null,
   signInError: null,
   toasts: [],
   showSettings: false,
   settingsAiNote: false,
+  showStash: false,
   hints: {
     firstCommitDone: false,
     firstPushDone: false,
     coachingDismissed: false
   },
   showClone: false,
+  repoDialog: null,
   showRepoManager: false,
   showNewBranch: false,
   newBranchBase: null,
   renameBranchTarget: null,
   mergeBranchOpen: false,
   showAbout: false,
+  update: null,
   confirm: null,
   initError: null,
   lastRefreshedAt: null
@@ -485,6 +522,10 @@ export class AppStore {
         terminalOpen: readTerminalOpen()
       })
       this.applyTheme(settings.theme)
+      // Best-effort pass over the stored accounts: refreshed names/avatars,
+      // and a toast for anything the provider now rejects.
+      void this.loadAvatars()
+      void this.syncAccounts()
 
       const lastPath = localStorage.getItem('aspen.lastRepo')
       // Missing folders never open silently — the manager surfaces them.
@@ -522,6 +563,10 @@ export class AppStore {
       ) {
         void this.refresh({ silent: true })
       }
+    })
+
+    onUpdateState(state => {
+      this.applyUpdatePush(state)
     })
 
     window.addEventListener('focus', () => {
@@ -581,10 +626,13 @@ export class AppStore {
   private async handleMenuAction(action: MenuAction): Promise<void> {
     // Menu accelerators bypass the disabled buttons; without this gate a
     // second Ctrl+Enter double-commits and Ctrl+Shift+{P,U} run git
-    // concurrently and hit index-lock errors. Read-only refresh is exempt.
+    // concurrently and hit index-lock errors. Read-only refresh is exempt —
+    // as are the donate and check-for-updates one-offs, neither of which
+    // touches the working tree.
     if (
       action !== 'refresh' &&
       action !== 'donate' &&
+      action !== 'check-updates' &&
       action !== 'toggle-terminal' &&
       this.state.busy !== null
     ) {
@@ -628,11 +676,20 @@ export class AppStore {
       case 'clone-repository':
         this.setCloneOpen(true)
         break
+      case 'new-repository':
+        this.setRepoDialog('new')
+        break
+      case 'publish-repository':
+        this.openPublishDialog()
+        break
       case 'manage-repositories':
         this.setRepoManagerOpen(true)
         break
       case 'show-about':
         this.update({ showAbout: true })
+        break
+      case 'check-updates':
+        await this.checkForUpdatesNow()
         break
       case 'toggle-terminal':
         this.toggleTerminal()
@@ -686,6 +743,7 @@ export class AppStore {
       selectedRepo: repo,
       status: null,
       statusError: null,
+      pushNeedsPull: false,
       selectedFilePath: null,
       selectedFileDiff: null,
       selectedFileError: null,
@@ -703,6 +761,7 @@ export class AppStore {
       view: 'review',
       deskFilter: '',
       mergeBranchOpen: false,
+      showStash: false,
       selectedStashIndex: null,
   scopeAdds: 0,
   scopeDels: 0,
@@ -1023,6 +1082,135 @@ export class AppStore {
     }
   }
 
+  // ------------------------------------------------- create / publish (new)
+
+  /** Open/close the create/publish dialog; opening refreshes the accounts. */
+  setRepoDialog(mode: 'new' | 'publish' | null): void {
+    this.update({ repoDialog: mode })
+    if (mode !== null) void this.refreshAccounts()
+  }
+
+  /** Repository ▸ Publish: only meaningful for the selected origin-less repo. */
+  openPublishDialog(): void {
+    if (this.state.selectedRepo === null) return
+    if (this.state.remoteUrl !== null) {
+      this.toast(
+        'info',
+        'This repository already has an origin — Push publishes the current branch.'
+      )
+      return
+    }
+    this.setRepoDialog('publish')
+  }
+
+  /** Owners an account can create repositories under (self + orgs/groups). */
+  loadOwners(accountId: string): Promise<ProviderOwner[]> {
+    return call('listAccountOwners', accountId)
+  }
+
+  /**
+   * Create a repository on disk and — when publishing — take it online in
+   * the same breath. Mirrors clone(): list refresh, select the new repo,
+   * celebrate. A failed publish keeps the local repo (and any origin) so
+   * the retry is a plain Push.
+   */
+  async createRepository(o: {
+    parentDir: string
+    name: string
+    description: string
+    isPrivate: boolean
+    addReadme: boolean
+    publish: boolean
+    accountId: string | null
+    owner: string
+  }): Promise<void> {
+    if (o.publish && o.accountId === null) {
+      this.toast('error', 'Choose an account to publish to — or sign in first.')
+      return
+    }
+    this.update({ busy: 'create' })
+    let repo: Repository
+    try {
+      repo = await call('createLocalRepository', o.parentDir, o.name.trim(), o.addReadme)
+    } catch (err) {
+      this.update({ busy: null })
+      this.toast('error', err instanceof Error ? err.message : String(err))
+      return
+    }
+    this.update({ repositories: await call('listRepositories') })
+    if (!o.publish) {
+      this.update({ busy: null, repoDialog: null })
+      await this.selectRepo(repo)
+      this.toast(
+        'success',
+        `Created ${repo.name}. Commit something, then Publish takes it online.`
+      )
+      return
+    }
+    try {
+      const created = await call(
+        'publishRepository',
+        repo.path,
+        o.accountId as string,
+        {
+          owner: o.owner,
+          name: o.name.trim(),
+          description: o.description,
+          isPrivate: o.isPrivate
+        }
+      )
+      this.update({ busy: null, repoDialog: null })
+      await this.selectRepo(repo)
+      this.publishSuccessToast(created, o.accountId as string)
+    } catch (err) {
+      this.update({ busy: null })
+      await this.selectRepo(repo)
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Publish the selected repository under the chosen account/owner. */
+  async publishRepository(o: {
+    accountId: string
+    owner: string
+    name: string
+    description: string
+    isPrivate: boolean
+  }): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    this.update({ busy: 'publish' })
+    try {
+      const created = await call('publishRepository', repo.path, o.accountId, {
+        owner: o.owner,
+        name: o.name.trim(),
+        description: o.description,
+        isPrivate: o.isPrivate
+      } satisfies CreateRepoRequest)
+      this.update({ busy: null, repoDialog: null, remoteUrl: created.cloneUrl })
+      this.publishSuccessToast(created, o.accountId)
+      void Promise.all([this.refresh(), this.refreshBranches()])
+    } catch (err) {
+      this.update({ busy: null })
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Success line every publish ends with, with the in-place view button. */
+  private publishSuccessToast(created: RemoteRepository, accountId: string): void {
+    const site =
+      this.state.accounts.find(a => a.id === accountId)?.provider === 'gitlab'
+        ? 'GitLab'
+        : 'GitHub'
+    this.celebrate('push')
+    this.toast('success', `Published to ${created.fullName}.`, [
+      {
+        label: `View on ${site}`,
+        onClick: () => void call('openExternal', created.webUrl)
+      }
+    ])
+  }
+
   // ------------------------------------------------------ hosted accounts
 
   private signInTimer: ReturnType<typeof setTimeout> | null = null
@@ -1030,8 +1218,45 @@ export class AppStore {
   async refreshAccounts(): Promise<void> {
     try {
       this.update({ accounts: await call('listAccounts') })
+      void this.loadAvatars()
     } catch {
       /* Account lists are best-effort; the next dialog open retries. */
+    }
+  }
+
+  /**
+   * Boot-time re-validation of every stored account (main owns the logic):
+   * updated names/avatars land in the list, and an account whose token was
+   * revoked signs itself out with a toast explaining why.
+   */
+  async syncAccounts(): Promise<void> {
+    try {
+      const report = await call('syncAccounts')
+      this.update({ accounts: report.accounts })
+      for (const gone of report.signedOut) {
+        this.toast(
+          'info',
+          `Signed out of ${gone.login} — ${gone.provider === 'github' ? 'GitHub' : 'GitLab'} no longer accepts the stored token.`
+        )
+      }
+      if (report.signedOut.length > 0) void this.loadAvatars()
+    } catch {
+      /* Offline at boot: the identities simply stay as last seen. */
+    }
+  }
+
+  /** Fetch any account avatars this renderer pass has not seen yet. */
+  private async loadAvatars(): Promise<void> {
+    for (const account of this.state.accounts) {
+      if (account.avatarUrl === null) continue
+      if (account.id in this.state.avatars) continue
+      void call('accountAvatar', account.id)
+        .then(url => {
+          this.update({ avatars: { ...this.state.avatars, [account.id]: url } })
+        })
+        .catch(() => {
+          this.update({ avatars: { ...this.state.avatars, [account.id]: null } })
+        })
     }
   }
 
@@ -1062,20 +1287,24 @@ export class AppStore {
   }
 
   /**
-   * Browser sign-in: device flow for GitHub, PKCE redirect for GitLab. The
-   * main process owns the token exchange; this loop only asks "is it done"
-   * at the provider's own cadence, so closing the dialog never strands the
-   * sign-in — it completes on the next poll wherever the UI happens to be.
+   * Browser sign-in: GitHub authorization-code + PKCE (falling back to the
+   * device-code flow when the loopback port is busy, or when `prefer` says
+   * 'device'), GitLab OAuth PKCE. The main process owns the token exchange;
+   * this loop only asks "is it done" at the provider's own cadence, so
+   * closing the dialog never strands the sign-in — it completes on the next
+   * poll wherever the UI happens to be.
    */
   async startBrowserSignIn(
     provider: AccountProvider,
-    apiBase?: string
+    apiBase?: string,
+    prefer?: 'web' | 'device'
   ): Promise<{ ok: boolean; message: string }> {
     try {
       const challenge = await call(
         'beginSignIn',
         provider,
-        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined
+        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined,
+        prefer
       )
       this.update({ signIn: challenge, signInError: null })
       const openUrl =
@@ -1143,6 +1372,9 @@ export class AppStore {
   async signOut(accountId: string): Promise<void> {
     try {
       await call('removeAccount', accountId)
+      const avatars = { ...this.state.avatars }
+      delete avatars[accountId]
+      this.update({ avatars })
       await this.refreshAccounts()
       this.toast('info', 'Signed out — the stored token was deleted.')
     } catch (err) {
@@ -1151,15 +1383,17 @@ export class AppStore {
   }
 
   /**
-   * One page of an account's hosted repositories (main applies the provider
-   * search where the API supports it; the pane re-filters loaded items).
+   * One page of an account's hosted repositories. A non-empty `search` is
+   * applied provider-side (GitHub Search API / GitLab `?search=`); the pane
+   * re-filters loaded items client-side too.
    */
   async listRemoteRepos(
     accountId: string,
     search: string,
-    cursor: string | null
+    cursor: string | null,
+    sort?: RemoteRepoSort
   ): Promise<RemoteRepoPage> {
-    return call('listRemoteRepositories', accountId, { search, cursor, perPage: 50 })
+    return call('listRemoteRepositories', accountId, { search, cursor, perPage: 50, sort })
   }
 
   // ---------------------------------------------------------------- refresh
@@ -1980,34 +2214,118 @@ export class AppStore {
   }
 
   undoCommit(): void {
-    const repo = this.state.selectedRepo
     const last = this.state.lastCommit
-    if (repo === null || last === null) {
-      this.toast('error', 'There is no Aspen commit to undo.')
+    if (last !== null) {
+      this.confirmUncommit(last.sha, last.summary, last.description, last.paths)
       return
     }
+    // No just-created Aspen commit: Undo still works as a generic
+    // "uncommit the tip" over whatever the history shows first. The
+    // expected-sha guard in main rejects a stale listing before touching
+    // history, so a moved tip just surfaces as its own refusal.
+    const tip = this.state.commits[0]
+    if (tip === undefined) {
+      this.toast('error', 'There is no commit to undo.')
+      return
+    }
+    if (tip.isMerge) {
+      this.toast(
+        'error',
+        'The latest commit is a merge — revert it instead of undoing it.'
+      )
+      return
+    }
+    this.confirmUncommit(tip.sha, tip.summary, tip.body, null)
+  }
+
+  /**
+   * Uncommits the selected commit — the history view's counterpart to
+   * Revert: the commit leaves the branch and its changes land in the commit
+   * box, instead of a new inverse commit being added.
+   */
+  uncommitSelectedCommit(): void {
+    const commit = this.state.selectedCommit
+    if (this.state.selectedRepo === null || commit === null) {
+      this.toast('error', 'Select a commit first.')
+      return
+    }
+    if (this.state.commits[0]?.sha !== commit.sha) {
+      this.toast(
+        'error',
+        'Only the latest commit can be uncommitted — older commits need Revert or a rebase.'
+      )
+      return
+    }
+    if (commit.isMerge) {
+      this.toast(
+        'error',
+        'This is a merge commit; uncommitting it would flatten the merge. Revert it instead.'
+      )
+      return
+    }
+    this.confirmUncommit(commit.sha, commit.summary, commit.body, null)
+  }
+
+  /**
+   * Shared confirm → guarded soft-reset → refill-the-commit-box flow behind
+   * Undo and Uncommit. `paths` rides along when Aspen just produced the
+   * commit (the toast's Undo); otherwise the scope is read from the commit
+   * itself when the dialog is confirmed.
+   */
+  private confirmUncommit(
+    sha: string,
+    summary: string,
+    description: string,
+    paths: ReadonlyArray<string> | null
+  ): void {
+    const repo = this.state.selectedRepo
+    if (repo === null) {
+      this.toast('error', 'Open a repository first.')
+      return
+    }
+    const status = this.state.status
+    const pushed =
+      status !== null && status.upstream !== undefined && status.ahead === 0
     this.update({
       confirm: {
-        title: 'Undo this commit?',
-        message: `"${last.summary}" will be undone. Its changes stay in your working directory, ready to commit again.`,
-        confirmLabel: 'Undo commit',
+        title: 'Uncommit this commit?',
+        message:
+          `"${summary.slice(0, 70)}" will be removed from history. Its changes stay staged and its message goes back to the commit box` +
+          (pushed
+            ? ' — it was already pushed, so your next push will need a force-push.'
+            : '.'),
+        confirmLabel: 'Uncommit',
         onConfirm: () => {
           this.update({ confirm: null })
-          // runGit reports failure via its boolean, not a rejection: on a
-          // refused undo (tip moved, repo moved on) the user's current draft
-          // must survive untouched and the Undo offer must stay alive.
-          void this.runGit(async () => {
-            await call('undoLastCommit', repo.path, last.sha)
-          }, 'undo').then(ok => {
+          void (async () => {
+            let scope = paths
+            if (scope === null) {
+              try {
+                const files = await call('getCommitFiles', repo.path, sha)
+                scope = files.map(f => f.path)
+              } catch (err) {
+                this.toast(
+                  'error',
+                  err instanceof Error ? err.message : String(err)
+                )
+                return
+              }
+            }
+            // runGit reports failure via its boolean, not a rejection: on a
+            // refused uncommit (tip moved, repo moved on) the user's current
+            // draft must survive untouched and the Undo offer must stay alive.
+            const ok = await this.runGit(async () => {
+              await call('undoLastCommit', repo.path, sha)
+            }, 'undo')
             if (!ok) return
             this.setDraft(repo.path, {
-              summary: last.summary,
-              description: last.description,
-              checked: new Set(last.paths)
+              summary,
+              description,
+              checked: new Set(scope)
             })
-            this.update({ lastCommit: null, amend: null })
+            this.update({ lastCommit: null, amend: null, view: 'review' })
             void this.loadLog(false)
-          })
+          })()
         }
       }
     })
@@ -2115,7 +2433,10 @@ export class AppStore {
     this.update({ busy: op })
     try {
       const output = await call(op, repo.path)
-      this.update({ busy: null })
+      // Any sync that lands proves the remote picture again — retire the
+      // rejected-push flag; a still-diverged branch re-arms the verb from
+      // git truth on the refresh below.
+      this.update({ busy: null, pushNeedsPull: false })
       const lines = output
         .split('\n')
         .map(l => l.trim())
@@ -2132,18 +2453,29 @@ export class AppStore {
       if (this.state.view === 'history') void this.loadLog(false)
       return true
     } catch (err) {
-      this.update({ busy: null })
+      // A failed pull retires the compound-verb flag: the conflicts banner (or
+      // the raw error toast) owns the recovery from here, and a later
+      // divergence re-arms the verb from the next status read.
+      this.update({
+        busy: null,
+        ...(op === 'pull' ? { pushNeedsPull: false } : {})
+      })
       const message = err instanceof Error ? err.message : String(err)
       if (op === 'push' && isNeedsPullRejectionMessage(message)) {
         // The push was rejected only because the remote moved ahead — the
-        // recovery is one click away, so the toast carries it.
-        this.toast('error', message, [
-          { label: 'Pull first', onClick: () => void this.doSync('pull') },
-          {
-            label: 'Pull and push again',
-            onClick: () => void this.pullThenPush()
-          }
-        ])
+        // recovery is exactly one click, so the button carries it instead of
+        // an error toast: the sync verbs convert into Pull & Push (see
+        // progressive.ts). A rejected `(fetch first)` push leaves the
+        // remote-tracking refs stale, so fetch once first, best-effort, to
+        // make the ahead/behind counts honest before the refresh paints.
+        if (this.state.selectedRepo?.path === repo.path) {
+          void call('fetch', repo.path).catch(() => undefined)
+          this.update({ pushNeedsPull: true })
+          this.toast(
+            'info',
+            'Remote has new commits — the button will pull before it pushes.'
+          )
+        }
       } else {
         this.toast('error', message)
       }
@@ -2155,9 +2487,10 @@ export class AppStore {
   }
 
   /**
-   * The recovery for a push rejected as non-fast-forward: pull, and only if
-   * that lands cleanly (no conflict stopping it, no new failure) retry the
-   * push. A conflicted pull leaves the merge banner up instead.
+   * The action behind the compound Pull & Push verb: pull, and only if that
+   * lands cleanly (no conflict stopping it, no new failure) retry the push. A
+   * conflicted pull leaves the merge banner up instead; a push rejected again
+   * (the remote moved during the pull) simply re-arms the same verb.
    */
   async pullThenPush(): Promise<void> {
     if (!(await this.doSync('pull'))) return
@@ -2171,6 +2504,10 @@ export class AppStore {
     if (repo === null) return
     try {
       await call('checkoutBranch', repo.path, name, fromRemote)
+      // The rejected-push flag belongs to the branch it fired on — a switch
+      // retires it; the fresh status re-arms the verb if the new branch is
+      // genuinely diverged.
+      this.update({ pushNeedsPull: false })
       await this.refresh()
       await this.refreshBranches()
       void this.loadLog(false)
@@ -2528,6 +2865,7 @@ export class AppStore {
 
   // --------------------------------------------------------------- stash
 
+  /** Opens the stash dialog; the verb itself lives in StashDialog. */
   stashAllChanges(): void {
     const repo = this.state.selectedRepo
     if (repo === null) return
@@ -2536,18 +2874,135 @@ export class AppStore {
       this.toast('error', 'There is nothing to stash.')
       return
     }
+    this.update({ showStash: true })
+  }
+
+  setStashOpen(open: boolean): void {
+    this.update({ showStash: open })
+  }
+
+  /**
+   * Stash every working change under an optional message (subject plus
+   * body become the stash commit's message). Resolves true on success so
+   * the dialog can close itself; failures already carry an error toast.
+   */
+  async stashWithMessage(
+    title: string,
+    description: string
+  ): Promise<boolean> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return false
+    const subject = title.trim()
+    const body = description.trim()
+    const message =
+      subject.length === 0
+        ? undefined
+        : body.length === 0
+          ? subject
+          : `${subject}\n\n${body}`
+    const ok = await this.runGit(async () => {
+      await call('stashAll', repo.path, message)
+    }, 'stash')
+    if (ok) {
+      await this.refreshStashes()
+      this.update({
+        showStash: false,
+        view: 'stash',
+        selectedStashIndex: 0
+      })
+    }
+    return ok
+  }
+
+  /**
+   * ✨ inside the stash dialog: describe *all* dirty paths (the stash takes
+   * everything), returning the draft for the dialog's fields. Shares the
+   * commit flow's config guard, busy flag and cancel channel.
+   */
+  async generateStashDraft(): Promise<GeneratedCommitMessage | null> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return null
+    const settings = this.state.settings
+    if (aiLooksUnconfigured(settings)) {
+      if (settings?.hintsEnabled === true) {
+        this.update({ showSettings: true, settingsAiNote: true })
+      } else {
+        this.toast(
+          'error',
+          'The AI agent has no endpoint configured — set one in Preferences first.'
+        )
+      }
+      return null
+    }
+    const scope = (this.state.status?.files ?? []).map(f => f.path)
+    if (scope.length === 0) {
+      this.toast('error', 'There is nothing to describe.')
+      return null
+    }
+    this.update({ aiBusy: true })
+    try {
+      return await call('generateCommitMessage', repo.path, scope)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message !== 'cancelled') this.toast('error', message)
+      return null
+    } finally {
+      this.update({ aiBusy: false })
+    }
+  }
+
+  /**
+   * ✨ on an existing stash: ask the agent to describe that entry's stored
+   * diff, then — after a preview confirm — rewrite the entry's message in
+   * place. Cancel or a failed confirm leaves the stash untouched.
+   */
+  async summarizeStash(entry: StashEntry): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null || this.state.busy !== null) return
+    const settings = this.state.settings
+    if (aiLooksUnconfigured(settings)) {
+      if (settings?.hintsEnabled === true) {
+        this.update({ showSettings: true, settingsAiNote: true })
+      } else {
+        this.toast(
+          'error',
+          'The AI agent has no endpoint configured — set one in Preferences first.'
+        )
+      }
+      return
+    }
+    this.update({ aiBusy: true })
+    let result: GeneratedCommitMessage
+    try {
+      result = await call('summarizeStash', repo.path, entry.index)
+    } catch (err) {
+      this.update({ aiBusy: false })
+      const message = err instanceof Error ? err.message : String(err)
+      if (message !== 'cancelled') this.toast('error', message)
+      return
+    }
+    this.update({ aiBusy: false })
     this.update({
       confirm: {
-        title: 'Stash your changes?',
-        message: `All ${count} changed file${count === 1 ? '' : 's'} will be moved to the stash and your working directory will be clean. Restore them later from the stash panel.`,
-        confirmLabel: 'Stash all',
-        onConfirm: async () => {
+        title: 'Replace this stash message?',
+        message: `${result.title}${
+          result.description.length > 0 ? `\n\n${result.description}` : ''
+        }`,
+        confirmLabel: 'Replace message',
+        onConfirm: () => {
           this.update({ confirm: null })
-          await this.runGit(async () => {
-            await call('stashAll', repo.path)
-          }, 'stash')
-          await this.refreshStashes()
-          this.update({ view: 'stash', selectedStashIndex: 0 })
+          void this.runGit(async () => {
+            await call(
+              'setStashMessage',
+              repo.path,
+              entry.index,
+              result.title,
+              result.description,
+              entry.branch
+            )
+          }, 'stash-set-message').then(ok => {
+            if (ok) void this.refreshStashes()
+          })
         }
       }
     })
@@ -2607,6 +3062,110 @@ export class AppStore {
 
   setAboutOpen(open: boolean): void {
     this.update({ showAbout: open })
+  }
+
+  // ------------------------------------------------------------------ updates
+
+  /** Last pushed phase — toasts fire on transitions, not on repeats of a
+   *  phase a re-check can push again (checking → … → checking → …). */
+  private lastUpdatePhase: UpdateState['phase'] | null = null
+
+  /** Mirror main's push and speak only for the moments that matter:
+   *  a found update (download note, or the page link for builds that
+   *  can't self-apply) and a finished download. Errors and up-to-date
+   *  answers come from the manual call itself, so the silent startup
+   *  pass never nags. */
+  private applyUpdatePush(state: UpdateState): void {
+    const repeated = this.lastUpdatePhase === state.phase
+    this.lastUpdatePhase = state.phase
+    this.update({ update: state })
+    if (repeated) return
+    if (state.phase === 'ready') {
+      this.toast('success', `Aspen ${state.version ?? 'x'} is downloaded.`, [
+        {
+          label: 'Restart now',
+          onClick: () => {
+            void this.applyDownloadedUpdate()
+          }
+        }
+      ])
+    } else if (state.phase === 'available') {
+      if (state.canInstall) {
+        this.toast('info', `Downloading Aspen ${state.version ?? 'x'}…`)
+      } else {
+        this.toast('info', `Aspen ${state.version ?? 'a newer version'} is available.`, [
+          {
+            label: 'Open releases',
+            onClick: () => {
+              void call('openExternal', state.releaseUrl)
+            }
+          }
+        ])
+      }
+    }
+  }
+
+  /** Help → "Check for updates…" and the About dialog's button. When an
+   *  update already sits downloaded the honest next step is the restart
+   *  question, not another round-trip. */
+  async checkForUpdatesNow(): Promise<void> {
+    const ready = this.state.update
+    if (ready !== null && ready.phase === 'ready') {
+      this.update({
+        confirm: {
+          title: 'Restart to update',
+          message: `Aspen ${ready.version ?? 'x'} is downloaded. Restart now to install it?`,
+          confirmLabel: 'Restart now',
+          onConfirm: () => {
+            this.dismissConfirm()
+            void this.applyDownloadedUpdate()
+          }
+        }
+      })
+      return
+    }
+    try {
+      const res = await call('checkForUpdates')
+      if (res.status === 'up-to-date') {
+        this.toast('info', `Aspen ${res.currentVersion} is the newest release.`)
+      } else if (res.status === 'error') {
+        this.toast('error', res.error ?? 'The update check failed.', [
+          {
+            label: 'Open releases',
+            onClick: () => {
+              void call('openExternal', RELEASES_URL)
+            }
+          }
+        ])
+      }
+      // 'available': applyUpdatePush already toasted the right action for
+      // this build's tier; saying it twice from here would only jingle.
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Hand off to the downloaded installer. In practice the app quits
+   *  before the promise answers; a refusal (no download, portable build)
+   *  lands as the actionable toast. */
+  private async applyDownloadedUpdate(): Promise<void> {
+    try {
+      await call('quitAndInstallUpdate')
+    } catch (err) {
+      const url = this.state.update?.releaseUrl ?? RELEASES_URL
+      this.toast(
+        'error',
+        err instanceof Error ? err.message : String(err),
+        [
+          {
+            label: 'Open releases',
+            onClick: () => {
+              void call('openExternal', url)
+            }
+          }
+        ]
+      )
+    }
   }
 
   dismissConfirm(): void {

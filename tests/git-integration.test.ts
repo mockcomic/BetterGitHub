@@ -23,8 +23,10 @@ import {
 import {
   applyStash,
   dropStash,
+  getStashDiff,
   listStashes,
   popStash,
+  setStashMessage,
   stashAll
 } from '../src/main/git/stash'
 import { resolveConflict, stagePaths, unstagePaths } from '../src/main/git/staging'
@@ -227,6 +229,27 @@ describe('git integration', () => {
     await expect(undoLastCommit(orphan, rootSha)).rejects.toThrow(/first commit/)
   })
 
+  it('refuses to uncommit a merge commit', async () => {
+    await git(['checkout', '-q', 'main'])
+    await resetClean()
+    await git(['checkout', '-q', '-b', 'undo-merge'])
+    write('undo-side.txt', 'side\n')
+    await commitAll('undo merge feature')
+    await git(['checkout', '-q', 'main'])
+    write('undo-main.txt', 'main\n')
+    await commitAll('undo merge main')
+    await mergeBranch(repo, 'undo-merge')
+    const [tip] = await getLog(repo, { maxCount: 1 })
+    expect(tip?.isMerge).toBe(true)
+
+    await expect(undoLastCommit(repo, tip?.sha ?? '')).rejects.toThrow(
+      /merge commit/i
+    )
+    // The refusal must leave the merge untouched at the tip.
+    expect(await git(['rev-parse', 'HEAD'])).toBe(tip?.sha)
+    await git(['branch', '-D', 'undo-merge'])
+  })
+
   it('reverts a commit and refuses merge commits', async () => {
     write('revertme.txt', 'content\n')
     const sha = await commitPaths(repo, 'Add revertme', '', ['revertme.txt'])
@@ -333,6 +356,58 @@ describe('git integration', () => {
     await dropStash(repo, 0)
     expect(await listStashes(repo)).toHaveLength(0)
     expect((await getStatus(repo)).files).toHaveLength(0)
+  })
+
+  it('stores a subject+body message, rewrites it, and can diff the entry', async () => {
+    await resetClean()
+    write('body-check.txt', 'v1\n')
+    await commitAll('add body-check')
+    write('body-check.txt', 'v2\n')
+
+    // A multi-line -m lands as subject + body on the stash commit. git
+    // prefixes the subject with `On <branch>: ` and flattens the *whole*
+    // message into %gs — %s/%b are what keep subject and body apart.
+    await stashAll(repo, 'park the edit\n\nRaises body-check to v2.')
+    let listed = await listStashes(repo)
+    expect(listed).toHaveLength(1)
+    expect(listed[0].message).toBe('On main: park the edit')
+    expect(listed[0].description).toBe('Raises body-check to v2.')
+    expect(listed[0].branch).toBe('main')
+
+    // The entry's stored diff is visible for the AI summarizer.
+    const diff = await getStashDiff(repo, 0)
+    expect(diff).toContain('-v1')
+    expect(diff).toContain('+v2')
+
+    // Rewriting keeps the changes, the entry's original date and the list
+    // size; later indices shift during the rebuild+drop but settle back to
+    // the original layout.
+    const originalDate = (await listStashes(repo))[0].date
+    write('second.txt', 'x\n')
+    await stashAll(repo, 'second entry')
+    expect((await listStashes(repo))).toHaveLength(2)
+    await setStashMessage(repo, 1, 'park the edit, take two', 'Same changes.', 'main')
+    listed = await listStashes(repo)
+    expect(listed).toHaveLength(2)
+    const retitled = listed.find(s =>
+      s.message.includes('park the edit, take two')
+    )
+    expect(retitled).toBeDefined()
+    expect(retitled?.description).toBe('Same changes.')
+    expect(retitled?.branch).toBe('main')
+    // commit-tree replays the original author/committer stamps, so the
+    // entry still reads as stashed when it was stashed.
+    expect(retitled?.date).toBe(originalDate)
+    // The re-entered stash still carries the v2 edit.
+    expect(retitled && (await getStashDiff(repo, retitled.index))).toContain('+v2')
+
+    await dropStash(repo, 0)
+    await dropStash(repo, 0)
+    expect(await listStashes(repo)).toHaveLength(0)
+    // The dropped entries were the only holders of the v2 edit; the file on
+    // disk never saw it.
+    expect(readFileSync(join(repo, 'body-check.txt'), 'utf8')).toBe('v1\n')
+    await resetClean()
   })
 
   it('refuses to stash mid-merge and can abort the merge', async () => {

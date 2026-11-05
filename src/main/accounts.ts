@@ -6,11 +6,15 @@ import { app } from 'electron'
 import type {
   AccountAuthKind,
   AccountInfo,
-  AccountProvider
+  AccountProvider,
+  AccountSyncReport
 } from '../shared/models'
 import { getAccountsConfig, readSecretFile, writeSecretFile } from './settings'
-import { githubRepoHost } from './providers/github'
-import { gitlabRefreshToken } from './providers/refresh'
+import { githubClient, githubRepoHost, githubSiteRoot } from './providers/github'
+import { gitlabClient } from './providers/gitlab'
+import { ProviderHttpError } from './providers/http'
+import { githubRefreshToken, gitlabRefreshToken } from './providers/refresh'
+import { AVATAR_MAX_BYTES } from './providers/config'
 import type { ProviderIdentity } from './providers/types'
 
 /**
@@ -31,6 +35,9 @@ export interface AccountCredential {
 type StoredAccount = AccountInfo
 
 let cached: StoredAccount[] | null = null
+
+/** Fetched avatar data URLs, keyed by account id (small, fixed identity). */
+const avatarCache = new Map<string, string | null>()
 
 function accountsPath(): string {
   return join(app.getPath('userData'), 'aspen-accounts.json')
@@ -105,6 +112,8 @@ export async function addAccount(input: {
   cached = [...accounts.filter(a => !replaced.includes(a)), account]
   await persist()
   await writeSecret(account.id, input.credential)
+  avatarCache.delete(account.id)
+  for (const old of replaced) avatarCache.delete(old.id)
   return { ...account }
 }
 
@@ -115,6 +124,7 @@ export async function removeAccount(id: string): Promise<void> {
   cached = accounts.filter(a => a.id !== id)
   await persist()
   await rm(secretPath(id), { force: true }).catch(() => undefined)
+  avatarCache.delete(id)
 }
 
 // ---------------------------------------------------------------------------
@@ -157,10 +167,12 @@ async function writeSecret(id: string, credential: AccountCredential): Promise<v
 }
 
 /**
- * The account's current access token, refreshing a GitLab OAuth token once
- * it is within a minute of its expiry (GitHub device tokens do not expire;
- * a revoked one surfaces as a 401 at the next call). Returns null when the
- * sidecar is unreadable — callers treat that as "signed out".
+ * The account's current access token, refreshing an OAuth token once it is
+ * within a minute of its expiry. GitLab access tokens always expire; GitHub
+ * ones only do when the OAuth app opted into expiring authorizations —
+ * otherwise (and for PATs and device-flow tokens) there is nothing to
+ * refresh and a revoked token surfaces as a 401 at the next call. Returns
+ * null when the sidecar is unreadable — callers treat that as "signed out".
  */
 export async function getAccountToken(
   account: AccountInfo,
@@ -170,18 +182,16 @@ export async function getAccountToken(
   if (secret === null) return null
   const expiringSoon =
     secret.expiresAt !== null && secret.expiresAt - Date.now() < 60_000
-  if (
-    account.provider === 'gitlab' &&
+  const refreshable =
     account.authKind === 'oauth' &&
     secret.refreshToken !== null &&
     (expiringSoon || opts?.forceRefresh === true)
-  ) {
-    const { gitlabClientId } = await getAccountsConfig()
-    const refreshed = await gitlabRefreshToken(
-      account.apiBase,
-      gitlabClientId,
-      secret
-    )
+  if (refreshable) {
+    const { gitlabClientId, githubClientId } = await getAccountsConfig()
+    const refreshed =
+      account.provider === 'gitlab'
+        ? await gitlabRefreshToken(account.apiBase, gitlabClientId, secret)
+        : await githubRefreshToken(githubSiteRoot(account.apiBase), githubClientId, secret)
     if (refreshed !== null) {
       await writeSecret(account.id, refreshed)
       return refreshed.token
@@ -192,6 +202,87 @@ export async function getAccountToken(
   return secret.token
 }
 
+// ---------------------------------------------------------------------------
+// Identity refresh + avatars (main-side helpers for the account UI)
+
+/**
+ * Re-validate every stored account against its provider. A working token
+ * refreshes the row's display name and avatar (people rename, avatars
+ * change); a token the provider now rejects (401/403) signs that account
+ * out and destroys its sidecar. Network errors leave everything as-is —
+ * offline is not revoked.
+ */
+export async function syncAccountIdentities(): Promise<AccountSyncReport> {
+  const accounts = await load()
+  const signedOut: Array<{ login: string; provider: AccountProvider }> = []
+  const patches = new Map<string, Partial<AccountInfo>>()
+  let changed = false
+  for (const account of accounts) {
+    const token = await getAccountToken(account)
+    if (token === null) continue // sidecar unreadable — next list call explains
+    try {
+      const identity =
+        account.provider === 'github'
+          ? await githubClient.validate(account.apiBase, token, account.authKind)
+          : await gitlabClient.validate(account.apiBase, token, account.authKind)
+      if (
+        identity.displayName !== account.displayName ||
+        identity.avatarUrl !== account.avatarUrl
+      ) {
+        patches.set(account.id, {
+          displayName: identity.displayName,
+          avatarUrl: identity.avatarUrl
+        })
+        avatarCache.delete(account.id)
+        changed = true
+      }
+    } catch (err) {
+      if (err instanceof ProviderHttpError && (err.status === 401 || err.status === 403)) {
+        signedOut.push({ login: account.login, provider: account.provider })
+        await removeAccount(account.id)
+        changed = true
+      }
+      // Anything else (offline, 5xx): keep the account, keep the doubt.
+    }
+  }
+  if (changed && cached !== null) {
+    cached = cached.map(a => ({ ...a, ...(patches.get(a.id) ?? {}) }))
+    await persist()
+  }
+  return { accounts: (await load()).map(a => ({ ...a })), signedOut }
+}
+
+/**
+ * The account's avatar as a `data:` URL, fetched in main and memoized: the
+ * renderer CSP never needs a remote image source, and self-hosted GitLab
+ * (plain http) works the same as GitHub's CDN. Null when there is no
+ * avatar or the fetch failed — the UI falls back to initials.
+ */
+export async function accountAvatar(account: AccountInfo): Promise<string | null> {
+  const hit = avatarCache.get(account.id)
+  if (hit !== undefined) return hit
+  let dataUrl: string | null = null
+  if (account.avatarUrl !== null) {
+    try {
+      const res = await fetch(account.avatarUrl, {
+        signal: AbortSignal.timeout(10_000),
+        redirect: 'follow'
+      })
+      const mime = res.headers.get('content-type')?.split(';')[0]?.toLowerCase() ?? ''
+      if (res.ok && mime.startsWith('image/')) {
+        const buf = Buffer.from(await res.arrayBuffer())
+        if (buf.length > 0 && buf.length <= AVATAR_MAX_BYTES) {
+          dataUrl = `data:${mime};base64,${buf.toString('base64')}`
+        }
+      }
+    } catch {
+      /* offline or unreachable CDN — initials until the next attempt */
+    }
+  }
+  avatarCache.set(account.id, dataUrl)
+  return dataUrl
+}
+
 /** The repo host whose https remotes this account's token can authenticate. */
 export function accountRepoHost(account: AccountInfo): string {
   return account.provider === 'github'
@@ -200,9 +291,28 @@ export function accountRepoHost(account: AccountInfo): string {
 }
 
 /**
- * Credential for the one-off git auth retry: username + token whose Basic
- * auth the host accepts (GitHub: the account login with either token kind;
- * GitLab: the fixed `oauth2` user, valid for PATs and access tokens).
+ * The account's git-over-https Basic credential: username + token the host
+ * accepts (GitHub: the account login with either token kind; GitLab: the
+ * fixed `oauth2` user, valid for PATs and access tokens). Null when the
+ * sidecar is unreadable — the caller treats that as "this account cannot
+ * authenticate git right now".
+ */
+export async function accountGitCredential(
+  account: AccountInfo
+): Promise<{ user: string; token: string } | null> {
+  const token = await getAccountToken(account)
+  if (token === null) return null
+  return {
+    user: account.provider === 'gitlab' ? 'oauth2' : account.login,
+    token
+  }
+}
+
+/**
+ * Credential for the one-off git auth retry: the first account whose host
+ * matches the remote. (Publish pins its push to one chosen account via
+ * accountGitCredential instead, so several accounts on one host stay
+ * unambiguous there.)
  */
 export async function gitRetryCredential(
   remoteHost: string
@@ -210,12 +320,8 @@ export async function gitRetryCredential(
   const wanted = remoteHost.toLowerCase()
   for (const account of await load()) {
     if (accountRepoHost(account) !== wanted) continue
-    const token = await getAccountToken(account)
-    if (token === null) continue
-    return {
-      user: account.provider === 'gitlab' ? 'oauth2' : account.login,
-      token
-    }
+    const credential = await accountGitCredential(account)
+    if (credential !== null) return credential
   }
   return null
 }

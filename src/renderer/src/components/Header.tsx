@@ -126,11 +126,13 @@ export function Header(): JSX.Element {
 
 /**
  * The strip's single sync verb. One button runs the verb git currently calls
- * for — catch up when behind, publish when ahead or unpublished, otherwise
- * look — and a caret next to it always offers all three by name, with their
- * accelerators. The context-aware label is GitHub Desktop's own pattern; the
- * caret keeps every verb a first-class click, so nothing is hidden, only
- * prioritised.
+ * for — catch up when behind, publish when ahead or unpublished, and when the
+ * branch has diverged (or a push just bounced off a moved-ahead remote) the
+ * compound Pull & Push, which lands the remote first and sends your work in
+ * one click. Otherwise it just looks. A caret next to it always offers the
+ * raw verbs by name, with their accelerators. The context-aware label is
+ * GitHub Desktop's own pattern; the caret keeps every verb a first-class
+ * click, so nothing is hidden, only prioritised.
  */
 function SyncButton(): JSX.Element {
   const state = useStoreState()
@@ -148,9 +150,20 @@ function SyncButton(): JSX.Element {
   const pushEnabled =
     busy === null && status !== null && (ahead > 0 || !hasUpstream)
   const pushArmed = useJustArmed(pushEnabled)
-  const verb = syncVerb(status)
-  const verbClass = verb === 'pull' ? ' pull' : verb === 'push' ? ' push' : ''
+  const needsPull = state.pushNeedsPull
+  const verb = syncVerb(status, needsPull)
+  const verbClass =
+    verb === 'pull'
+      ? ' pull'
+      : verb === 'push'
+        ? ' push'
+        : verb === 'sync'
+          ? ' sync-verb'
+          : ''
   const armed = verb === 'push' && pushArmed ? ' arming' : ''
+  // The compound verb runs as two raw ops in sequence, so its spinner follows
+  // whichever half is in flight.
+  const syncing = verb === 'sync' && (busy === 'pull' || busy === 'push')
 
   useEffect(() => {
     if (!open) return
@@ -172,17 +185,22 @@ function SyncButton(): JSX.Element {
 
   const run = (op: SyncVerb): void => {
     setOpen(false)
-    void store.doSync(op)
+    if (op === 'sync') void store.pullThenPush()
+    else void store.doSync(op)
   }
 
   const title =
-    verb === 'pull'
-      ? `The remote has ${behind} new commit${behind === 1 ? '' : 's'} — Pull brings them in (the ▾ menu also has Fetch and Push)`
-      : verb === 'push'
-        ? ahead > 0
-          ? `Push ${ahead} commit${ahead === 1 ? '' : 's'} to ${status?.upstream ?? 'origin'}`
-          : 'Publish this branch — the first push sets upstream on origin'
-        : 'Check the remote for new work. Nothing on your machine changes.'
+    verb === 'sync'
+      ? needsPull
+        ? 'The remote branch has commits you do not have — Pull lands first, then your Push follows automatically (the ▾ menu also has them on their own)'
+        : `The remote has ${behind} new commit${behind === 1 ? '' : 's'} and you have ${ahead} to send — Pull lands first, then your Push follows automatically (the ▾ menu also has them on their own)`
+      : verb === 'pull'
+        ? `The remote has ${behind} new commit${behind === 1 ? '' : 's'} — Pull brings them in (the ▾ menu also has Fetch and Push)`
+        : verb === 'push'
+          ? ahead > 0
+            ? `Push ${ahead} commit${ahead === 1 ? '' : 's'} to ${status?.upstream ?? 'origin'}`
+            : 'Publish this branch — the first push sets upstream on origin'
+          : 'Check the remote for new work. Nothing on your machine changes.'
 
   const item = (op: SyncVerb, label: string, accel: string, enabled: boolean): JSX.Element => (
     <button
@@ -205,8 +223,22 @@ function SyncButton(): JSX.Element {
           onClick={() => run(verb)}
           title={title}
         >
-          {busy === verb ? <span className="spinner" /> : null}
-          {verb === 'pull' ? (
+          {busy === verb || syncing ? <span className="spinner" /> : null}
+          {verb === 'sync' ? (
+            <>
+              ⇅ Pull &amp; Push
+              {behind > 0 && (
+                <span className="count-pop" key={`sync-behind-${behind}`}>
+                  {' '}↓{behind}
+                </span>
+              )}
+              {ahead > 0 && (
+                <span className="count-pop" key={`sync-ahead-${ahead}`}>
+                  {' '}↑{ahead}
+                </span>
+              )}
+            </>
+          ) : verb === 'pull' ? (
             <>
               ↓ Pull
               {behind > 0 && (
@@ -338,7 +370,7 @@ function OverflowButton(): JSX.Element {
         disabled={state.busy !== null}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="More — GitHub page, add remote, open in…"
+        title="More — GitHub page, publish, open in…"
         onClick={() => setOpen(o => !o)}
       >
         ⋯
@@ -387,13 +419,25 @@ function OverflowButton(): JSX.Element {
                 </div>
               </div>
             ) : (
-              <button
-                className="popover-item"
-                title="This repository has no origin remote yet — add one to push"
-                onClick={() => setAddingRemote(true)}
-              >
-                Add remote…
-              </button>
+              <>
+                <button
+                  className="popover-item"
+                  title="Create a repository on your account and push this one into it"
+                  onClick={() => {
+                    closeAll()
+                    store.openPublishDialog()
+                  }}
+                >
+                  Publish repository…
+                </button>
+                <button
+                  className="popover-item"
+                  title="This repository has no origin remote yet — point it at an existing URL to push"
+                  onClick={() => setAddingRemote(true)}
+                >
+                  Add remote URL…
+                </button>
+              </>
             )
           ) : null}
           <button

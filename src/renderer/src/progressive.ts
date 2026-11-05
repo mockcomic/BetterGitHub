@@ -7,17 +7,30 @@ import type { PublicSettings, RepositoryStatus } from '../../shared/models'
  * state that could mislead (Git truth, no magic).
  */
 
-export type SyncVerb = 'fetch' | 'pull' | 'push'
+export type SyncVerb = 'fetch' | 'pull' | 'push' | 'sync'
 
 /**
  * The one verb the strip's Sync button should offer, in the order a healthy
- * workflow needs it: catch the remote up first (behind), then land your own
- * work (ahead, or publishing a branch with no upstream), otherwise just
- * look. The caret menu always offers all three, so this picks the verb,
- * never restricts it.
+ * workflow needs it: when the branch has diverged — or a push just bounced
+ * off a moved-ahead remote — offer the compound Pull & Push (`sync`), which
+ * lands the remote first and sends your work in one click; then catch the
+ * remote up (behind), then land your own work (ahead, or publishing a branch
+ * with no upstream), otherwise just look. The caret menu always offers the
+ * raw verbs, so this picks the default, never restricts it.
+ *
+ * `pushNeedsPull` is renderer-side recovery state, not git truth: main sets
+ * it in flight after a push was rejected non-fast-forward, covering the
+ * moment before the next status read can show `behind > 0`. It only ever
+ * *adds* the compound verb — clearing it falls back to the same decision a
+ * fresh status would produce.
  */
-export function syncVerb(status: RepositoryStatus | null): SyncVerb {
+export function syncVerb(
+  status: RepositoryStatus | null,
+  pushNeedsPull = false
+): SyncVerb {
   if (status === null) return 'fetch'
+  if (pushNeedsPull || ((status.behind ?? 0) > 0 && (status.ahead ?? 0) > 0))
+    return 'sync'
   if ((status.behind ?? 0) > 0) return 'pull'
   if ((status.ahead ?? 0) > 0 || status.upstream === undefined) return 'push'
   return 'fetch'

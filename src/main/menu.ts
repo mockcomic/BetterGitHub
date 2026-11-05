@@ -49,6 +49,7 @@ const MENUS: ReadonlyArray<TopMenu> = [
       },
       { label: 'Add local repository…', action: 'add-repository' },
       { label: 'Clone repository…', action: 'clone-repository' },
+      { label: 'New repository…', action: 'new-repository' },
       { separator: true },
       {
         label: 'Preferences',
@@ -124,6 +125,8 @@ const MENUS: ReadonlyArray<TopMenu> = [
       { label: 'Rename branch…', action: 'rename-branch' },
       { label: 'Delete branch…', action: 'delete-branch' },
       { separator: true },
+      { label: 'Publish repository…', action: 'publish-repository' },
+      { separator: true },
       {
         label: 'Fetch',
         accelerator: 'CmdOrCtrl+Shift+F',
@@ -175,6 +178,9 @@ const MENUS: ReadonlyArray<TopMenu> = [
   {
     label: 'Help',
     items: [
+      // Contextual in the renderer: 'ready' phase asks to restart-and-apply,
+      // anything else runs the check (src/renderer/src/store.ts dispatcher).
+      { label: 'Check for updates…', action: 'check-updates' },
       { label: 'About Aspen', action: 'show-about' },
       { separator: true },
       { label: 'Donate via PayPal', action: 'donate' }

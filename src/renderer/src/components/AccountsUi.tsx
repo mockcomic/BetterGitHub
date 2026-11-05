@@ -3,16 +3,24 @@ import { useEffect, useState } from 'react'
 import type {
   AccountInfo,
   AccountProvider,
-  RemoteRepository
+  RemoteRepository,
+  RemoteRepoSort
 } from '../../../shared/models'
+import {
+  appRegistrationUrl,
+  appSetupSteps,
+  oauthInstanceLabel,
+  OAUTH_CALLBACK_URL
+} from '../../../shared/oauth-setup'
 import { call } from '../api'
 import { useStore, useStoreState } from '../store'
 import { relativeTime } from '../time'
 
 /**
  * Shared hosted-account UI: the settings rows, the sign-in panel (browser
- * flows + token fallback), and the clone dialog's account repository pane.
- * Tokens never appear here — only logins, badges, and one-way inputs.
+ * flows, the one-step OAuth-app setup they need, and the token fallback), and
+ * the clone dialog's account repository pane. Tokens never appear here — only
+ * logins, badges, and one-way inputs.
  */
 
 const TOKEN_PAGES: Record<AccountProvider, string> = {
@@ -39,6 +47,24 @@ function instanceLabel(account: AccountInfo): string | null {
   }
 }
 
+/** The account's profile page on the provider's site, when derivable. */
+function profileUrl(account: AccountInfo): string | null {
+  try {
+    const url = new URL(account.apiBase)
+    if (account.provider === 'github') {
+      // The stored apiBase is the REST root; profiles live on the site.
+      if (url.hostname.toLowerCase() === 'api.github.com') {
+        return `https://github.com/${encodeURIComponent(account.login)}`
+      }
+      const root = url.origin + url.pathname.replace(/\/+$/, '').replace(/\/api\/v3$/i, '')
+      return `${root}/${encodeURIComponent(account.login)}`
+    }
+    return `${url.origin}/${encodeURIComponent(account.login)}`
+  } catch {
+    return null
+  }
+}
+
 function initials(name: string): string {
   const cleaned = name.trim()
   if (cleaned.length === 0) return '?'
@@ -46,6 +72,24 @@ function initials(name: string): string {
   const first = parts[0][0]
   const second = parts.length > 1 ? parts[1][0] : ''
   return (first + second).toUpperCase()
+}
+
+/**
+ * The account's real avatar once main has fetched it (as a data: URL —
+ * the CSP never needs a remote image source); the initials circle is the
+ * loading and unavailable state.
+ */
+function AccountAvatar({ account }: { account: AccountInfo }): JSX.Element {
+  const state = useStoreState()
+  const src = state.avatars[account.id]
+  if (typeof src === 'string') {
+    return <img className="account-avatar" src={src} alt="" draggable={false} />
+  }
+  return (
+    <span className="account-avatar" aria-hidden="true">
+      {initials(account.displayName || account.login)}
+    </span>
+  )
 }
 
 /** The signed-accounts rows in Preferences → Accounts. */
@@ -65,11 +109,10 @@ export function AccountList(): JSX.Element {
     <div className="account-list">
       {accounts.map(account => {
         const instance = instanceLabel(account)
+        const profile = profileUrl(account)
         return (
           <div className="account-row" key={account.id}>
-            <span className="account-avatar" aria-hidden="true">
-              {initials(account.displayName || account.login)}
-            </span>
+            <AccountAvatar account={account} />
             <span className="account-who">
               <span className="account-name">
                 {account.displayName || account.login}
@@ -79,6 +122,15 @@ export function AccountList(): JSX.Element {
                 {instance !== null ? ` · ${instance}` : ''}
               </span>
             </span>
+            {profile !== null && (
+              <button
+                className="mini link"
+                title={`Open ${account.login} on ${providerLabel(account)}`}
+                onClick={() => void call('openExternal', profile)}
+              >
+                Profile
+              </button>
+            )}
             <span className="account-chip">{account.authKind === 'pat' ? 'Token' : 'Browser'}</span>
             <button
               className="mini danger"
@@ -95,10 +147,12 @@ export function AccountList(): JSX.Element {
 }
 
 /**
- * Sign-in panel: browser buttons when client ids are configured, and the
- * token form that works everywhere (self-hosted included). Pending browser
- * sign-ins render their waiting state here; polling lives in the store so
- * closing the dialog never strands the flow.
+ * Sign-in panel: the two browser buttons — always clickable, running the real
+ * OAuth flow when an application id is configured and opening the one-step
+ * setup in place when it is not — plus the token form that works everywhere
+ * (self-hosted included). Pending browser sign-ins render their waiting state
+ * here; polling lives in the store so closing the dialog never strands the
+ * flow.
  */
 export function SignInPanel({
   onSuccess
@@ -112,6 +166,7 @@ export function SignInPanel({
   const [instance, setInstance] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [setupFor, setSetupFor] = useState<AccountProvider | null>(null)
 
   const support = state.settings?.accounts
   const challenge = state.signIn
@@ -124,9 +179,28 @@ export function SignInPanel({
     setNotice(null)
   }, [challenge])
 
+  /** Hand the flow to main: authorize page (or device code) + polling. */
+  const runFlow = (which: AccountProvider): void => {
+    // The optional instance line doubles as the enterprise/self-hosted
+    // root for both providers' browser flows.
+    const trimmed = instance.trim()
+    void store.startBrowserSignIn(which, trimmed.length > 0 ? trimmed : undefined)
+  }
+
   const startBrowser = (which: AccountProvider): void => {
     setNotice(null)
-    void store.startBrowserSignIn(which, which === 'gitlab' ? instance : undefined)
+    const configured =
+      support != null &&
+      (which === 'github' ? support.hasGitHubClientId : support.hasGitLabClientId)
+    // No id means the provider has nothing to authorize against yet, so the
+    // click asks for the id here instead of doing nothing: a greyed button
+    // reads as "Aspen can't sign in", which is not the truth.
+    if (!configured) {
+      setSetupFor(which)
+      return
+    }
+    setSetupFor(null)
+    runFlow(which)
   }
 
   const submitToken = (): void => {
@@ -149,32 +223,42 @@ export function SignInPanel({
     <div className="signin-panel">
       {challenge === null ? (
         <>
-          <div className="signin-browser">
-            <button
-              className="btn"
-              disabled={support ? !support.hasGitHubClientId : true}
-              onClick={() => startBrowser('github')}
-              title={
-                support && !support.hasGitHubClientId
-                  ? 'Needs an OAuth App client id (Device Flow enabled) in Browser sign-in apps below — or use a token.'
-                  : 'GitHub device flow: a code, not a password, leaves this machine.'
-              }
-            >
-              Sign in with GitHub
-            </button>
-            <button
-              className="btn"
-              disabled={support ? !support.hasGitLabClientId : true}
-              onClick={() => startBrowser('gitlab')}
-              title={
-                support && !support.hasGitLabClientId
-                  ? 'Needs an application id (redirect http://127.0.0.1:8765/callback) in Browser sign-in apps below — or use a token.'
-                  : 'GitLab OAuth with PKCE; the instance is the URL below when you fill it in.'
-              }
-            >
-              Sign in with GitLab
-            </button>
-          </div>
+          {setupFor === null ? (
+            <div className="signin-browser">
+              <button
+                className="btn"
+                onClick={() => startBrowser('github')}
+                title={
+                  support && !support.hasGitHubClientId
+                    ? 'Signs you in in your browser (GitHub authorization, one-time-code fallback) — needs a free OAuth App id first, which the next step asks for.'
+                    : 'Sign in in your browser (GitHub authorization); falls back to the one-time code if the local port is busy.'
+                }
+              >
+                Sign in with GitHub
+              </button>
+              <button
+                className="btn"
+                onClick={() => startBrowser('gitlab')}
+                title={
+                  support && !support.hasGitLabClientId
+                    ? 'GitLab OAuth with PKCE — needs a free application id first, which the next step asks for.'
+                    : 'GitLab OAuth with PKCE; the instance is the URL below when you fill it in.'
+                }
+              >
+                Sign in with GitLab
+              </button>
+            </div>
+          ) : (
+            <SignInAppSetup
+              provider={setupFor}
+              instance={instance}
+              onCancel={() => setSetupFor(null)}
+              onSaved={() => {
+                setSetupFor(null)
+                runFlow(setupFor)
+              }}
+            />
+          )}
           {error !== null && <p className="signin-error">{error}</p>}
           {notice !== null && <p className="signin-notice">{notice}</p>}
         </>
@@ -243,6 +327,126 @@ export function SignInPanel({
   )
 }
 
+/**
+ * The one-step OAuth-app setup a browser sign-in needs the first time: the
+ * registration page for the server being signed into, the callback URL to
+ * type in (copyable, since a single wrong character silently breaks the
+ * redirect), the two traps, and one paste box. Saving is the same settings
+ * write the Browser-sign-in-apps drawer does, so the id shows up there
+ * afterwards; the caller then starts the browser flow immediately.
+ */
+function SignInAppSetup({
+  provider,
+  instance,
+  onCancel,
+  onSaved
+}: {
+  provider: AccountProvider
+  instance: string
+  onCancel: () => void
+  onSaved: () => void
+}): JSX.Element {
+  const store = useStore()
+  const [id, setId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const save = (): void => {
+    const trimmed = id.trim()
+    if (trimmed.length === 0 || busy) return
+    setBusy(true)
+    setNotice(null)
+    void store
+      .saveSettings({
+        accounts:
+          provider === 'github'
+            ? { githubClientId: trimmed }
+            : { gitlabClientId: trimmed }
+      })
+      .then(saved => {
+        if (saved === null) {
+          setNotice(
+            'Aspen could not store that id. Try again, or sign in with a token below.'
+          )
+          return
+        }
+        onSaved()
+      })
+      .finally(() => setBusy(false))
+  }
+
+  return (
+    <div className="signin-setup">
+      <p className="signin-setup-lede">
+        {provider === 'github' ? 'GitHub' : 'GitLab'} sign-in needs one free OAuth
+        application on <strong>{oauthInstanceLabel(provider, instance)}</strong> —
+        about a minute, once, and Aspen never needs the secret.
+      </p>
+      <div className="signin-setup-callback">
+        <code>{OAUTH_CALLBACK_URL}</code>
+        <button
+          className="mini"
+          title="Copy the callback/redirect URL to type into the registration form"
+          onClick={() =>
+            void call('writeClipboard', OAUTH_CALLBACK_URL).then(() =>
+              setNotice('Callback URL copied.')
+            )
+          }
+        >
+          Copy
+        </button>
+        <button
+          className="mini link"
+          onClick={() =>
+            void call('openExternal', appRegistrationUrl(provider, instance))
+          }
+        >
+          Open the registration page
+        </button>
+      </div>
+      <ol className="signin-setup-steps">
+        {appSetupSteps(provider, instance).map(step => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+      <div className="row">
+        <input
+          className="signin-setup-id"
+          placeholder={provider === 'github' ? 'Iv23li…' : 'app id…'}
+          aria-label={
+            provider === 'github'
+              ? 'GitHub OAuth App client id'
+              : 'GitLab application id'
+          }
+          value={id}
+          onChange={e => setId(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') save()
+          }}
+        />
+        <button
+          className="btn primary"
+          disabled={busy || id.trim().length === 0}
+          onClick={save}
+        >
+          {busy ? 'Saving…' : 'Save & sign in'}
+        </button>
+        <button className="mini" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      <span className="field-hint">
+        One id per provider: the optional instance field below picks the server
+        this sign-in runs against, so a GitHub Enterprise or self-hosted GitLab
+        server needs an application registered there (paste it here when you
+        have one — it replaces the stored id). A personal access token needs
+        none of this.
+      </span>
+      {notice !== null && <p className="signin-notice">{notice}</p>}
+    </div>
+  )
+}
+
 function BrowserSignInProgress({
   onCopy
 }: {
@@ -252,38 +456,60 @@ function BrowserSignInProgress({
   const store = useStore()
   const challenge = state.signIn
   if (challenge === null) return <></>
-  const url =
-    challenge.kind === 'github-device' ? challenge.verificationUrl : challenge.authorizeUrl
+  if (challenge.kind === 'github-device') {
+    return (
+      <div className="signin-progress">
+        <p className="signin-progress-line">
+          Enter this code at{' '}
+          <button
+            className="mini link"
+            onClick={() => void call('openExternal', challenge.verificationUrl)}
+          >
+            github.com/login/device
+          </button>
+          :
+        </p>
+        <div className="signin-code-row">
+          <code className="signin-code">{challenge.userCode}</code>
+          <button className="mini" onClick={() => void onCopy(challenge.userCode)}>
+            Copy
+          </button>
+        </div>
+        <p className="signin-waiting">
+          <span className="spinner" /> Waiting for you to approve the request…
+        </p>
+        <p>
+          <button className="mini" onClick={() => store.cancelBrowserSignIn()}>
+            Cancel sign-in
+          </button>
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="signin-progress">
-      {challenge.kind === 'github-device' ? (
-        <>
-          <p className="signin-progress-line">
-            Enter this code at{' '}
-            <button className="mini link" onClick={() => void call('openExternal', url)}>
-              github.com/login/device
-            </button>
-            :
-          </p>
-          <div className="signin-code-row">
-            <code className="signin-code">{challenge.userCode}</code>
-            <button className="mini" onClick={() => void onCopy(challenge.userCode)}>
-              Copy
-            </button>
-          </div>
-        </>
-      ) : (
-        <p className="signin-progress-line">
-          <button className="mini link" onClick={() => void call('openExternal', url)}>
-            Continue in your browser
-          </button>{' '}
-          — Aspen is listening on 127.0.0.1 for the redirect.
-        </p>
-      )}
+      <p className="signin-progress-line">
+        <button
+          className="mini link"
+          onClick={() => void call('openExternal', challenge.authorizeUrl)}
+        >
+          Continue in your browser
+        </button>{' '}
+        — Aspen is listening on 127.0.0.1 for the redirect.
+      </p>
       <p className="signin-waiting">
         <span className="spinner" /> Waiting for you to approve the request…
       </p>
-      <p>
+      <p className="signin-progress-alt">
+        {challenge.kind === 'github-browser' && (
+          <button
+            className="mini"
+            title="Use GitHub's device-code flow instead (no local callback port needed)"
+            onClick={() => void store.startBrowserSignIn('github', undefined, 'device')}
+          >
+            Use the one-time code instead
+          </button>
+        )}{' '}
         <button className="mini" onClick={() => store.cancelBrowserSignIn()}>
           Cancel sign-in
         </button>
@@ -307,11 +533,21 @@ export const EMPTY_PANE: RepoPaneState = {
   error: null
 }
 
+type VisibilityFilter = 'all' | 'public' | 'private'
+
+const SORT_LABELS: ReadonlyArray<{ value: RemoteRepoSort; label: string }> = [
+  { value: 'pushed', label: 'Most recent activity' },
+  { value: 'created', label: 'Recently created' },
+  { value: 'name', label: 'Name A–Z' }
+]
+
 export function RemoteRepoPane({
   account,
   pane,
   search,
   onSearch,
+  sort,
+  onSort,
   onRefresh,
   onLoadMore,
   onPick,
@@ -321,33 +557,66 @@ export function RemoteRepoPane({
   pane: RepoPaneState
   search: string
   onSearch: (value: string) => void
+  sort: RemoteRepoSort
+  onSort: (value: RemoteRepoSort) => void
   onRefresh: () => void
   onLoadMore: () => void
   onPick: (repo: RemoteRepository) => void
   pickedCloneUrl: string
 }): JSX.Element {
+  const [visibility, setVisibility] = useState<VisibilityFilter>('all')
   const needle = search.trim().toLowerCase()
-  // The provider searches server-side where it can (GitLab); GitHub pages
-  // are filtered here so typing feels instant and never hits the Search
-  // API's separate rate limit.
-  const visible =
-    needle.length === 0
-      ? pane.items
-      : pane.items.filter(
-          r =>
-            r.fullName.toLowerCase().includes(needle) ||
-            (r.description ?? '').toLowerCase().includes(needle)
-        )
+  // Search is applied provider-side for both hosts (GitHub via the Search
+  // API, GitLab via ?search=); this re-filter is instant and free — it also
+  // covers description matches and partial keystrokes mid-debounce.
+  const visible = pane.items.filter(r => {
+    if (visibility === 'public' && r.isPrivate) return false
+    if (visibility === 'private' && !r.isPrivate) return false
+    return (
+      needle.length === 0 ||
+      r.fullName.toLowerCase().includes(needle) ||
+      (r.description ?? '').toLowerCase().includes(needle)
+    )
+  })
 
   return (
     <div className="remote-pane">
       <div className="remote-toolbar">
         <input
           className="remote-search"
-          placeholder={`Filter ${providerLabel(account)} repositories`}
+          placeholder={`Search ${providerLabel(account)} repositories`}
           value={search}
           onChange={e => onSearch(e.target.value)}
         />
+        <span className="repo-filter-chips" role="group" aria-label="Filter by visibility">
+          {(['all', 'public', 'private'] as const).map(value => (
+            <button
+              key={value}
+              className={`chip-toggle${visibility === value ? ' active' : ''}`}
+              onClick={() => setVisibility(value)}
+            >
+              {value === 'all' ? 'All' : value === 'public' ? 'Public' : 'Private'}
+            </button>
+          ))}
+        </span>
+        {account.provider === 'github' && (
+          <select
+            className="remote-sort"
+            value={sort}
+            onChange={e => {
+              const next = e.target.value
+              if (next === 'pushed' || next === 'created' || next === 'name') onSort(next)
+            }}
+            aria-label="Sort repositories"
+            title="Order the provider-side listing"
+          >
+            {SORT_LABELS.map(entry => (
+              <option key={entry.value} value={entry.value}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           className="btn"
           disabled={pane.loading}
@@ -360,9 +629,15 @@ export function RemoteRepoPane({
       {pane.error !== null && <p className="remote-error">{pane.error}</p>}
       {pane.items.length === 0 && !pane.loading && pane.error === null && (
         <p className="remote-empty">
-          No repositories visible for @{account.login}. Fetch the first page with{' '}
-          <strong>Refresh</strong>, or sign in with a token that has read access to all of
-          your repositories.
+          {needle.length > 0 ? (
+            <>No repositories matching “{search.trim()}” for @{account.login}.</>
+          ) : (
+            <>
+              No repositories visible for @{account.login}. Fetch the first page with{' '}
+              <strong>Refresh</strong>, or sign in with a token that has read access to all of
+              your repositories.
+            </>
+          )}
         </p>
       )}
       <div className="remote-list" role="listbox" aria-label="Repositories">

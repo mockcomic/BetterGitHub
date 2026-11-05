@@ -41,3 +41,46 @@ export async function gitlabRefreshToken(
     return null
   }
 }
+
+/**
+ * Exchange a GitHub OAuth refresh token for a fresh access token. Only
+ * relevant for apps with expiring authorizations enabled — a plain GitHub
+ * OAuth token never expires, so most credentials have nothing to refresh.
+ * Same failure contract as {@link gitlabRefreshToken}: null keeps the old
+ * token and lets the provider's 401 explain.
+ */
+export async function githubRefreshToken(
+  siteRoot: string,
+  clientId: string,
+  credential: AccountCredential
+): Promise<AccountCredential | null> {
+  if (clientId.length === 0 || credential.refreshToken === null) return null
+  try {
+    const res = await apiFetch(`${siteRoot}/login/oauth/access_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json'
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        refresh_token: credential.refreshToken
+      }).toString()
+    })
+    if (!res.ok) return null
+    const token = str(res.json.access_token)
+    if (token === null) return null
+    const expiresIn =
+      typeof res.json.expires_in === 'number' && res.json.expires_in > 0
+        ? res.json.expires_in
+        : null
+    return {
+      token,
+      refreshToken: str(res.json.refresh_token) ?? credential.refreshToken,
+      expiresAt: expiresIn === null ? credential.expiresAt : Date.now() + expiresIn * 1000
+    }
+  } catch {
+    return null
+  }
+}

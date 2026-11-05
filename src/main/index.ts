@@ -10,6 +10,7 @@ import { initRepoScan, scheduleScan, stopRepoScan } from './repo-scan'
 import { terminalManager } from './terminal'
 import { configureGitBroker } from './git/sandbox'
 import { migrateFromGitDesk } from './migrate'
+import { initUpdates } from './updates'
 
 if (process.env['ELECTRON_RENDERER_URL'] !== undefined) {
   app.setPath('userData', join(process.cwd(), '.userdata-dev'))
@@ -65,6 +66,11 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc()
     buildAppMenu()
     const mainWindow = createMainWindow(process.env['ELECTRON_RENDERER_URL'])
+
+    // GitHub Releases self-update (src/main/updates.ts): wires the win32
+    // NSIS updater and schedules the silent startup check once the window
+    // is up. Manual "Check for updates…" works regardless.
+    initUpdates()
 
     // Repository watch folder (src/main/repo-scan.ts): reconcile once on
     // startup, then on every focus — a clone done outside the app shows up

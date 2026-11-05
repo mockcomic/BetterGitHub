@@ -1,11 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { RequestResponseChannel } from '../shared/ipc'
+import type { UpdateState } from '../shared/updates'
 import {
   MENU_ACTION_CHANNEL,
   REPO_CHANGED_CHANNEL,
   REPOS_CHANGED_CHANNEL,
   TERMINAL_EXIT_CHANNEL,
   TERMINAL_OUTPUT_CHANNEL,
+  UPDATE_STATE_CHANNEL,
   type MenuAction
 } from '../shared/ipc'
 import type { RepoScanOutcome } from '../shared/models'
@@ -86,6 +88,18 @@ const api = {
     ipcRenderer.on(TERMINAL_EXIT_CHANNEL, listener)
     return () => {
       ipcRenderer.removeListener(TERMINAL_EXIT_CHANNEL, listener)
+    }
+  },
+  /**
+   * Main pushes the self-update flow's state on every phase change
+   * (checking → available → downloading → ready, or error/up-to-date).
+   */
+  onUpdateState: (callback: (state: UpdateState) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: UpdateState) =>
+      callback(state)
+    ipcRenderer.on(UPDATE_STATE_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, listener)
     }
   }
 }

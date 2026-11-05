@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildGitHubCreateRepoBody,
+  buildGitHubOwners,
+  buildGitHubSearchQuery,
+  githubListSortParams,
   githubRepoHost,
   githubSiteRoot,
   mapGitHubIdentity,
   mapGitHubRepo,
   mapGitHubRepoPage,
+  mapGitHubSearchPage,
   normalizeGitHubApiBase
 } from '../src/main/providers/github'
 import {
+  buildGitLabCreateRepoBody,
+  gitLabNamespaceIdFor,
   mapGitLabIdentity,
+  mapGitLabOwners,
   mapGitLabProject,
   mapGitLabRepoPage,
   normalizeGitLabApiBase
@@ -238,5 +246,185 @@ describe('mapGitLabRepoPage', () => {
       mapGitLabRepoPage(one, 'a', new Headers({ 'x-next-page': '' })).nextCursor
     ).toBeNull()
     expect(mapGitLabRepoPage({}, 'a', new Headers()).items).toEqual([])
+  })
+})
+
+describe('githubListSortParams', () => {
+  it('maps each sort choice to GitHub parameters', () => {
+    expect(githubListSortParams('pushed')).toBe('&sort=pushed&direction=desc')
+    expect(githubListSortParams('created')).toBe('&sort=created&direction=desc')
+    expect(githubListSortParams('name')).toBe('&sort=full-name&direction=asc')
+    expect(githubListSortParams(undefined)).toBe('')
+  })
+})
+
+describe('buildGitHubSearchQuery', () => {
+  it('scopes to the user plus seen orgs and includes forks', () => {
+    expect(buildGitHubSearchQuery('octo', ['github', 'octocat'], 'aspen git')).toBe(
+      'aspen git org:github org:octocat user:octo fork:true'
+    )
+  })
+
+  it('drops the login from the org list and caps orgs at five', () => {
+    const many = ['octo', 'a', 'b', 'c', 'd', 'e', 'f']
+    expect(buildGitHubSearchQuery('octo', many, 'x')).toBe(
+      'x org:a org:b org:c org:d org:e user:octo fork:true'
+    )
+  })
+
+  it('neutralizes query-syntax characters in the pasted text', () => {
+    expect(buildGitHubSearchQuery('octo', [], '"quoted" -minus normal')).toBe(
+      'quoted minus normal user:octo fork:true'
+    )
+  })
+})
+
+describe('mapGitHubSearchPage', () => {
+  const body = {
+    total_count: 2,
+    items: [
+      { full_name: 'a/one', clone_url: 'https://github.com/a/one.git' },
+      { full_name: 'a/two', clone_url: 'https://github.com/a/two.git' }
+    ]
+  }
+
+  it('maps the items array with the same full-page cursor rule', () => {
+    const page = mapGitHubSearchPage(body, 'acct', 1, 2)
+    expect(page.items).toHaveLength(2)
+    expect(page.nextCursor).toBe('2')
+    expect(mapGitHubSearchPage(body, 'acct', 1, 50).nextCursor).toBeNull()
+  })
+
+  it('survives bodies without an items array', () => {
+    expect(mapGitHubSearchPage({ message: 'sad' }, 'acct', 1, 10).items).toEqual([])
+    expect(mapGitHubSearchPage([1, 2], 'acct', 1, 10).items).toEqual([])
+  })
+})
+
+describe('buildGitHubCreateRepoBody', () => {
+  it('creates under the user when the owner is the account itself', () => {
+    expect(
+      buildGitHubCreateRepoBody('octo', {
+        owner: 'octo',
+        name: 'aspen',
+        description: 'A git client',
+        isPrivate: false
+      })
+    ).toEqual({ name: 'aspen', description: 'A git client', private: false })
+  })
+
+  it('matches logins case-insensitively and adds organization otherwise', () => {
+    expect(
+      buildGitHubCreateRepoBody('Octo', {
+        owner: 'OCTO-CORP',
+        name: 'aspen',
+        description: '',
+        isPrivate: true
+      })
+    ).toEqual({
+      name: 'aspen',
+      description: '',
+      private: true,
+      organization: 'OCTO-CORP'
+    })
+  })
+})
+
+describe('buildGitHubOwners', () => {
+  it('leads with the account and maps the org list behind it', () => {
+    expect(
+      buildGitHubOwners('octo', [
+        { login: 'octo-corp' },
+        { login: 'aspen-org' },
+        { id: 3 }
+      ])
+    ).toEqual([
+      { name: 'octo', displayName: 'octo', kind: 'user' },
+      { name: 'octo-corp', displayName: 'octo-corp', kind: 'organization' },
+      { name: 'aspen-org', displayName: 'aspen-org', kind: 'organization' }
+    ])
+  })
+
+  it('never lists the account twice and survives junk bodies', () => {
+    expect(buildGitHubOwners('octo', [{ login: 'octo' }, null, 'x'])).toEqual([
+      { name: 'octo', displayName: 'octo', kind: 'user' }
+    ])
+    expect(buildGitHubOwners('octo', {})).toEqual([
+      { name: 'octo', displayName: 'octo', kind: 'user' }
+    ])
+  })
+})
+
+describe('mapGitLabOwners', () => {
+  it('maps namespaces with full_path, kind and name fallback', () => {
+    expect(
+      mapGitLabOwners([
+        { id: 1, name: 'Git User', path: 'gituser', full_path: 'gituser', kind: 'user' },
+        { id: 2, name: 'Eng', path: 'eng', full_path: 'corp/eng', kind: 'group' },
+        { id: 3, path: 'bare', kind: 'group' },
+        { id: 4 }
+      ])
+    ).toEqual([
+      { name: 'gituser', displayName: 'Git User', kind: 'user' },
+      { name: 'corp/eng', displayName: 'Eng', kind: 'group' },
+      { name: 'bare', displayName: 'bare', kind: 'group' }
+    ])
+  })
+
+  it('returns nothing for bodies that are not arrays', () => {
+    expect(mapGitLabOwners({ message: 'sad' })).toEqual([])
+  })
+})
+
+describe('gitLabNamespaceIdFor', () => {
+  const body = [
+    { id: 1, path: 'gituser', full_path: 'gituser', kind: 'user' },
+    { id: 2, path: 'eng', full_path: 'corp/eng', kind: 'group' }
+  ]
+
+  it('returns null when the owner is the account (GitLab defaults to it)', () => {
+    expect(gitLabNamespaceIdFor('gituser', body, 'gituser')).toBeNull()
+    expect(gitLabNamespaceIdFor('gituser', body, 'GitUser')).toBeNull()
+    expect(gitLabNamespaceIdFor('gituser', body, '  ')).toBeNull()
+  })
+
+  it('resolves group paths case-insensitively', () => {
+    expect(gitLabNamespaceIdFor('gituser', body, 'CORP/Eng')).toBe(2)
+  })
+
+  it('answers null for an owner the token cannot create into', () => {
+    expect(gitLabNamespaceIdFor('gituser', body, 'someone-else')).toBeNull()
+    expect(gitLabNamespaceIdFor('gituser', 'junk', 'corp/eng')).toBeNull()
+  })
+})
+
+describe('buildGitLabCreateRepoBody', () => {
+  it('promises the strictest visibility for a private toggle', () => {
+    expect(
+      buildGitLabCreateRepoBody(
+        { owner: 'gituser', name: 'aspen', description: '', isPrivate: true },
+        null
+      )
+    ).toEqual({ name: 'aspen', description: '', visibility: 'private' })
+    expect(
+      buildGitLabCreateRepoBody(
+        { owner: 'gituser', name: 'aspen', description: 'hi', isPrivate: false },
+        null
+      )
+    ).toEqual({ name: 'aspen', description: 'hi', visibility: 'public' })
+  })
+
+  it('targets the resolved namespace when one was needed', () => {
+    expect(
+      buildGitLabCreateRepoBody(
+        { owner: 'corp/eng', name: 'aspen', description: '', isPrivate: false },
+        42
+      )
+    ).toEqual({
+      name: 'aspen',
+      description: '',
+      visibility: 'public',
+      namespace_id: 42
+    })
   })
 })

@@ -138,6 +138,9 @@ export interface StashEntry {
   readonly label: string
   /** The stash subject, e.g. `On main: my changes`. */
   readonly message: string
+  /** The stash commit-message body (paragraphs after the subject); empty
+   *  when the stash carries only a subject — every pre-existing stash. */
+  readonly description: string
   /** ISO 8601 commit date of the stash commit. */
   readonly date: string
   /** Branch the stash was created on. */
@@ -325,9 +328,10 @@ export interface PublicSettings {
     readonly hasApiKey: boolean
   }
   /**
-   * Whether browser sign-in can be offered per provider. Device flow and
-   * OAuth PKCE need an app client id (see providers/config.ts); without one
-   * the UI offers token sign-in only.
+   * Whether browser sign-in can start immediately per provider. Device flow
+   * and OAuth PKCE need an app client id (see providers/config.ts); without
+   * one the buttons still work — they open the sign-in panel's one-step
+   * setup that asks for the id — and token sign-in is always offered.
    */
   readonly accounts: {
     readonly hasGitHubClientId: boolean
@@ -336,6 +340,13 @@ export interface PublicSettings {
   readonly confirmOverrideWithGeneratedMessage: boolean
   readonly autoRefresh: boolean
   readonly theme: ThemeId
+  /**
+   * Silent GitHub Releases check a few seconds after launch (packaged runs
+   * only). The Help → "Check for updates…" item works regardless; this
+   * switch only governs the automatic pass — and with it, the background
+   * download of a found update on self-updating builds.
+   */
+  readonly autoUpdateChecks: boolean
   /**
    * Folder whose direct child git repos Aspen keeps its list in step with
    * (see src/main/repo-scan.ts). '' = watching is off.
@@ -367,6 +378,7 @@ export interface SettingsPatch {
   readonly confirmOverrideWithGeneratedMessage?: boolean
   readonly autoRefresh?: boolean
   readonly theme?: ThemeId
+  readonly autoUpdateChecks?: boolean
   /** undefined = leave unchanged, '' = stop watching a folder. */
   readonly scanFolder?: string
   readonly hintsEnabled?: boolean
@@ -415,11 +427,40 @@ export interface RemoteRepoPage {
   readonly nextCursor: string | null
 }
 
+/**
+ * A place an account can create a repository: the account itself, plus the
+ * organizations (GitHub) or groups (GitLab) its token can publish into.
+ * `name` is the path segment the create API takes; `displayName` is what the
+ * picker shows.
+ */
+export interface ProviderOwner {
+  readonly name: string
+  readonly displayName: string
+  readonly kind: 'user' | 'organization' | 'group'
+}
+
+/** Payload for creating a hosted repository (create / publish flows). */
+export interface CreateRepoRequest {
+  /** Owner path segment: an account login, an org, or a group path. */
+  readonly owner: string
+  readonly name: string
+  /** '' is a real choice — the dialog's empty description field. */
+  readonly description: string
+  readonly isPrivate: boolean
+}
+
+export type RemoteRepoSort = 'pushed' | 'created' | 'name'
+
 export interface RemoteRepoQuery {
-  /** Provider-side text filter where supported; always re-filtered client-side. */
+  /**
+   * Provider-side text filter where supported (GitHub Search API, GitLab
+   * `?search=`); always re-filtered client-side as well.
+   */
   readonly search?: string
   readonly cursor?: string | null
   readonly perPage?: number
+  /** Server-side ordering where the provider supports one. */
+  readonly sort?: RemoteRepoSort
 }
 
 /** Kick-off data for a browser sign-in; the renderer decides when to open it. */
@@ -435,10 +476,29 @@ export type SignInChallenge =
       readonly intervalMs: number
     }
   | {
+      /** GitHub authorization-code + PKCE (public client, loopback redirect). */
+      readonly kind: 'github-browser'
+      readonly requestId: string
+      readonly authorizeUrl: string
+    }
+  | {
       readonly kind: 'gitlab-browser'
       readonly requestId: string
       readonly authorizeUrl: string
     }
+
+/**
+ * Outcome of re-validating every stored account's token against the
+ * provider (run at boot): `accounts` is the refreshed list and `signedOut`
+ * names the accounts whose token no longer works and were removed.
+ */
+export interface AccountSyncReport {
+  readonly accounts: AccountInfo[]
+  readonly signedOut: ReadonlyArray<{
+    readonly login: string
+    readonly provider: AccountProvider
+  }>
+}
 
 /** Result of polling a pending sign-in. */
 export type SignInStatus =
@@ -449,16 +509,31 @@ export type SignInStatus =
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: string }
 
 /** The media families the diff pane can preview natively. */
-export type PreviewKind = 'image' | 'video' | 'audio'
+export type PreviewKind = 'image' | 'video' | 'audio' | 'model'
+
+/**
+ * One file a 3D model references — a .gltf buffer or image, a .mtl, the
+ * textures a .mtl maps — read from the same place as the model itself.
+ */
+export interface PreviewResource {
+  /** Repository-relative path, the key the viewer matches loader URLs against. */
+  readonly path: string
+  readonly byteLength: number
+  readonly data: ArrayBuffer
+}
 
 /**
  * A media file's bytes for the diff pane's preview: from the working tree,
  * or from a commit's tree when fetched with a sha. `data` is absent when the
  * file exceeds the preview size limit — the pane says so instead of hanging.
+ * Models also carry their sidecars, since a bare .gltf/.obj is usually an
+ * empty shell; `resourcesTruncated` marks a set stopped by a cap.
  */
 export interface FilePreview {
   readonly kind: PreviewKind
   readonly mime: string
   readonly byteLength: number
   readonly data?: ArrayBuffer
+  readonly resources?: ReadonlyArray<PreviewResource>
+  readonly resourcesTruncated?: boolean
 }

@@ -1,4 +1,10 @@
-import type { AccountAuthKind, RemoteRepoPage, RemoteRepository } from '../../shared/models'
+import type {
+  AccountAuthKind,
+  CreateRepoRequest,
+  ProviderOwner,
+  RemoteRepoPage,
+  RemoteRepository
+} from '../../shared/models'
 import {
   apiFetch,
   providerErrorMessage,
@@ -97,6 +103,69 @@ function fail(res: ApiResponse): never {
   throw new ProviderHttpError(res.status, providerErrorMessage('GitLab', res))
 }
 
+/**
+ * Map a GET /api/v4/namespaces array (the user namespace + the groups the
+ * user can create projects in) to owner entries. `full_path` carries the
+ * group path; plain `path` is the fallback for older instances.
+ */
+export function mapGitLabOwners(body: unknown): ProviderOwner[] {
+  const owners: ProviderOwner[] = []
+  if (!Array.isArray(body)) return owners
+  for (const value of body) {
+    if (value === null || typeof value !== 'object') continue
+    const json = value as Record<string, unknown>
+    const path = str(json.full_path) ?? str(json.path)
+    if (path === null) continue
+    const kind = json.kind === 'group' ? 'group' : 'user'
+    owners.push({ name: path, displayName: str(json.name) ?? path, kind })
+  }
+  return owners
+}
+
+/**
+ * The namespace id a create request must target for `owner`, read from a
+ * GET /api/v4/namespaces body; null when the owner is the account itself
+ * (GitLab then defaults to the user's own namespace). A non-null request
+ * whose owner is not in the body resolves to null too — the caller turns
+ * that into the "you cannot create here" error.
+ */
+export function gitLabNamespaceIdFor(
+  login: string,
+  body: unknown,
+  owner: string
+): number | null {
+  const wanted = owner.trim().toLowerCase()
+  if (wanted.length === 0 || wanted === login.toLowerCase()) return null
+  if (!Array.isArray(body)) return null
+  for (const value of body) {
+    if (value === null || typeof value !== 'object') continue
+    const json = value as Record<string, unknown>
+    const path = str(json.full_path) ?? str(json.path)
+    if (path === null || path.toLowerCase() !== wanted) continue
+    return typeof json.id === 'number' ? json.id : null
+  }
+  return null
+}
+
+/**
+ * The POST /api/v4/projects body. Private maps to GitLab's strictest
+ * `private` visibility (an `internal` project is signed-in-visible, which is
+ * more public than the dialog's toggle promises). A `namespace_id` moves
+ * the project out of the user's own space; omitting it creates under the
+ * authenticated user.
+ */
+export function buildGitLabCreateRepoBody(
+  request: CreateRepoRequest,
+  namespaceId: number | null
+): Record<string, unknown> {
+  return {
+    name: request.name,
+    description: request.description,
+    visibility: request.isPrivate ? 'private' : 'public',
+    ...(namespaceId !== null ? { namespace_id: namespaceId } : {})
+  }
+}
+
 export const gitlabClient: ProviderClient = {
   async validate(apiBase, token, authKind) {
     const res = await apiFetch(`${apiBase}/api/v4/user`, {
@@ -127,5 +196,46 @@ export const gitlabClient: ProviderClient = {
     )
     if (!res.ok) fail(res)
     return mapGitLabRepoPage(res.json, account.id, res.headers)
+  },
+
+  async listOwners(apiBase, account, token, authKind) {
+    const res = await apiFetch(`${apiBase}/api/v4/namespaces`, {
+      headers: authHeaders(token, authKind)
+    })
+    if (!res.ok) fail(res)
+    return mapGitLabOwners(res.json)
+  },
+
+  async createRepo(apiBase, account, token, authKind, request) {
+    // A non-default owner must resolve to a namespace id the instance will
+    // accept; /namespaces is exactly what this token may create into.
+    let namespaceId: number | null = null
+    const owner = request.owner.trim()
+    if (owner.length > 0 && owner.toLowerCase() !== account.login.toLowerCase()) {
+      const nsRes = await apiFetch(`${apiBase}/api/v4/namespaces`, {
+        headers: authHeaders(token, authKind)
+      })
+      if (!nsRes.ok) fail(nsRes)
+      namespaceId = gitLabNamespaceIdFor(account.login, nsRes.json, owner)
+      if (namespaceId === null) {
+        throw new Error(
+          `GitLab will not let ${account.login} create a repository in ${owner} — pick another owner, or an account that is a member of that group.`
+        )
+      }
+    }
+    const res = await apiFetch(`${apiBase}/api/v4/projects`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token, authKind),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(buildGitLabCreateRepoBody(request, namespaceId))
+    })
+    if (!res.ok) fail(res)
+    const created = mapGitLabProject(res.json, account.id)
+    if (created === null) {
+      throw new Error('GitLab created the project but returned an unreadable record.')
+    }
+    return created
   }
 }

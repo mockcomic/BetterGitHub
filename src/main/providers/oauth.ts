@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, createHash } from 'crypto'
+import { randomUUID } from 'crypto'
 import { createServer, type Server } from 'http'
 import type {
   AccountProvider,
@@ -14,21 +14,34 @@ import {
 } from './github'
 import { gitlabClient } from './gitlab'
 import { apiFetch, providerErrorMessage, str, type ApiResponse } from './http'
-import { GITLAB_REDIRECT_PORT, GITLAB_REDIRECT_URI } from './config'
+import { OAUTH_REDIRECT_PORT, OAUTH_REDIRECT_URI } from './config'
+import {
+  githubAuthorizeUrl,
+  gitlabAuthorizeUrl,
+  parseCallbackParams,
+  pkceMaterial
+} from './oauth-urls'
 
 /**
  * Browser sign-in flows, kept entirely in main so tokens never touch the
  * renderer:
  *
- * - **GitHub** uses the OAuth **device flow**: main fetches a device code,
- *   the user types the short code at github.com/login/device, main polls
- *   until GitHub says yes. No localhost port, works with proxies, and the
- *   client id is public by design.
- * - **GitLab** uses **authorization-code + PKCE** against the instance the
- *   user signs into: main opens the authorize URL and catches the redirect
- *   on a one-shot 127.0.0.1 server (the fixed port must match the
- *   registered application's redirect URI), then exchanges the code with
- *   the verifier. PKCE keeps the exchange secret-free (public client).
+ * - **GitHub web (default)**: OAuth **authorization code + PKCE** (public
+ *   client — no client secret). Main opens the authorize URL and catches the
+ *   redirect on the shared loopback server, then exchanges the code with the
+ *   verifier. Works against github.com and GitHub Enterprise roots alike.
+ * - **GitHub device (fallback)**: the `gh` / GitHub Desktop dance — main
+ *   fetches a device code, the user types the short code at
+ *   github.com/login/device, main polls until GitHub says yes. Used when the
+ *   loopback port is busy or the user picks it explicitly.
+ * - **GitLab**: the same authorization-code + PKCE shape against the
+ *   instance the user signs into.
+ *
+ * Both web flows share **one** 127.0.0.1 callback server (fixed port, see
+ * config.ts): the redirect URI is identical for GitHub and GitLab, and the
+ * handler dispatches purely on the unguessable `state` parameter — so a
+ * GitHub and a GitLab sign-in can be pending at the same time without the
+ * second one failing to bind the port.
  *
  * Every challenge is in-memory, single per provider, and dies on expiry,
  * cancel, or the next beginSignIn.
@@ -45,35 +58,109 @@ interface PendingSignIn {
   deviceCode?: string
   intervalMs: number
   nextPollAt: number
-  /** gitlab PKCE */
+  /** github/gitlab authorization-code + PKCE */
   verifier?: string
   state?: string
   code?: string
   denied?: string
-  server?: Server
 }
 
 const pending = new Map<string, PendingSignIn>()
 
-function base64url(buf: Buffer): string {
-  return buf
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
+/** Live web challenges indexed by their CSRF state token. */
+const byState = new Map<string, PendingSignIn>()
+
+let callbackServer: Server | null = null
+let callbackStarting: Promise<void> | null = null
 
 function sweepExpired(): void {
   const now = Date.now()
-  for (const entry of pending.values()) {
+  for (const entry of [...pending.values()]) {
     if (entry.expiresAt <= now) closeEntry(entry)
   }
 }
 
 function closeEntry(entry: PendingSignIn): void {
-  entry.server?.close()
-  entry.server = undefined
   pending.delete(entry.requestId)
+  if (entry.state !== undefined) byState.delete(entry.state)
+  pruneCallbackServer()
+}
+
+function webChallengesLive(): boolean {
+  for (const entry of pending.values()) {
+    if (entry.state !== undefined) return true
+  }
+  return false
+}
+
+/** Once no web challenge can still receive a redirect, release the port. */
+function pruneCallbackServer(): void {
+  if (callbackServer !== null && !webChallengesLive() && callbackStarting === null) {
+    callbackServer.close()
+    callbackServer = null
+  }
+}
+
+function callbackPage(title: string, message: string): string {
+  return `<!doctype html><meta charset="utf-8"><title>Aspen — ${title}</title>` +
+    `<body style="font:14px -apple-system,'Segoe UI',sans-serif;padding:40px;">` +
+    `<h2>${title}</h2><p>${message}</p>`
+}
+
+function providerName(provider: AccountProvider): string {
+  return provider === 'github' ? 'GitHub' : 'GitLab'
+}
+
+/**
+ * Start (once) the shared loopback callback server. The handler is fully
+ * provider-agnostic: it only trusts the `state` parameter, which was
+ * generated per challenge and is matched against the live web challenges.
+ */
+function ensureCallbackServer(): Promise<void> {
+  if (callbackServer !== null && callbackServer.listening) return Promise.resolve()
+  if (callbackStarting !== null) return callbackStarting
+  callbackStarting = new Promise<void>((resolve, reject) => {
+    const server = createServer((req, res) => {
+      const params = parseCallbackParams(req.url ?? '/')
+      if (!new URL(req.url ?? '/', 'http://127.0.0.1').pathname.endsWith('/callback')) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('Not found')
+        return
+      }
+      const entry = params.state === null ? undefined : byState.get(params.state)
+      if (params.error !== null) {
+        const message = params.errorDescription ?? params.error
+        if (entry !== undefined) entry.denied = message
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(callbackPage('Sign-in failed', `Aspen was denied access (${message}). Close this tab and try again.`))
+        return
+      }
+      if (entry === undefined || params.code === null) {
+        if (entry !== undefined) entry.denied = 'The sign-in callback did not match this request.'
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(callbackPage('Sign-in failed', 'The callback did not match Aspen. Close this tab and try again.'))
+        return
+      }
+      entry.code = params.code
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end(callbackPage('Signed in', `Aspen received your ${providerName(entry.provider)} authorization. You can close this tab and return to Aspen.`))
+    })
+    server.once('error', err => {
+      callbackStarting = null
+      reject(
+        new Error(
+          `Could not listen on 127.0.0.1:${OAUTH_REDIRECT_PORT} for the browser sign-in redirect (${err.message}). ` +
+          `Close whatever holds the port, use the code sign-in, or sign in with a token instead.`
+        )
+      )
+    })
+    server.listen(OAUTH_REDIRECT_PORT, '127.0.0.1', () => {
+      callbackServer = server
+      callbackStarting = null
+      resolve()
+    })
+  })
+  return callbackStarting
 }
 
 async function formPost(url: string, fields: Record<string, string>): Promise<ApiResponse> {
@@ -136,52 +223,38 @@ async function beginGitHubDevice(
   }
 }
 
-function callbackPage(title: string, message: string): string {
-  return `<!doctype html><meta charset="utf-8"><title>Aspen — ${title}</title>` +
-    `<body style="font:14px -apple-system,'Segoe UI',sans-serif;padding:40px;">` +
-    `<h2>${title}</h2><p>${message}</p>`
-}
-
-function startGitLabCallbackServer(entry: PendingSignIn): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const server = createServer((req, res) => {
-      const url = new URL(req.url ?? '/', `http://127.0.0.1:${GITLAB_REDIRECT_PORT}`)
-      if (url.pathname !== '/callback') {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
-        res.end('Not found')
-        return
-      }
-      const error = url.searchParams.get('error')
-      const state = url.searchParams.get('state')
-      const code = url.searchParams.get('code')
-      if (error !== null) {
-        entry.denied = url.searchParams.get('error_description') ?? error
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end(callbackPage('Sign-in failed', 'Aspen was denied access. Close this tab and try again.'))
-        return
-      }
-      if (state !== entry.state || code === null) {
-        entry.denied = 'The sign-in callback did not match this request.'
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end(callbackPage('Sign-in failed', 'The callback did not match Aspen. Close this tab and try again.'))
-        return
-      }
-      entry.code = code
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(callbackPage('Signed in', 'Aspen received your GitLab authorization. You can close this tab and return to Aspen.'))
-    })
-    server.once('error', err => {
-      reject(
-        new Error(
-          `Could not listen on 127.0.0.1:${GITLAB_REDIRECT_PORT} for the GitLab redirect (${err.message}). ` +
-          `Close whatever holds the port, or sign in with a token instead.`
-        )
+function beginGitHubBrowser(
+  apiBase: string,
+  clientId: string
+): Promise<SignInChallenge> {
+  const { verifier, challenge, state } = pkceMaterial()
+  const entry: PendingSignIn = {
+    requestId: randomUUID(),
+    provider: 'github',
+    apiBase,
+    clientId,
+    kind: 'github-browser',
+    // Generous human window: read the page, log in, approve.
+    expiresAt: Date.now() + 5 * 60_000,
+    intervalMs: 1000,
+    nextPollAt: Date.now(),
+    verifier,
+    state
+  }
+  return ensureCallbackServer().then(() => {
+    pending.set(entry.requestId, entry)
+    byState.set(state, entry)
+    return {
+      kind: 'github-browser',
+      requestId: entry.requestId,
+      authorizeUrl: githubAuthorizeUrl(
+        githubSiteRoot(apiBase),
+        clientId,
+        OAUTH_REDIRECT_URI,
+        state,
+        challenge
       )
-    })
-    server.listen(GITLAB_REDIRECT_PORT, '127.0.0.1', () => {
-      entry.server = server
-      resolve()
-    })
+    } satisfies SignInChallenge
   })
 }
 
@@ -189,17 +262,7 @@ async function beginGitLabBrowser(
   apiBase: string,
   clientId: string
 ): Promise<SignInChallenge> {
-  const verifier = base64url(randomBytes(32))
-  const challenge = base64url(createHash('sha256').update(verifier).digest())
-  const state = randomBytes(16).toString('hex')
-  const authorizeUrl =
-    `${apiBase}/oauth/authorize?response_type=code` +
-    `&client_id=${encodeURIComponent(clientId)}` +
-    `&redirect_uri=${encodeURIComponent(GITLAB_REDIRECT_URI)}` +
-    `&scope=api` +
-    `&state=${state}` +
-    `&code_challenge=${challenge}` +
-    `&code_challenge_method=S256`
+  const { verifier, challenge, state } = pkceMaterial()
   const entry: PendingSignIn = {
     requestId: randomUUID(),
     provider: 'gitlab',
@@ -213,20 +276,26 @@ async function beginGitLabBrowser(
     verifier,
     state
   }
-  try {
-    await startGitLabCallbackServer(entry)
-  } catch (err) {
-    entry.server?.close()
-    throw err
-  }
+  await ensureCallbackServer()
   pending.set(entry.requestId, entry)
-  return { kind: 'gitlab-browser', requestId: entry.requestId, authorizeUrl }
+  byState.set(state, entry)
+  return {
+    kind: 'gitlab-browser',
+    requestId: entry.requestId,
+    authorizeUrl: gitlabAuthorizeUrl(apiBase, clientId, OAUTH_REDIRECT_URI, state, challenge)
+  }
 }
 
-/** Start a browser sign-in for a provider; returns what the UI must show. */
+/**
+ * Start a browser sign-in for a provider; returns what the UI must show.
+ * `prefer` picks the GitHub flow explicitly ('web' default, 'device' for
+ * the code screen); a GitHub web start whose callback port is busy falls
+ * back to the device flow automatically.
+ */
 export async function beginSignIn(
   provider: AccountProvider,
-  apiBase?: string
+  apiBase?: string,
+  prefer?: 'web' | 'device'
 ): Promise<SignInChallenge> {
   sweepExpired()
   // One live challenge per provider: a second begin replaces the first.
@@ -236,10 +305,13 @@ export async function beginSignIn(
   const config = await getAccountsConfig()
   const clientId = provider === 'github' ? config.githubClientId : config.gitlabClientId
   if (clientId.length === 0) {
+    // Reached only when the id vanished after the panel looked at it (or an
+    // IPC caller skipped the panel): the panel's own setup step normally
+    // asks for the id before a sign-in ever starts here.
     throw new Error(
       provider === 'github'
-        ? 'GitHub browser sign-in needs an OAuth App client id (with Device Flow enabled) — enter it in Preferences → Accounts, or sign in with a personal access token.'
-        : 'GitLab browser sign-in needs an application id (redirect URI http://127.0.0.1:8765/callback) — enter it in Preferences → Accounts, or sign in with a personal access token.'
+        ? 'GitHub browser sign-in needs an OAuth App client id (Device Flow enabled, callback http://127.0.0.1:8765/callback) — press “Sign in with GitHub” again and paste it in the setup step, add one under Preferences → Accounts → Browser sign-in apps, or sign in with a personal access token.'
+        : 'GitLab browser sign-in needs an application id (redirect URI http://127.0.0.1:8765/callback) — press “Sign in with GitLab” again and paste it in the setup step, add one under Preferences → Accounts → Browser sign-in apps, or sign in with a personal access token.'
     )
   }
   // The stored apiBase follows each provider's token sign-in convention
@@ -251,9 +323,14 @@ export async function beginSignIn(
   )
   // GitHub stores the REST root (like token sign-in); GitLab the site root.
   const base = provider === 'github' ? normalizeGitHubApiBase(root) : root
-  return provider === 'github'
-    ? beginGitHubDevice(base, clientId)
-    : beginGitLabBrowser(base, clientId)
+  if (provider === 'gitlab') return beginGitLabBrowser(base, clientId)
+  if (prefer === 'device') return beginGitHubDevice(base, clientId)
+  try {
+    return await beginGitHubBrowser(base, clientId)
+  } catch {
+    // Loopback port busy (or refused): the device flow needs no port.
+    return beginGitHubDevice(base, clientId)
+  }
 }
 
 /**
@@ -271,7 +348,7 @@ function instanceRoot(apiBase: string | undefined, fallback: string): string {
   return `${url.origin}${path}`
 }
 
-async function pollGitHub(entry: PendingSignIn): Promise<SignInStatus> {
+async function pollGitHubDevice(entry: PendingSignIn): Promise<SignInStatus> {
   if (entry.deviceCode === undefined) {
     return { status: 'failed', message: 'This sign-in is no longer pending — start it again.' }
   }
@@ -312,8 +389,49 @@ async function pollGitHub(entry: PendingSignIn): Promise<SignInStatus> {
     closeEntry(entry)
     return { status: 'failed', message: 'GitHub returned no access token.' }
   }
+  return finishGitHub(entry, token)
+}
+
+async function pollGitHubWeb(entry: PendingSignIn): Promise<SignInStatus> {
+  if (entry.denied !== undefined) {
+    const message = entry.denied
+    closeEntry(entry)
+    return { status: 'failed', message }
+  }
+  if (entry.code === undefined) return { status: 'pending' }
+  const res = await formPost(`${githubSiteRoot(entry.apiBase)}/login/oauth/access_token`, {
+    grant_type: 'authorization_code',
+    client_id: entry.clientId,
+    code: entry.code,
+    redirect_uri: OAUTH_REDIRECT_URI,
+    code_verifier: entry.verifier ?? ''
+  })
+  const token = str(res.json.access_token)
+  if (!res.ok || token === null) {
+    const detail = providerErrorMessage('GitHub', res)
+    closeEntry(entry)
+    return {
+      status: 'failed',
+      message: `${detail} If this persists, use the one-time code or sign in with a token.`
+    }
+  }
+  // GitHub OAuth tokens do not expire unless the app opted into expiring
+  // authorizations — then a refresh token rides along and is stored.
+  const expiresAt =
+    typeof res.json.expires_in === 'number' && res.json.expires_in > 0
+      ? Date.now() + res.json.expires_in * 1000
+      : null
+  return finishGitHub(entry, token, str(res.json.refresh_token), expiresAt)
+}
+
+async function finishGitHub(
+  entry: PendingSignIn,
+  token: string,
+  refreshToken: string | null = null,
+  expiresAt: number | null = null
+): Promise<SignInStatus> {
   const identity = await githubClient.validate(entry.apiBase, token, 'oauth')
-  const credential: AccountCredential = { token, refreshToken: null, expiresAt: null }
+  const credential: AccountCredential = { token, refreshToken, expiresAt }
   const account = await addAccount({
     provider: 'github',
     apiBase: entry.apiBase,
@@ -337,7 +455,7 @@ async function pollGitLab(entry: PendingSignIn): Promise<SignInStatus> {
     client_id: entry.clientId,
     code: entry.code,
     code_verifier: entry.verifier ?? '',
-    redirect_uri: GITLAB_REDIRECT_URI
+    redirect_uri: OAUTH_REDIRECT_URI
   })
   const token = str(res.json.access_token)
   if (!res.ok || token === null) {
@@ -382,14 +500,16 @@ export async function pollSignIn(requestId: string): Promise<SignInStatus> {
       status: 'failed',
       message:
         entry.provider === 'github'
-          ? 'The device code expired before it was used. Start sign-in again.'
+          ? 'The sign-in expired before it was approved. Start it again.'
           : 'The sign-in took too long and expired. Start it again.'
     }
   }
   if (entry.kind === 'github-device' && Date.now() < entry.nextPollAt) {
     return { status: 'pending' }
   }
-  return entry.kind === 'github-device' ? pollGitHub(entry) : pollGitLab(entry)
+  if (entry.kind === 'github-device') return pollGitHubDevice(entry)
+  if (entry.kind === 'github-browser') return pollGitHubWeb(entry)
+  return pollGitLab(entry)
 }
 
 export function cancelSignIn(requestId: string): void {

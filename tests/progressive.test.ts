@@ -60,7 +60,8 @@ function settings(
     autoRefresh: true,
     scanFolder: '',
     theme: 'system',
-    hintsEnabled: true
+    hintsEnabled: true,
+    autoUpdateChecks: true
   }
 }
 
@@ -69,8 +70,22 @@ describe('syncVerb', () => {
     expect(syncVerb(null)).toBe('fetch')
   })
 
-  it('catches up first: behind wins over ahead', () => {
-    expect(syncVerb(status({ behind: 2, ahead: 1 }))).toBe('pull')
+  it('the rejected-push flag converts the verb even before status knows', () => {
+    expect(syncVerb(status(), true)).toBe('sync')
+    expect(syncVerb(status({ behind: 3 }), true)).toBe('sync')
+    // Still no status loaded — nothing to reason about yet.
+    expect(syncVerb(null, true)).toBe('fetch')
+    // The flag alone (default false) changes the in-sync answer, not the
+    // plain ahead/behind answers that already match git truth.
+    expect(syncVerb(status({ behind: 3 }))).toBe('pull')
+  })
+
+  it('a diverged branch earns the compound Pull & Push verb', () => {
+    expect(syncVerb(status({ behind: 2, ahead: 1 }))).toBe('sync')
+  })
+
+  it('catches up when behind with nothing to send', () => {
+    expect(syncVerb(status({ behind: 2 }))).toBe('pull')
   })
 
   it('publishes local work when ahead', () => {

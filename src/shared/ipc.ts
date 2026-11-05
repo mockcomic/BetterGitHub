@@ -1,10 +1,12 @@
 import type {
   AccountInfo,
   AccountProvider,
+  AccountSyncReport,
   AddRepositoriesResult,
   AiMergeOutcome,
   BranchList,
   CommitInfo,
+  CreateRepoRequest,
   ExternalApp,
   FilePreview,
   FileStatus,
@@ -18,8 +20,10 @@ import type {
   ManagedRepository,
   MergeExchange,
   PublicSettings,
+  ProviderOwner,
   RemoteRepoPage,
   RemoteRepoQuery,
+  RemoteRepository,
   RemoveRepositoriesResult,
   RepoSummaryEntry,
   RepoScanOutcome,
@@ -32,6 +36,7 @@ import type {
   TerminalSessionInfo,
   WorkflowKind
 } from './models'
+import type { UpdateCheckResult } from './updates'
 
 /**
  * The typed renderer -> main request/response contract.
@@ -79,6 +84,23 @@ export interface RequestResponseChannels {
   }) => { ok: boolean; message: string }
   suggestCloneFolder: (url: string) => string
 
+  // self-update (GitHub Releases; see src/main/updates.ts)
+  /**
+   * Manual "Check for updates…". Unlike the silent startup pass this always
+   * answers — up-to-date, available, or an error string — so the UI can
+   * report it. Main additionally pushes UPDATE_STATE_CHANNEL phases (progress
+   * of a self-applying download included).
+   */
+  checkForUpdates: () => UpdateCheckResult
+  /**
+   * Apply an already-downloaded update and restart. Self-updating builds
+   * only; everywhere else it throws a "download from the releases page"
+   * message the generic toast displays.
+   */
+  quitAndInstallUpdate: () => void
+  /** The real packaged version for the About dialog's version line. */
+  getAppVersion: () => string
+
   // hosted accounts (GitHub / GitLab) — sign in, browse, clone
   /** Every signed-in account, token-free. */
   listAccounts: () => AccountInfo[]
@@ -93,21 +115,74 @@ export interface RequestResponseChannels {
     apiBase?: string
   ) => AccountInfo
   /**
-   * Start a browser sign-in: GitHub device flow (type the code) or GitLab
-   * OAuth PKCE (main already listens for the localhost redirect). Throws a
-   * clear message when the provider's client id is not configured.
+   * Start a browser sign-in: GitHub authorization-code + PKCE (falling back
+   * to the device-code flow when the loopback port is busy or `prefer` says
+   * so) or GitLab OAuth PKCE; main already listens for the localhost
+   * redirect. Throws a clear message when the provider's client id is not
+   * configured.
    */
-  beginSignIn: (provider: AccountProvider, apiBase?: string) => SignInChallenge
+  beginSignIn: (
+    provider: AccountProvider,
+    apiBase?: string,
+    prefer?: 'web' | 'device'
+  ) => SignInChallenge
   /** Poll a pending challenge; 'pending' keeps the UI's wait state alive. */
   pollSignIn: (requestId: string) => SignInStatus
   cancelSignIn: (requestId: string) => void
   /** Forget an account and destroy its stored token. */
   removeAccount: (id: string) => void
+  /**
+   * Re-validate every stored account against the provider: refreshes
+   * display name/avatar and drops accounts whose token was revoked.
+   */
+  syncAccounts: () => AccountSyncReport
+  /**
+   * The account's avatar as a `data:` URL (fetched in main so the renderer
+   * CSP never needs remote image sources); null while unavailable.
+   */
+  accountAvatar: (accountId: string) => string | null
   /** One page of the account's repositories, owner/collaborator/org-wide. */
   listRemoteRepositories: (
     accountId: string,
     query?: RemoteRepoQuery
   ) => RemoteRepoPage
+  /**
+   * Where an account may create a repository: itself plus its organizations
+   * (GitHub) or groups (GitLab). Powers the publish dialog's owner picker.
+   */
+  listAccountOwners: (accountId: string) => ProviderOwner[]
+  /**
+   * Create a hosted repository under the account (Publish's first step, and
+   * what "Create and Publish" runs against an already-created local repo).
+   */
+  createRemoteRepository: (
+    accountId: string,
+    request: CreateRepoRequest
+  ) => RemoteRepository
+  /**
+   * Publish a local repository in one shot: create the hosted repo under
+   * `accountId`, point `origin` at its clone URL, and push the current
+   * branch with upstream tracking. Requires no existing origin, at least
+   * one commit, and a checked-out branch. The push uses that account's own
+   * token first, so publishing works correctly with several accounts on the
+   * same host.
+   */
+  publishRepository: (
+    repoPath: string,
+    accountId: string,
+    request: CreateRepoRequest
+  ) => RemoteRepository
+  /**
+   * Create a new git repository on disk inside `parentDir` (optionally with
+   * a staged README) and add it to the app's repository list. Publishing is
+   * a separate verb, so a repo with no commits yet publishes right after
+   * the user's first commit.
+   */
+  createLocalRepository: (
+    parentDir: string,
+    name: string,
+    addReadme: boolean
+  ) => Repository
 
   // filesystem watching (main pushes REPO_CHANGED_CHANNEL)
   startWatching: (repoPath: string) => void
@@ -146,9 +221,10 @@ export interface RequestResponseChannels {
   getCommitFileDiff: (repoPath: string, sha: string, path: string) => string
   getCommitFiles: (repoPath: string, sha: string) => FileStatus[]
   /**
-   * Media preview bytes for image/video/audio files — the working-tree file,
-   * or the blob in commit `sha`'s tree when one is given. Null for anything
-   * the previewer doesn't handle or that vanished since the listing.
+   * Media preview bytes for image/video/audio/model files — the working-tree
+   * file, or the blob in commit `sha`'s tree when one is given. A model also
+   * brings the sidecar files it references, read from the same place. Null for
+   * anything the previewer doesn't handle or that vanished since the listing.
    */
   getPreview: (repoPath: string, path: string, sha?: string) => FilePreview | null
 
@@ -188,6 +264,23 @@ export interface RequestResponseChannels {
   applyStash: (repoPath: string, index: number) => void
   popStash: (repoPath: string, index: number) => void
   dropStash: (repoPath: string, index: number) => void
+  /**
+   * Ask the AI agent to describe one stash entry's changes. Read-only: it
+   * returns the proposed message; `setStashMessage` applies it. Aborted by
+   * the same cancelGenerateCommitMessage channel the commit flow uses.
+   */
+  summarizeStash: (repoPath: string, index: number) => GeneratedCommitMessage
+  /**
+   * Rewrite one entry's message (subject + body), keeping its changes.
+   * `branch` re-applies git's `On <branch>: ` subject prefix when known.
+   */
+  setStashMessage: (
+    repoPath: string,
+    index: number,
+    title: string,
+    description: string,
+    branch?: string
+  ) => void
 
   // branches
   getBranches: (repoPath: string) => BranchList
@@ -230,7 +323,8 @@ export interface RequestResponseChannels {
   // integrated terminal (main pushes TERMINAL_OUTPUT/EXIT channels)
   /**
    * Spawn the platform-priority shell in `repoPath` (validated like every
-   * other repo verb) at the given size; one session at a time per panel.
+   * other repo verb) at the given size. Each call is one more live session —
+   * the panel's tab strip runs as many as it has tabs.
    */
   terminalStart: (repoPath: string, cols: number, rows: number) => TerminalSessionInfo
   /** Feed keystrokes to a live session; an unknown id is a silent no-op. */
@@ -290,6 +384,8 @@ export type MenuAction =
   | 'show-preferences'
   | 'add-repository'
   | 'clone-repository'
+  | 'new-repository'
+  | 'publish-repository'
   | 'manage-repositories'
   | 'stash-all'
   | 'edit-last-commit'
@@ -302,6 +398,7 @@ export type MenuAction =
   | 'rename-branch'
   | 'view-on-github'
   | 'toggle-terminal'
+  | 'check-updates'
   | 'show-about'
   | 'donate'
 
@@ -354,6 +451,13 @@ export const TERMINAL_OUTPUT_CHANNEL = 'terminal-output'
 
 /** Main -> renderer push: a terminal session's shell exited (id, code). */
 export const TERMINAL_EXIT_CHANNEL = 'terminal-exit'
+
+/**
+ * Main -> renderer push: the self-update flow changed phase. Payload is an
+ * UpdateState (src/shared/updates.ts); the store mirrors it and toasts on
+ * the transitions that deserve attention.
+ */
+export const UPDATE_STATE_CHANNEL = 'update-state'
 
 /**
  * Main -> renderer push: the watch-folder scan changed the repository list.

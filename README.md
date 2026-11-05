@@ -22,12 +22,26 @@ parsing → cancellable request).
   anywhere else are left alone. Manual removals stick (the folder is
   remembered as dismissed until it leaves the disk); rescans run on startup,
   on folder changes, and on window focus.
-- **Hosted accounts** — sign in with **GitHub** (browser device flow or
-  personal access token) and **GitLab** (OAuth PKCE for gitlab.com, token for
-  self-hosted instances too); the Clone dialog grows a tab per account
-  listing every repository you own, collaborate on, or see through an
-  organization. Tokens are stored encrypted (Electron `safeStorage`) and
-  never enter the renderer.
+- **Hosted accounts** — sign in with **GitHub** (browser OAuth, the device
+  code, or a personal access token) and **GitLab** (OAuth PKCE for gitlab.com,
+  token for self-hosted instances too); the Clone dialog grows a tab per
+  account listing every repository you own, collaborate on, or see through an
+  organization, with provider-side search (GitHub's Search API, GitLab's
+  `?search=`), sorting and a public/private filter. Account rows show your
+  real avatar and a profile link; every launch re-validates stored tokens —
+  a revoked one signs that account out with a toast instead of failing later.
+  Tokens are stored encrypted (Electron `safeStorage`) and never enter the
+  renderer.
+- **Create & publish** — **New repository…** (File menu, the first-run
+  screen, or the manager) makes a new git folder on disk — optionally with
+  a staged README — and can publish it in the same breath; any local repo
+  without an origin publishes from **Repository ▸ Publish repository…** or
+  the header's ⋯ menu. The dialog grows one tab per signed-in account —
+  signed into GitHub twice? you pick which one, and which organization or
+  group — then creates the hosted repo, adds `origin`, and pushes the
+  current branch with upstream set. The first push is pinned to the
+  publishing account's own token, so several accounts on one host can
+  never push as the wrong one.
 - **Branch picker** — filter, switch, create, rename and delete branches;
   remote-tracking branches listed separately and checked out as tracking
   branches; delete on the remote too.
@@ -43,8 +57,11 @@ parsing → cancellable request).
 - **Merge-conflict handling** — a banner for an in-progress merge / rebase /
   cherry-pick / revert with conflict count and **Continue** / **Abort**;
   per-file *ours / theirs / done* resolution buttons.
-- **Stash** — stash all changes (including untracked), and apply / pop / drop
-  entries from the sidebar.
+- **Stash** — stash all changes (including untracked) under an optional
+  message (subject + description, stored on the stash commit itself), and
+  apply / pop / drop entries from the sidebar. ✨ **Summarize** describes an
+  existing entry's stored diff with the AI agent and rewrites its message in
+  place, replaying the original author, committer and date.
 - **Diff viewer** — unified **or split** view, line wrap toggle, word-level
   highlighting of what actually changed inside a modified line, syntax
   highlighting (Prism), a large-diff guard, distinct binary / error / empty
@@ -52,6 +69,16 @@ parsing → cancellable request).
 - **Media previews** — selecting an image, video, or audio change shows it in
   the pane instead of the binary notice (Chromium playback, up to 128 MB);
   history previews read the exact committed blob, not the working tree.
+- **3D model previews** — `.glb`, `.gltf`, `.fbx`, `.obj`, `.stl`, `.ply` and
+  `.dae` changes open in an orbitable WebGL stage (three.js, imported lazily per
+  format, so the library never enters the startup chunk): drag to orbit, scroll
+  to zoom, plus Reset view, Wireframe and Grid toggles and a caption reporting
+  triangles, meshes and animations. A model is rarely the whole asset, so the
+  files it names are read alongside it — `.gltf` buffers and images, `.obj`
+  material libraries and the textures they map, Collada and FBX texture paths —
+  resolved from the same commit or working tree as the model (up to 48 files,
+  32 MB each, with the caption saying when the set is incomplete). A model whose
+  diff is readable text can be switched to it with one click, and back.
 - **Commit** — summary + description (two `-m` paragraphs), restricted to the
   selected files via `git commit --only`; commit-message drafts are persisted
   per repository; **Undo** and **Edit latest commit…** (amend) with a
@@ -96,6 +123,13 @@ parsing → cancellable request).
   ▸ *Show tips for getting started*); and copy that says "not on the remote
   yet" instead of "no upstream". Every shortcut, menu and tooltip power users
   rely on is unchanged.
+- **Self-update from GitHub Releases** — packaged runs check this
+  repository's Releases a few seconds after launch and whenever you press
+  **Help → Check for updates…**. On Windows NSIS installs the newer
+  installer downloads in the background and a **Restart now** toast (or the
+  About dialog) applies it; on every other build — and the portable exe —
+  Aspen points you at the release page instead. Toggle the automatic pass
+  in Preferences ▸ Behavior. See *Keeping Aspen up to date* below.
 - Toasts with actions (e.g. **Undo** after a commit) and manual dismiss.
 - Light / dark / system theme.
 
@@ -192,37 +226,100 @@ is simply never consulted.
 
 Open **Clone a repository → Accounts** (or Preferences → Accounts).
 
-- **GitHub — browser sign-in (device flow).** The same dance `gh` and GitHub
-  Desktop do: Aspen shows a short code, you type it at
-  github.com/login/device, and Aspen picks up the token when you approve.
-  No localhost port, no password on this machine, and the token never
-  expires until you sign out.
+- **GitHub — browser sign-in (OAuth).** The browser opens GitHub's authorize
+  page and Aspen catches the redirect on a loopback server at
+  `http://127.0.0.1:8765/callback` (authorization code + PKCE — a public
+  client, so no secret travels and the token never expires until you sign
+  out). If something else holds that port, Aspen automatically falls back to
+  the **device flow** — the short code you type at github.com/login/device,
+  the same dance `gh` and GitHub Desktop do — and the sign-in panel always
+  offers "Use the one-time code instead" as the manual choice.
 - **GitLab — browser sign-in (OAuth + PKCE).** The browser opens your
-  instance's authorize page; Aspen catches the redirect on a one-shot
-  server at `http://127.0.0.1:8765/callback`. PKCE means no client secret
-  travels. Access tokens expire after GitLab's two hours — Aspen refreshes
-  them silently.
+  instance's authorize page; Aspen catches the redirect on the same
+  loopback server (it dispatches purely on the unguessable `state`
+  parameter, so GitHub and GitLab sign-ins can even be pending at once).
+  PKCE means no client secret travels. Access tokens expire after GitLab's
+  two hours — Aspen refreshes them silently.
 - **Token sign-in — works for everything.** A GitHub classic PAT with the
-  `repo` scope (or a fine-grained token with repository contents: read), or
-  a GitLab PAT with `read_api` + `read_user`. Fill in the optional instance
+  `repo` scope (or a fine-grained token with repository contents: read —
+  enough to browse and clone; publishing needs the `repo` classic scope or
+  a fine-grained token with contents: write), or a GitLab PAT with
+  `read_api` + `read_user` (`api` to publish). Fill in the optional instance
   URL to sign a **GitHub Enterprise** or **self-hosted GitLab** server; that
   is the only way to use a server whose OAuth app you cannot register from
   the app. The token is validated against `/user` before anything is stored,
   then kept encrypted next to the settings file.
 
-Browser sign-in needs an OAuth application you register once and paste into
-**Preferences → Accounts → Browser sign-in apps** (GitHub: an OAuth App with
-*Enable Device Flow* ticked; GitLab: an application, confidential **off**,
-redirect URI exactly `http://127.0.0.1:8765/callback`, scope `api`). The ids
-are public, so they ship empty: without them the browser buttons stay hidden
-and the token path works everywhere.
+Browser sign-in needs an OAuth application you register once (or bake into
+`src/main/providers/config.ts` and rebuild): GitHub — an OAuth App whose
+Authorization callback URL is `http://127.0.0.1:8765/callback` with *Enable
+Device Flow* ticked, one app serving both GitHub flows; GitLab — an
+application, confidential **off**, redirect URI exactly
+`http://127.0.0.1:8765/callback`, scope `api`. The ids are public, so they
+ship empty — and both sign-in buttons are always clickable either way: with
+an id on file they go straight to your browser for authorization, and without
+one they first open a one-step setup **in the sign-in panel** (registration
+page, copyable callback URL, the steps, one paste box) and start the same
+authorization the moment you paste and press **Save & sign in**. The
+**Browser sign-in apps** fields in Preferences are the same two ids, for
+replacing them later; the token path needs none of this and covers servers
+whose application you cannot register.
 
 Once signed in, the Clone dialog gets one tab per account listing your
-repositories (owner, visibility, last push) with GitLab-side/loaded-item
-filtering and paging. Clones, fetches, pulls and pushes still prefer your
-system credential helper; your account token is the automatic one-shot
-fallback that host rejects without — so a token-only private-repo setup
-works end to end, and an existing Git Credential Manager setup is untouched.
+repositories (owner, visibility, last push) with provider-side search,
+sorting and paging (GitHub's Search API covers your own and your
+organizations' repositories; typed text is also filtered client-side for
+instant feedback). The create/publish dialog grows the same per-account
+tabs plus an **owner** dropdown — your user, plus the organizations
+(GitLab: groups) the token can create repositories in. Every launch
+re-checks stored tokens against the provider: names and avatars refresh,
+and a revoked token signs that account out with a toast. Clones, fetches,
+pulls and pushes still prefer your system credential helper; your account
+token is the automatic one-shot fallback that host rejects without — so a
+token-only private-repo setup works end to end, and an existing Git
+Credential Manager setup is untouched. (Publishing is stricter on purpose:
+its first push authenticates with the publishing account's own token
+before any helper, so with two accounts on one host the repository is
+always created *and* pushed by the same one you picked.)
+
+## Keeping Aspen up to date
+
+Aspen updates itself from this repository's **GitHub Releases**
+(`src/main/updates.ts`):
+
+- **Windows (NSIS install).** The silent startup pass and the manual
+  **Help → Check for updates…** both go through `electron-updater`, which
+  reads `latest.yml` from the newest release, downloads the new Setup exe
+  in the background (progress shows in the About dialog), and finishes with
+  a **Restart now** toast. Restarting runs the installer and relaunches the
+  updated app — your profile and settings are untouched.
+- **macOS, Linux and the Windows portable exe.** The same check hits the
+  Releases API (`releases/latest`) and compares `tag_name` semantically.
+  A newer release offers an **Open releases** button; there is no
+  in-place install (mac self-update additionally requires signed and
+  notarized builds).
+- Manual checks always answer with a verdict: newest release already
+  running, a version is available, or why the check failed — including the
+  friendly "no published releases yet" before the first release exists.
+  The silent pass never nags on network errors, and
+  **Preferences ▸ Behavior → Check GitHub releases for updates at startup**
+  turns the automatic pass off. A signed-in GitHub account's token is used
+  opportunistically for the API pass (higher rate limit; ready-made for a
+  private repo).
+
+### Releasing an update
+
+1. Bump `version` in `package.json` (the number users see and the updater
+   compares), commit, and tag it: `git tag vX.Y.Z && git push --tags`.
+2. `npm run dist:win` — electron-builder writes the installer **and the
+   updater metadata** into `release/`.
+3. Create a GitHub Release for `vX.Y.Z` and upload, for each platform you
+   ship, the installer **plus its `latest*.yml`** (and the `.blockmap` next
+   to the Windows installer). The filename recorded in the yml must match
+   the uploaded asset exactly, or the download 404s — when in doubt, upload
+   exactly what `release/` holds.
+4. Draft/prerelease versions are ignored by the stable updater channel, so
+   beta tags don't reach normal installs.
 
 ## Project layout
 
@@ -230,7 +327,8 @@ works end to end, and an existing Git Credential Manager setup is untouched.
 src/shared/      models + typed IPC channel map (shared by all three sides)
 src/main/        Electron main process
   git/           exec wrapper, porcelain-v2 parser, status/diff/staging/
-                 commit/branches/log/sync/stash/ignore/workflow/github-url
+                 commit/branches/log/sync/stash/ignore/workflow/github-url/
+                 init (new-repo creation)
   watcher.ts     debounced recursive working-tree watcher (watch-filter.ts
                  holds the pure ignore logic)
   terminal.ts    integrated terminal: node-pty sessions, shell-choice
@@ -240,6 +338,9 @@ src/main/        Electron main process
                  PKCE sign-in, token refresh, client-id config
   accounts.ts    signed-account store (encrypted per-account token sidecars)
   settings.ts    JSON settings + safeStorage-encrypted API key
+  updates.ts     GitHub Releases self-update: electron-updater on packaged
+                 win32 (latest.yml → background download → quitAndInstall),
+                 Releases-API check + release-page handoff everywhere else
   windows.ts/menu.ts/ipc.ts  window, app menu, typed handle() registrar
 src/preload/     contextBridge surface (window.aspen)
 src/renderer/    React UI: Header, ChangesSidebar (+CommitBox, stash panel),
@@ -248,7 +349,8 @@ src/renderer/    React UI: Header, ChangesSidebar (+CommitBox, stash panel),
                  ContextMenu, Toasts, TerminalPanel, AppStore (store.ts)
 tests/           Vitest suites: porcelain / diff parsers, stash & log parsing,
                  github URLs, watcher filter, word-diff, provider mappers,
-                 git auth-retry classifier, plus an integration suite that
+                 git auth-retry classifier, update version/release
+                 parsing, plus an integration suite that
                  drives the real `git` binary in a temp repo
 ```
 

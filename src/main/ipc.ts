@@ -1,14 +1,19 @@
-import { clipboard, dialog, ipcMain, shell } from 'electron'
+import { app, clipboard, dialog, ipcMain, shell } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
 import type {
+  AccountInfo,
+  CreateRepoRequest,
   ExternalApp,
+  GeneratedCommitMessage,
   GitHubTarget,
   IgnoreRequest,
   IpcResult,
   MergeExchange,
+  ProviderOwner,
   RemoteRepoQuery,
+  RemoteRepository,
   RepoSummaryEntry,
   Repository
 } from '../shared/models'
@@ -52,8 +57,10 @@ import { abortOperation, continueOperation } from './git/workflow'
 import {
   applyStash,
   dropStash,
+  getStashDiff,
   listStashes,
   popStash,
+  setStashMessage,
   stashAll
 } from './git/stash'
 import {
@@ -76,11 +83,13 @@ import {
   getConfigInfo,
   getRemoteUrl,
   pull,
+  publishRepository as publishToRemote,
   push,
   setConfigInfo,
   suggestedCloneDirectory,
   verifyRepository
 } from './git/sync'
+import { createLocalRepository } from './git/init'
 import {
   addRepository,
   getAiConfig,
@@ -98,17 +107,20 @@ import {
 } from './repo-scan'
 import { parentKey, pathKey } from './repo-scan-plan'
 import {
+  accountAvatar,
+  accountGitCredential,
   addAccount,
   getAccount,
   getAccountToken,
   listAccounts,
-  removeAccount as forgetAccount
+  removeAccount as forgetAccount,
+  syncAccountIdentities
 } from './accounts'
 import { beginSignIn, cancelSignIn, pollSignIn } from './providers/oauth'
 import { githubClient, normalizeGitHubApiBase } from './providers/github'
 import { gitlabClient, normalizeGitLabApiBase } from './providers/gitlab'
 import { ProviderHttpError } from './providers/http'
-import type { AccountProvider } from '../shared/models'
+import type { AccountProvider, RemoteRepoSort } from '../shared/models'
 import { generateCommitMessage, testConnection } from './ai/commit-agent'
 import {
   askMergeAgent,
@@ -120,6 +132,7 @@ import {
   restoreEol
 } from './ai/merge-agent'
 import { dispatchMenuAction, getMenuBarSpec, runMenuRole } from './menu'
+import { checkForUpdates, quitAndInstallUpdate } from './updates'
 import { applyTheme, getMainWindow, isTrustedSender } from './windows'
 import { getWatchedPath, startWatching, stopWatching } from './watcher'
 
@@ -130,6 +143,61 @@ type Handlers = {
 }
 
 const generationControllers = new Map<string, AbortController>()
+
+/** AI config with a usable key, or the same error the commit flow throws. */
+async function requireAiConfig(): Promise<{
+  baseUrl: string
+  model: string
+  customInstructions: string
+  apiKey: string
+}> {
+  const cfg = await getAiConfig()
+  if (cfg.apiKey === null || cfg.apiKey.length === 0) {
+    throw new Error(
+      'No API key configured. Open Preferences → AI agent and add one.'
+    )
+  }
+  const { apiKey } = cfg
+  return { ...cfg, apiKey }
+}
+
+/**
+ * One AI message request (commit or stash summary) under the per-repo abort
+ * controller, so the existing cancelGenerateCommitMessage channel covers
+ * every generation the desk starts.
+ */
+async function runMessageGeneration(
+  repoPath: string,
+  diff: string,
+  cfg: { baseUrl: string; model: string; customInstructions: string; apiKey: string }
+): Promise<GeneratedCommitMessage> {
+  generationControllers.get(repoPath)?.abort()
+  const controller = new AbortController()
+  generationControllers.set(repoPath, controller)
+
+  try {
+    return await generateCommitMessage({
+      diff,
+      baseUrl: cfg.baseUrl,
+      model: cfg.model,
+      apiKey: cfg.apiKey,
+      customInstructions: cfg.customInstructions,
+      signal: controller.signal
+    })
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.name === 'AbortError' || controller.signal.aborted)
+    ) {
+      throw new Error('cancelled')
+    }
+    throw err
+  } finally {
+    if (generationControllers.get(repoPath) === controller) {
+      generationControllers.delete(repoPath)
+    }
+  }
+}
 
 /** In-flight AI merge requests, keyed by `repoPath\npath`. */
 const mergeControllers = new Map<string, AbortController>()
@@ -148,6 +216,56 @@ async function openUrl(url: string): Promise<void> {
     throw new Error(`Refusing to open a non-http(s) URL: ${url}`)
   }
   await shell.openExternal(url)
+}
+
+/** The signed-in account behind an IPC account id, or an actionable error. */
+async function requireAccount(accountId: string): Promise<AccountInfo> {
+  const account = await getAccount(accountId)
+  if (account === null) {
+    throw new Error('That account is no longer signed in — sign in again.')
+  }
+  return account
+}
+
+/**
+ * Run a hosted-API call with the account's current token; an OAuth token
+ * rejected with 401 refreshes once and reruns — the same rule the
+ * repository listing follows, so a long-open publish dialog never dies on
+ * token expiry.
+ */
+async function withAccountToken<T>(
+  account: AccountInfo,
+  run: (token: string) => Promise<T>
+): Promise<T> {
+  const token = await getAccountToken(account)
+  if (token === null) {
+    throw new Error(
+      `Aspen could not read ${account.login}'s stored token — sign in again.`
+    )
+  }
+  try {
+    return await run(token)
+  } catch (err) {
+    if (
+      err instanceof ProviderHttpError &&
+      err.status === 401 &&
+      account.authKind === 'oauth'
+    ) {
+      const fresh = await getAccountToken(account, { forceRefresh: true })
+      if (fresh !== null && fresh !== token) return run(fresh)
+    }
+    throw err
+  }
+}
+
+/** The checks every create/publish runs before touching the network. */
+function validateCreateRepoRequest(request: CreateRepoRequest): void {
+  if (request.name.trim().length === 0) {
+    throw new Error('Enter a repository name.')
+  }
+  if (request.owner.trim().length === 0) {
+    throw new Error('Choose the account or organization to publish into.')
+  }
 }
 
 async function resolveWebRepo(repoPath: string) {
@@ -391,6 +509,19 @@ const handlers: Handlers = {
     return suggestedCloneDirectory(url)
   },
 
+  // --------------------------------------------------------------- self-update
+  async checkForUpdates() {
+    // Manual verdict for Help → "Check for updates…" (and the About
+    // dialog's button). Background phases ride UPDATE_STATE_CHANNEL.
+    return checkForUpdates(true)
+  },
+  async quitAndInstallUpdate() {
+    quitAndInstallUpdate()
+  },
+  async getAppVersion() {
+    return app.getVersion()
+  },
+
   // ---------------------------------------------------------- hosted accounts
   async listAccounts() {
     return listAccounts()
@@ -398,7 +529,7 @@ const handlers: Handlers = {
   async signInWithToken(provider: AccountProvider, token: string, apiBase?: string) {
     const trimmed = token.trim()
     if (trimmed.length === 0) {
-      throw new Error('Paste a token — GitHub classic needs the `repo` scope, GitLab `read_api` + `read_user`.')
+      throw new Error('Paste a token — GitHub needs the `repo` scope and GitLab the `api` scope, or Aspen cannot publish repositories with it.')
     }
     const base =
       provider === 'github'
@@ -415,8 +546,12 @@ const handlers: Handlers = {
       credential: { token: trimmed, refreshToken: null, expiresAt: null }
     })
   },
-  async beginSignIn(provider: AccountProvider, apiBase?: string) {
-    return beginSignIn(provider, apiBase)
+  async beginSignIn(
+    provider: AccountProvider,
+    apiBase?: string,
+    prefer?: 'web' | 'device'
+  ) {
+    return beginSignIn(provider, apiBase, prefer)
   },
   async pollSignIn(requestId: string) {
     return pollSignIn(requestId)
@@ -427,6 +562,14 @@ const handlers: Handlers = {
   async removeAccount(id: string) {
     await forgetAccount(id)
   },
+  async syncAccounts() {
+    return syncAccountIdentities()
+  },
+  async accountAvatar(accountId: string) {
+    const account = await getAccount(accountId)
+    if (account === null) return null
+    return accountAvatar(account)
+  },
   async listRemoteRepositories(accountId: string, query?: RemoteRepoQuery) {
     const account = await getAccount(accountId)
     if (account === null) {
@@ -436,7 +579,8 @@ const handlers: Handlers = {
     const request = {
       search: query?.search?.trim() ?? '',
       cursor: query?.cursor ?? null,
-      perPage: query?.perPage ?? 50
+      perPage: query?.perPage ?? 50,
+      sort: query?.sort as RemoteRepoSort | undefined
     }
     const token = await getAccountToken(account)
     if (token === null) {
@@ -459,6 +603,51 @@ const handlers: Handlers = {
       }
       throw err
     }
+  },
+
+  async listAccountOwners(accountId: string): Promise<ProviderOwner[]> {
+    const account = await requireAccount(accountId)
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    return withAccountToken(account, token =>
+      client.listOwners(account.apiBase, account, token, account.authKind)
+    )
+  },
+  async createRemoteRepository(accountId: string, request: CreateRepoRequest) {
+    const account = await requireAccount(accountId)
+    validateCreateRepoRequest(request)
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    return withAccountToken(account, token =>
+      client.createRepo(account.apiBase, account, token, account.authKind, {
+        ...request,
+        name: request.name.trim(),
+        owner: request.owner.trim()
+      })
+    )
+  },
+  async publishRepository(
+    repoPath: string,
+    accountId: string,
+    request: CreateRepoRequest
+  ): Promise<RemoteRepository> {
+    const account = await requireAccount(accountId)
+    validateCreateRepoRequest(request)
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    const created = await withAccountToken(account, token =>
+      client.createRepo(account.apiBase, account, token, account.authKind, {
+        ...request,
+        name: request.name.trim(),
+        owner: request.owner.trim()
+      })
+    )
+    // Pin the first push to the publishing account itself (git/sync.ts);
+    // an unreadable sidecar pushes unauthenticated and lets the standard
+    // helper/retry path speak for itself.
+    const credential = await accountGitCredential(account)
+    await publishToRemote(repoPath, created.cloneUrl, credential)
+    return created
+  },
+  async createLocalRepository(parentDir: string, name: string, addReadme: boolean) {
+    return createLocalRepository(parentDir, name, addReadme)
   },
 
   async startWatching(repoPath: string) {
@@ -797,12 +986,7 @@ const handlers: Handlers = {
     repoPath: string,
     paths: ReadonlyArray<string>
   ) {
-    const cfg = await getAiConfig()
-    if (cfg.apiKey === null || cfg.apiKey.length === 0) {
-      throw new Error(
-        'No API key configured. Open Preferences → AI agent and add one.'
-      )
-    }
+    const cfg = await requireAiConfig()
 
     const status = await getStatus(repoPath)
     const statusByPath = new Map(
@@ -813,32 +997,21 @@ const handlers: Handlers = {
       throw new Error('There are no changes in the selected files to describe.')
     }
 
-    generationControllers.get(repoPath)?.abort()
-    const controller = new AbortController()
-    generationControllers.set(repoPath, controller)
-
-    try {
-      return await generateCommitMessage({
-        diff,
-        baseUrl: cfg.baseUrl,
-        model: cfg.model,
-        apiKey: cfg.apiKey,
-        customInstructions: cfg.customInstructions,
-        signal: controller.signal
-      })
-    } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.name === 'AbortError' || controller.signal.aborted)
-      ) {
-        throw new Error('cancelled')
-      }
-      throw err
-    } finally {
-      if (generationControllers.get(repoPath) === controller) {
-        generationControllers.delete(repoPath)
-      }
-    }
+    return await runMessageGeneration(repoPath, diff, cfg)
+  },
+  async summarizeStash(repoPath: string, index: number) {
+    const cfg = await requireAiConfig()
+    const diff = await getStashDiff(repoPath, index)
+    return await runMessageGeneration(repoPath, diff, cfg)
+  },
+  async setStashMessage(
+    repoPath: string,
+    index: number,
+    title: string,
+    description: string,
+    branch?: string
+  ) {
+    await setStashMessage(repoPath, index, title, description, branch)
   },
   async cancelGenerateCommitMessage(repoPath: string) {
     generationControllers.get(repoPath)?.abort()
