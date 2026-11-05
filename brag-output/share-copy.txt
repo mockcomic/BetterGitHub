@@ -1,2 +1,2 @@
-Introducing Aspen 0.2.0: a visual desktop client for Git with an AI commit-message agent (OpenAI, OpenRouter, Ollama or LM Studio), an integrated terminal, a watch folder that finds your repos, and a built-in updater — no GitHub account required.
+Introducing Aspen 0.2.0: a visual desktop client for Git where any AI agent — OpenAI, OpenRouter, Ollama, LM Studio — writes your commit messages, merge conflicts resolve with one click, and 3D model changes render right in the diff view. Plus an integrated terminal, a watch folder, and a built-in updater. No GitHub account required.
 Built with Electron, React and TypeScript, after reverse-engineering GitHub Desktop 3.6.7's shipped artifact. The mark is an aspen leaf whose veins are a commit graph — one gold node, once.

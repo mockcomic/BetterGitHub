@@ -121,8 +121,8 @@
     <div data-hf-id="hf-tday" id="end-word" class="clip" data-start="0" data-duration="3.8" data-var-text="product">Aspen</div>
 
     <div data-hf-id="hf-xglo" id="end-facts" class="clip" data-start="0" data-duration="3.8">
-      <span data-hf-id="hf-wz0v" class="f" id="end-f1">OpenAI &middot; OpenRouter &middot; Ollama &middot; LM Studio</span>
-      <span data-hf-id="hf-tplt" class="f" id="end-f2">Integrated terminal &middot; no GitHub account required</span>
+      <span data-hf-id="hf-wz0v" class="f" id="end-f1">Any AI agent writes your message: OpenAI · OpenRouter · Ollama · LM Studio</span>
+      <span data-hf-id="hf-tplt" class="f" id="end-f2">Conflicts, terminal, watch folder, 3D previews — in one window</span>
       <span data-hf-id="hf-cfi1" class="f" id="end-f3">MIT &middot; free &middot; open source</span>
     </div>
 
@@ -169,12 +169,12 @@
     tl.fromTo("#end-f1", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.26 }, 0.5);
     tl.fromTo("#end-f2", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.26 }, 0.76);
     tl.fromTo("#end-f3", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.26 }, 1.02);
-    // beat-locked: 17.74 (bed beat) — the punchline lands (scene-local 1.54)
+    // beat-locked: 27.88 (post-loop bed beat) — the punchline lands (scene-local 1.68)
     tl.fromTo(
       "#end-punch",
       { opacity: 0, y: 18, filter: "blur(8px)" },
       { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.34, ease: "power4.out" },
-      1.54,
+      1.68,
     );
     // beat-grid: the gold node breathes on the bed (18.30 / 18.85 strong / 19.40)
     tl.to("#end-mark .glow", { opacity: 0.5, duration: 0.14, ease: "sine.inOut" }, 2.1);

@@ -1,0 +1,261 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #f4f1e8;
+      font-family: Inter, sans-serif;
+      perspective: 2000px;
+    }
+    /* the changed-file row that carries a .glb, opening into a viewer */
+    #m3d-file {
+      position: absolute;
+      left: 96px;
+      top: 130px;
+      width: 1728px;
+      height: 84px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid #d9d3c2;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 30px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 34px;
+      color: #24402f;
+    }
+    #m3d-file .mk {
+      color: #2e7d3a;
+      font-weight: 700;
+    }
+    #m3d-file .tag {
+      margin-left: auto;
+      font-family: Inter, sans-serif;
+      font-size: 26px;
+      color: #6e5210;
+      background: rgba(227, 172, 56, 0.18);
+      border: 1px solid rgba(227, 172, 56, 0.55);
+      border-radius: 7px;
+      padding: 4px 14px;
+    }
+    /* the viewer */
+    #m3d-stage {
+      position: absolute;
+      left: 460px;
+      top: 260px;
+      width: 1000px;
+      height: 660px;
+      border-radius: 16px;
+      background: linear-gradient(160deg, #16382a, #0f2a1f);
+      border: 1px solid #d9d3c2;
+      box-shadow: 0 24px 60px rgba(38, 60, 48, 0.25);
+      overflow: hidden;
+      transform-style: preserve-3d;
+    }
+    #m3d-stage .vh {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 28px;
+      color: #cfd8cf;
+      background: rgba(0, 0, 0, 0.25);
+    }
+    #m3d-stage .vh .g {
+      color: #a8e0b4;
+    }
+    /* the mesh: a leaf "gem" built from colored facets */
+    #m3d-obj {
+      position: absolute;
+      left: 500px;
+      top: 360px;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      rotation: y 0deg;
+    }
+    .face {
+      position: absolute;
+      left: -140px;
+      top: -140px;
+      width: 280px;
+      height: 280px;
+      transform-style: preserve-3d;
+    }
+    .face .f {
+      position: absolute;
+      inset: 0;
+      background: rgba(46, 125, 85, 0.32);
+      border: 2px solid rgba(168, 224, 180, 0.9);
+    }
+    .face .f.gold {
+      background: rgba(227, 172, 56, 0.34);
+      border-color: #e3ac38;
+    }
+    .face .f.front { transform: translateZ(160px); }
+    .face .f.back { transform: rotateY(180deg) translateZ(160px); }
+    .face .f.left { transform: rotateY(-90deg) translateZ(160px); }
+    .face .f.right { transform: rotateY(90deg) translateZ(160px); }
+    /* facets: two tilted planes making a pointed leaf volume */
+    .wedge {
+      position: absolute;
+      left: -150px;
+      width: 300px;
+      height: 260px;
+      border: 2px solid rgba(168, 224, 180, 0.9);
+    }
+    .wedge.w1 {
+      top: -260px;
+      background: rgba(33, 92, 74, 0.55);
+      transform: rotateY(24deg) translateZ(140px);
+      clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    }
+    .wedge.w2 {
+      top: -260px;
+      background: rgba(33, 92, 74, 0.35);
+      transform: rotateY(-24deg) translateZ(-140px);
+      clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    }
+    .wedge.w3 {
+      top: 0;
+      background: rgba(227, 172, 56, 0.5);
+      border-color: #e3ac38;
+      transform: rotateY(24deg) translateZ(-140px);
+      clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+    }
+    .wedge.w4 {
+      top: 0;
+      background: rgba(227, 172, 56, 0.3);
+      border-color: rgba(227, 172, 56, 0.85);
+      transform: rotateY(-24deg) translateZ(140px);
+      clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+    }
+    #m3d-node {
+      position: absolute;
+      left: -26px;
+      top: -300px;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #e3ac38;
+      box-shadow: 0 0 40px rgba(227, 172, 56, 0.8);
+    }
+    #m3d-orbit {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      font-family: Inter, sans-serif;
+      font-size: 26px;
+      color: #8fa396;
+      opacity: 0;
+    }
+    #m3d-side {
+      position: absolute;
+      right: 24px;
+      bottom: 24px;
+      display: flex;
+      gap: 10px;
+    }
+    #m3d-side .side {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 28px;
+      color: #8fa396;
+      border: 1px solid #2e5142;
+      border-radius: 7px;
+      padding: 4px 12px;
+      opacity: 0;
+    }
+    #m3d-caption {
+      position: absolute;
+      left: 96px;
+      top: 970px;
+      width: 1728px;
+      text-align: center;
+      font-size: 34px;
+      color: #3d4b41;
+      opacity: 0;
+    }
+  </style>
+
+  <div data-hf-id="m3-root" id="root" data-composition-id="model3d" data-width="1920" data-height="1080">
+    <div data-hf-id="m3-file" id="m3d-file">
+      <span class="mk">A</span> assets/marks/aspen-leaf.glb
+      <span class="tag" id="m3d-tag">+4.2 MB · model</span>
+    </div>
+
+    <div data-hf-id="m3-stage" id="m3d-stage">
+      <div class="vh"><span class="g">aspen-leaf.glb</span> · orbitable preview · sidecars resolved</div>
+      <div data-hf-id="m3-obj" id="m3d-obj">
+        <div class="face">
+          <div class="f front"></div>
+          <div class="f back"></div>
+          <div class="f left"></div>
+          <div class="f right gold"></div>
+        </div>
+        <div class="wedge w1"></div>
+        <div class="wedge w2"></div>
+        <div class="wedge w3"></div>
+        <div class="wedge w4"></div>
+        <div id="m3d-node"></div>
+      </div>
+      <div id="m3d-orbit">orbit with the mouse</div>
+      <div id="m3d-side">
+        <span class="side">leaf.bin</span>
+        <span class="side">leaf-basecolor.png</span>
+      </div>
+    </div>
+
+    <p data-hf-id="m3-cap" id="m3d-caption">3D models render right in the diff view</p>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    tl.fromTo(
+      "#m3d-file",
+      { opacity: 0, y: -14 },
+      { opacity: 1, y: 0, duration: 0.26, ease: "power3.out" },
+      0,
+    );
+    // stage opens on the bed beat (global 22.8, local 0.6)
+    tl.fromTo(
+      "#m3d-stage",
+      { opacity: 0, y: 30, scale: 0.96 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "power3.out" },
+      0.6,
+    );
+    // the object assembles, then orbits for the rest of the beat
+    tl.fromTo(
+      "#m3d-obj",
+      { scale: 0.2, opacity: 0 },
+      { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.5)" },
+      0.9,
+    );
+    tl.fromTo(
+      "#m3d-obj",
+      { rotationY: -30, rotationX: 8 },
+      { rotationY: 330, rotationX: 14, duration: 4.4, ease: "sine.inOut" },
+      0.5,
+    );
+    // sidecars fade in as the orbit reads (global 24.8 / 25.0)
+    tl.to("#m3d-side .side", { opacity: 1, duration: 0.25, stagger: 0.15 }, 1.8);
+    tl.to("#m3d-orbit", { opacity: 1, duration: 0.3 }, 1.0);
+    tl.fromTo(
+      "#m3d-caption",
+      { opacity: 0, y: 12 },
+      { opacity: 1, y: 0, duration: 0.34, ease: "power2.out" },
+      1.4,
+    );
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines["model3d"] = tl;
+  </script>
+</template>

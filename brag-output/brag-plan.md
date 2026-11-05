@@ -189,3 +189,31 @@ Contrast fixes forced by the new layout: caption
 of over the new drawer, status `M` badge `#7d6318`, terminal
 output `#a8e0b4`. Drawer SFX: drop_001 at 5.75. Check: 0 errors, 0 lint
 warnings, the same 8 end-card advisories as the shipped 10-31 cut.
+
+## Addendum 5 (2026-11-06): 30s cut — the full 0.2.0 story
+
+The user asked for a longer film highlighting (a) any AI agent for commit
+messages, (b) merge-conflict handling, (c) 3D model previews. The edit is now
+**30.0s / 7 scenes**: hook 0-3.4, desk 3.4-9.0 (terminal drawer), agent
+9.0-14.95, commit 14.95-17.75, conflict 17.75-22.65, model3d 22.65-26.2,
+endcard 26.2-30.0.
+
+- Agent scene: a "Your agent:" pill row (OpenAI / OpenRouter / Ollama / LM
+  Studio) rotates the highlighted endpoint on the bed grid — the any-agent
+  claim shown, not told.
+- New `conflict.html`: the conflict banner drops on the 18.34 beat, cursor
+  clicks Use this line on the incoming side (19.60), Resolution panel + gold
+  Resolved stamp land on the 20.72 beat. Copy: "Resolve conflicts by picking a
+  side — yours, theirs, or both".
+- New `model3d.html`: an added `.glb` file row opens a dark stage with a
+  CSS-3D wireframe leaf/gem orbiting (2800px-style perspective), sidecar chips
+  (leaf.bin, leaf-basecolor.png) tick in on the 24.8/25.0 beats. Copy: "3D
+  models render right in the diff view".
+- End card facts rewritten: line 1 = any-AI-agent, line 2 = conflicts/
+  terminal/watch folder/3D previews in one window.
+- Music: the 21.9s brand bed was looped to 30s — 21.2s content + 0.7s tri
+  crossfade from 11.103s (exactly 19 grid periods; the grid 0.52+n*0.557 holds
+  across the seam). All beat locks re-stated on the continuous grid; punchline
+  moved to the post-loop beat 27.88.
+- Check: passed (0 errors). Contrast re-audited for the new scenes; small text
+  raised to the 28px floor.

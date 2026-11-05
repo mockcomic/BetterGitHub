@@ -149,6 +149,31 @@
       border: 2px solid #8a6514;
       opacity: 0;
     }
+    /* 0.2.0 story: your agent, your endpoint — the pill row rotates */
+    #agent-eps {
+      position: absolute;
+      left: 96px;
+      top: 990px;
+      width: 1728px;
+      justify-content: center;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 28px;
+      color: #4e5d52;
+    }
+    #agent-eps .pill {
+      border: 1px solid #d4cebc;
+      border-radius: 999px;
+      padding: 8px 24px;
+      color: #3c5445;
+      background: #f8f6ee;
+    }
+    #agent-eps .pill.hot {
+      background: #16382a;
+      border-color: #16382a;
+      color: #f0efe4;
+    }
     .ascope {
       position: absolute;
       left: 40px;
@@ -245,7 +270,7 @@
   </style>
 
   <div data-hf-id="hf-ye2g" id="root" data-composition-id="agent" data-width="1920" data-height="1080">
-    <div data-hf-id="hf-dz6k" id="agent-panel" class="clip" data-start="0" data-duration="4.8">
+    <div data-hf-id="hf-dz6k" id="agent-panel" class="clip" data-start="0" data-duration="5.95">
       <div data-hf-id="hf-d74r" class="box">
         <div data-hf-id="hf-x5sz" class="sheen"></div>
         <div data-hf-id="hf-pipu" class="arow" id="agent-r1">
@@ -278,15 +303,25 @@
           <span data-hf-id="hf-v59j" class="lbl cancel" id="agent-cancel"><span data-hf-id="hf-jggx" class="spin"></span> Cancel</span>
         </div>
         <div data-hf-id="hf-3r19" class="abtn" id="agent-commit">Commit to main</div>
+
       </div>
     </div>
 
-    <div data-hf-id="hf-uejw" id="agent-trust" class="clip" data-start="0" data-duration="4.8">
+    <!-- any endpoint: the highlighted pill rotates through real options -->
+    <div data-hf-id="hf-eps0" id="agent-eps" class="clip" data-start="0" data-duration="5.95">
+      <span>Your agent:</span>
+      <span class="pill" id="ep-0">OpenAI</span>
+      <span class="pill" id="ep-1">OpenRouter</span>
+      <span class="pill" id="ep-2">Ollama</span>
+      <span class="pill" id="ep-3">LM Studio</span>
+    </div>
+
+    <div data-hf-id="hf-uejw" id="agent-trust" class="clip" data-start="0" data-duration="5.95">
       <code data-hf-id="hf-2f4c">&lt;diff-7f3a9&gt;</code>
       <span data-hf-id="hf-646i">the diff cannot forge the boundary.</span>
     </div>
 
-    <div data-hf-id="hf-dev0" id="agent-cursor" class="clip" data-start="0" data-duration="4.8">
+    <div data-hf-id="hf-dev0" id="agent-cursor" class="clip" data-start="0" data-duration="5.95">
       <svg data-hf-id="hf-eqst" class="cur" viewBox="0 0 24 24" aria-hidden="true">
         <path data-hf-id="hf-5tlk"
           d="M4 1 L4 19 L8.6 14.8 L11.4 21 L14.4 19.7 L11.6 13.7 L18 13.2 Z"
@@ -364,6 +399,14 @@
     // the trust-boundary insert reads, then gets out of the way
     tl.fromTo("#agent-trust", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3 }, 0.5);
     tl.to("#agent-trust", { opacity: 0, duration: 0.3 }, 3.25);
+
+    // 0.2.0 story: the highlighted endpoint rotates — any agent writes your message
+    const eps = ["#ep-0", "#ep-1", "#ep-2", "#ep-3"];
+    tl.set(eps[0], { className: "pill hot" }, 3.2);
+    eps.slice(1).forEach((p, i) => {
+      tl.set(p, { className: "pill hot" }, 3.76 + i * 0.557);
+      tl.set(eps[i], { className: "pill" }, 3.76 + i * 0.557);
+    });
 
     window.__timelines = window.__timelines || {};
     window.__timelines["agent"] = tl;

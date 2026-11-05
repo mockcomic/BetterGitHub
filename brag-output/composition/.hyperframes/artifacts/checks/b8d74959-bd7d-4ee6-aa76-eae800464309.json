@@ -8,121 +8,145 @@
     "warningCount": 0,
     "infoCount": 0,
     "findings": [],
-    "filesScanned": 6
+    "filesScanned": 8
   },
   "runtime": {
     "ok": true,
     "errorCount": 0,
-    "warningCount": 0,
+    "warningCount": 5,
     "infoCount": 0,
-    "findings": []
+    "findings": [
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-ep1\" is 0.01s but its slot (data-duration) is 0.10s — the slot is shortened to the media length when rendered. Set data-duration to ~0.01s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-hf-id": "hf-at0g",
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "30",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-ep2\" is 0.01s but its slot (data-duration) is 0.10s — the slot is shortened to the media length when rendered. Set data-duration to ~0.01s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-hf-id": "hf-at0g",
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "30",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-ep3\" is 0.01s but its slot (data-duration) is 0.10s — the slot is shortened to the media length when rendered. Set data-duration to ~0.01s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-hf-id": "hf-at0g",
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "30",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-side1\" is 0.01s but its slot (data-duration) is 0.10s — the slot is shortened to the media length when rendered. Set data-duration to ~0.01s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-hf-id": "hf-at0g",
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "30",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"sfx-side2\" is 0.01s but its slot (data-duration) is 0.10s — the slot is shortened to the media length when rendered. Set data-duration to ~0.01s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-hf-id": "hf-at0g",
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "30",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      }
+    ]
   },
   "layout": {
     "ok": true,
     "errorCount": 0,
     "warningCount": 0,
-    "infoCount": 3,
+    "infoCount": 1,
     "findings": [
-      {
-        "code": "canvas_overflow",
-        "severity": "info",
-        "time": 5.556,
-        "selector": "span.ps1",
-        "message": "Text extends outside the composition canvas.",
-        "rect": {
-          "left": 166.18,
-          "top": 1068.21,
-          "right": 181.82,
-          "bottom": 1103.29,
-          "width": 15.64,
-          "height": 35.08
-        },
-        "containerSelector": "#root",
-        "text": "$",
-        "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
-        "containerRect": {
-          "left": 0,
-          "top": 0,
-          "right": 1920,
-          "bottom": 1080,
-          "width": 1920,
-          "height": 1080
-        },
-        "overflow": {
-          "bottom": 23.29
-        },
-        "dataAttributes": {},
-        "sourceFile": "compositions/desk.html",
-        "bbox": {
-          "x": 166.18,
-          "y": 1068.21,
-          "width": 15.64,
-          "height": 35.08
-        },
-        "firstSeen": 5.556,
-        "lastSeen": 5.556,
-        "occurrences": 1,
-        "heldMs": 0,
-        "times": [
-          5.556
-        ]
-      },
-      {
-        "code": "escaped_container",
-        "severity": "info",
-        "time": 5.556,
-        "selector": "#desk-term",
-        "message": "Positioned element renders far outside its offset parent — its coordinates were likely computed in a different frame (canvas/viewport pixels).",
-        "rect": {
-          "left": 140.12,
-          "top": 990.03,
-          "right": 1779.88,
-          "bottom": 1310.77,
-          "width": 1639.76,
-          "height": 320.74
-        },
-        "containerSelector": "#desk-window",
-        "text": "bash + $ git push main...origin/main [ahead 1] — pushed.",
-        "fixHint": "Compute left/top in the offset parent's frame (subtract its rect), or mark intentional placement with data-layout-allow-overflow.",
-        "containerRect": {
-          "left": 138.11,
-          "top": 88.96,
-          "right": 1781.89,
-          "bottom": 991.04,
-          "width": 1643.77,
-          "height": 902.07
-        },
-        "dataAttributes": {
-          "data-hf-id": "hf-dsk30"
-        },
-        "sourceFile": "compositions/desk.html",
-        "bbox": {
-          "x": 140.12,
-          "y": 990.03,
-          "width": 1639.76,
-          "height": 320.74
-        },
-        "firstSeen": 5.556,
-        "lastSeen": 5.556,
-        "occurrences": 1,
-        "heldMs": 0,
-        "times": [
-          5.556
-        ]
-      },
       {
         "code": "text_occluded",
         "severity": "info",
-        "time": 7.778,
+        "time": 8.333,
         "selector": "#desk-term-cmd > span:nth-of-type(8)",
         "message": "Text is hidden beneath an opaque element.",
         "rect": {
-          "left": 297.41,
-          "top": 750.52,
-          "right": 313.28,
-          "bottom": 786.11,
-          "width": 15.87,
-          "height": 35.6
+          "left": 296.76,
+          "top": 750.73,
+          "right": 312.65,
+          "bottom": 786.36,
+          "width": 15.89,
+          "height": 35.63
         },
         "containerSelector": "#desk-term-cur",
         "text": "h",
@@ -130,41 +154,41 @@
         "coveredFraction": 0.11,
         "lifetime": {
           "start": 3.4,
-          "end": 8.4
+          "end": 9
         },
         "dataAttributes": {},
         "sourceFile": "compositions/desk.html",
         "bbox": {
-          "x": 297.41,
-          "y": 750.52,
-          "width": 15.87,
-          "height": 35.6
+          "x": 296.76,
+          "y": 750.73,
+          "width": 15.89,
+          "height": 35.63
         },
-        "firstSeen": 7.778,
-        "lastSeen": 7.778,
+        "firstSeen": 8.333,
+        "lastSeen": 8.333,
         "occurrences": 1,
         "heldMs": 0,
         "times": [
-          7.778
+          8.333
         ]
       }
     ],
-    "duration": 20,
+    "duration": 30,
     "samples": [
-      1.111,
-      3.333,
-      5.556,
-      7.778,
-      10,
-      12.222,
-      14.444,
-      16.667,
-      18.889
+      1.667,
+      5,
+      8.333,
+      11.667,
+      15,
+      18.333,
+      21.667,
+      25,
+      28.333
     ],
     "transitionSamples": [],
     "transitionSamplesDropped": 0,
     "tolerance": 2,
-    "totalIssueCount": 3,
+    "totalIssueCount": 1,
     "truncated": false
   },
   "motion": {
@@ -184,19 +208,19 @@
     "findings": [],
     "enabled": true,
     "samples": [
-      1.111,
-      5.556,
-      10,
-      14.444,
-      18.889
+      1.667,
+      8.333,
+      15,
+      21.667,
+      28.333
     ],
-    "checked": 63,
-    "passed": 63
+    "checked": 70,
+    "passed": 70
   },
   "craft": {
     "ok": true,
     "errorCount": 0,
-    "warningCount": 8,
+    "warningCount": 12,
     "infoCount": 0,
     "findings": [
       {
@@ -256,280 +280,280 @@
         ],
         "fontPx": 18.87,
         "floorPx": 28,
-        "seconds": 5,
+        "seconds": 5.5,
         "elements": [
           {
             "selector": "span.k",
             "text": "Ctrl K",
             "fontPx": 18.87,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "div.qhead > span:nth-of-type(1)",
             "text": "CHANGES",
             "fontPx": 21.85,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "div.qhead > span:nth-of-type(2)",
             "text": "SELECT ALL",
             "fontPx": 21.85,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "#desk-row-1 > span:nth-of-type(2)",
             "text": "+84",
             "fontPx": 22,
             "time": 4,
-            "seconds": 4.5
+            "seconds": 5
           },
           {
             "selector": "#desk-row-2 > span:nth-of-type(2)",
             "text": "M",
             "fontPx": 22,
             "time": 4.5,
-            "seconds": 4
+            "seconds": 4.5
           },
           {
             "selector": "#desk-row-3 > span:nth-of-type(2)",
             "text": "+42",
             "fontPx": 22.01,
             "time": 5.125,
-            "seconds": 3.375
+            "seconds": 3.875
           },
           {
             "selector": "#desk-row-4 > span:nth-of-type(2)",
             "text": "M",
             "fontPx": 22.06,
             "time": 5.625,
-            "seconds": 2.875
+            "seconds": 3.375
           },
           {
             "selector": "span.m.del",
             "text": "−17",
             "fontPx": 22.15,
             "time": 6.25,
-            "seconds": 2.25
+            "seconds": 2.75
           },
           {
             "selector": "#desk-band > span:nth-of-type(2)",
             "text": "main",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "#desk-strip > span:nth-of-type(1) > b:nth-of-type(1)",
             "text": "portfolio",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "#desk-strip > span:nth-of-type(2)",
             "text": "main",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "#desk-strip > span:nth-of-type(2) > b:nth-of-type(1)",
             "text": "↑1",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "#desk-strip > span:nth-of-type(3)",
             "text": "Fetch",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "#desk-strip > span:nth-of-type(4)",
             "text": "Pull & Push",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "span.chip.push",
             "text": "Push",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "span.tab",
             "text": "bash",
             "fontPx": 23.84,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "span.hunk",
             "text": "@@ -49,6 +49,9 @@ settings.ts",
             "fontPx": 24.05,
             "time": 5.5,
-            "seconds": 3
+            "seconds": 3.5
           },
           {
             "selector": "span.ln.del",
             "text": "return join(dir, -settings.json')",
             "fontPx": 24.06,
             "time": 5.625,
-            "seconds": 2.875
+            "seconds": 3.375
           },
           {
             "selector": "span.ln.del > b:nth-of-type(1)",
             "text": "'gitdesk",
             "fontPx": 24.06,
             "time": 5.625,
-            "seconds": 2.875
+            "seconds": 3.375
           },
           {
             "selector": "#desk-diff > span:nth-of-type(4)",
             "text": "+ return join(dir, -settings.json')",
             "fontPx": 24.08,
             "time": 5.75,
-            "seconds": 2.75
+            "seconds": 3.25
           },
           {
             "selector": "span.ln.add > b:nth-of-type(1)",
             "text": "'aspen",
             "fontPx": 24.08,
             "time": 5.75,
-            "seconds": 2.75
+            "seconds": 3.25
           },
           {
             "selector": "#desk-diff > span:nth-of-type(5)",
             "text": "+ // the leaf keeps the record it grew from",
             "fontPx": 24.08,
             "time": 5.75,
-            "seconds": 2.75
+            "seconds": 3.25
           },
           {
             "selector": "#desk-diff > span:nth-of-type(8)",
             "text": "+ app.mark('aspen-leaf')",
             "fontPx": 24.12,
             "time": 6,
-            "seconds": 2.5
+            "seconds": 3
           },
           {
             "selector": "#desk-row-1",
             "text": "src/main/migrate.ts",
             "fontPx": 25,
             "time": 4,
-            "seconds": 4.5
+            "seconds": 5
           },
           {
             "selector": "#desk-row-2",
             "text": "scripts/make-icons.mjs",
             "fontPx": 25,
             "time": 4.5,
-            "seconds": 4
+            "seconds": 4.5
           },
           {
             "selector": "#desk-row-3",
             "text": "resources/aspen-icon.svg",
             "fontPx": 25.01,
             "time": 5.125,
-            "seconds": 3.375
+            "seconds": 3.875
           },
           {
             "selector": "#desk-row-4",
             "text": "src/main/windows.ts",
             "fontPx": 25.07,
             "time": 5.625,
-            "seconds": 2.875
+            "seconds": 3.375
           },
           {
             "selector": "#desk-row-5",
             "text": "README.md",
             "fontPx": 25.17,
             "time": 6.25,
-            "seconds": 2.25
+            "seconds": 2.75
           },
           {
             "selector": "span.word",
             "text": "Aspen",
             "fontPx": 25.82,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "span.ps1",
             "text": "$",
             "fontPx": 25.82,
             "time": 3.5,
-            "seconds": 5
+            "seconds": 5.5
           },
           {
             "selector": "#desk-term-cmd > span:nth-of-type(1)",
             "text": "g",
             "fontPx": 26.14,
             "time": 6,
-            "seconds": 2.5
+            "seconds": 3
           },
           {
             "selector": "#desk-term-cmd > span:nth-of-type(2)",
             "text": "i",
             "fontPx": 26.14,
             "time": 6,
-            "seconds": 2.5
+            "seconds": 3
           },
           {
             "selector": "#desk-term-cmd > span:nth-of-type(3)",
             "text": "t",
             "fontPx": 26.15,
             "time": 6.125,
-            "seconds": 2.375
+            "seconds": 2.875
           },
           {
             "selector": "#desk-term-cmd > span:nth-of-type(5)",
             "text": "p",
             "fontPx": 26.18,
             "time": 6.25,
-            "seconds": 2.25
+            "seconds": 2.75
           },
           {
             "selector": "#desk-term-cmd > span:nth-of-type(6)",
             "text": "u",
             "fontPx": 26.21,
             "time": 6.375,
-            "seconds": 2.125
+            "seconds": 2.625
           },
           {
             "selector": "#desk-term-cmd > span:nth-of-type(7)",
             "text": "s",
             "fontPx": 26.21,
             "time": 6.375,
-            "seconds": 2.125
+            "seconds": 2.625
           },
           {
             "selector": "#desk-term-cmd > span:nth-of-type(8)",
             "text": "h",
             "fontPx": 26.23,
             "time": 6.5,
-            "seconds": 2
+            "seconds": 2.5
           },
           {
             "selector": "#desk-term-out",
             "text": "main...origin/main [ahead 1] — pushed.",
             "fontPx": 26.28,
             "time": 6.75,
-            "seconds": 1.75
+            "seconds": 2.25
           }
         ]
       },
       {
         "code": "line_unread",
         "severity": "warning",
-        "message": "\"@@ -49,6 +49,9 @@ settings.ts return join(dir, 'gitdesk-s...\" (30 words) is on screen 2.91 s (±0.01 s), under its 7.13 s floor: hold it about 0.5 s + 0.3 s a word (9.50 s here) before it leaves or changes; see references/motion.md.",
+        "message": "\"@@ -49,6 +49,9 @@ settings.ts return join(dir, 'gitdesk-s...\" (30 words) is on screen 3.50 s (±0.01 s), under its 7.13 s floor: hold it about 0.5 s + 0.3 s a word (9.50 s here) before it leaves or changes; see references/motion.md.",
         "text": "@@ -49,6 +49,9 @@ settings.ts return join(dir, 'gitdesk-settings.json') + return join(dir, 'aspen-settings.json') + // the leaf keeps the record it grew from + app.mark('aspen-leaf')",
         "selector": "#desk-diff",
         "dataAttributes": {},
@@ -542,32 +566,128 @@
         },
         "time": 5.5,
         "words": 30,
-        "seconds": 2.906,
+        "seconds": 3.5,
         "floorSeconds": 7.125
       },
       {
         "code": "line_unread",
         "severity": "warning",
-        "message": "\"main...origin/main [ahead 1] — pushed.\" (6 words) is on screen 1.67 s (±0.01 s), under its 1.72 s floor: hold it about 0.5 s + 0.3 s a word (2.30 s here) before it leaves or changes; see references/motion.md.",
-        "text": "main...origin/main [ahead 1] — pushed.",
-        "selector": "#desk-term-out",
+        "message": "\"A assets/marks/aspen-leaf.glb +4.2 MB · model\" (10 words) is on screen 2.42 s (±0.01 s), under its 2.63 s floor: hold it about 0.5 s + 0.3 s a word (3.50 s here) before it leaves or changes; see references/motion.md.",
+        "text": "A assets/marks/aspen-leaf.glb +4.2 MB · model",
+        "selector": "#m3d-file",
         "dataAttributes": {},
-        "sourceFile": "compositions/desk.html",
+        "sourceFile": "compositions/model3d.html",
         "bbox": {
-          "x": 159.45,
-          "y": 795.73,
-          "width": 614.97,
-          "height": 35.379999999999995
+          "x": 165.41,
+          "y": 146.52,
+          "width": 550.81,
+          "height": 45
         },
-        "time": 6.734,
-        "words": 6,
-        "seconds": 1.672,
-        "floorSeconds": 1.725
+        "time": 22.703,
+        "words": 10,
+        "seconds": 2.422,
+        "floorSeconds": 2.625
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 2 text elements stay under it for 0.5 s or more, the smallest \"+4.2 MB · model\" at 26 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "+4.2 MB · model",
+        "selector": "#m3d-tag",
+        "dataAttributes": {},
+        "sourceFile": "compositions/model3d.html",
+        "bbox": {
+          "x": 1575.86,
+          "y": 153.52,
+          "width": 202.14,
+          "height": 31
+        },
+        "time": 22.75,
+        "times": [
+          22.75,
+          23.875
+        ],
+        "fontPx": 26,
+        "floorPx": 28,
+        "seconds": 2.375,
+        "elements": [
+          {
+            "selector": "#m3d-tag",
+            "text": "+4.2 MB · model",
+            "fontPx": 26,
+            "time": 22.75,
+            "seconds": 2.375
+          },
+          {
+            "selector": "#m3d-orbit",
+            "text": "orbit with the mouse",
+            "fontPx": 26,
+            "time": 23.875,
+            "seconds": 1.25
+          }
+        ]
       },
       {
         "code": "line_unread",
         "severity": "warning",
-        "message": "The film's last line \"Aspen\" (1 word) is on screen 1.37 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "message": "\"aspen-leaf.glb · orbitable preview · sidecars resolved\" (7 words) is on screen 1.79 s (±0.01 s), under its 1.95 s floor: hold it about 0.5 s + 0.3 s a word (2.60 s here) before it leaves or changes; see references/motion.md.",
+        "text": "aspen-leaf.glb · orbitable preview · sidecars resolved",
+        "selector": "div.vh",
+        "dataAttributes": {},
+        "sourceFile": "compositions/model3d.html",
+        "bbox": {
+          "x": 738.46,
+          "y": 283.26,
+          "width": 648.5900000000001,
+          "height": 36.629999999999995
+        },
+        "time": 23.336,
+        "words": 7,
+        "seconds": 1.789,
+        "floorSeconds": 1.95
+      },
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "\"3D models render right in the diff view\" (8 words) is on screen 0.98 s (±0.01 s), under its 2.17 s floor: hold it about 0.5 s + 0.3 s a word (2.90 s here) before it leaves or changes; see references/motion.md.",
+        "text": "3D models render right in the diff view",
+        "selector": "#m3d-caption",
+        "dataAttributes": {},
+        "sourceFile": "compositions/model3d.html",
+        "bbox": {
+          "x": 652.42,
+          "y": 971.17,
+          "width": 615.14,
+          "height": 41
+        },
+        "time": 24.141,
+        "words": 8,
+        "seconds": 0.984,
+        "floorSeconds": 2.175
+      },
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "\"leaf-basecolor.png\" (3 words) is on screen 0.95 s (±0.01 s), under its 1.05 s floor: hold it about 0.5 s + 0.3 s a word (1.40 s here) before it leaves or changes; see references/motion.md.",
+        "text": "leaf-basecolor.png",
+        "selector": "#m3d-side > span:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/model3d.html",
+        "bbox": {
+          "x": 1119.59,
+          "y": 853,
+          "width": 302.4100000000001,
+          "height": 37
+        },
+        "time": 25.258,
+        "words": 3,
+        "seconds": 0.945,
+        "floorSeconds": 1.05
+      },
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "The film's last line \"Aspen\" (1 word) is on screen 1.50 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
         "text": "Aspen",
         "selector": "#end-word",
         "dataAttributes": {},
@@ -578,53 +698,53 @@
           "width": 320.6700000000001,
           "height": 131
         },
-        "time": 18.633,
+        "time": 28.508,
         "words": 1,
-        "seconds": 1.371,
+        "seconds": 1.496,
         "floorSeconds": 2
       },
       {
         "code": "line_unread",
         "severity": "warning",
-        "message": "The film's last line \"OpenAI · OpenRouter · Ollama · LM Studio\" (5 words) is on screen 1.37 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
-        "text": "OpenAI · OpenRouter · Ollama · LM Studio",
+        "message": "The film's last line \"Any AI agent writes your message: OpenAI · OpenRouter · O...\" (11 words) is on screen 1.50 s (±0.01 s), under the 2.85 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "text": "Any AI agent writes your message: OpenAI · OpenRouter · Ollama · LM Studio",
         "selector": "#end-f1",
         "dataAttributes": {},
         "sourceFile": "compositions/endcard.html",
         "bbox": {
-          "x": 664.19,
+          "x": 413.75,
           "y": 603,
-          "width": 591.6199999999999,
+          "width": 1092.48,
           "height": 36
         },
-        "time": 18.633,
-        "words": 5,
-        "seconds": 1.371,
-        "floorSeconds": 2
+        "time": 28.508,
+        "words": 11,
+        "seconds": 1.496,
+        "floorSeconds": 2.85
       },
       {
         "code": "line_unread",
         "severity": "warning",
-        "message": "The film's last line \"Integrated terminal · no GitHub account required\" (6 words) is on screen 1.37 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
-        "text": "Integrated terminal · no GitHub account required",
+        "message": "The film's last line \"Conflicts, terminal, watch folder, 3D previews — in one w...\" (9 words) is on screen 1.50 s (±0.01 s), under the 2.40 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "text": "Conflicts, terminal, watch folder, 3D previews — in one window",
         "selector": "#end-f2",
         "dataAttributes": {},
         "sourceFile": "compositions/endcard.html",
         "bbox": {
-          "x": 617.78,
+          "x": 512.92,
           "y": 665,
-          "width": 684.4199999999998,
+          "width": 894.14,
           "height": 36
         },
-        "time": 18.633,
-        "words": 6,
-        "seconds": 1.371,
-        "floorSeconds": 2
+        "time": 28.508,
+        "words": 9,
+        "seconds": 1.496,
+        "floorSeconds": 2.4
       },
       {
         "code": "line_unread",
         "severity": "warning",
-        "message": "The film's last line \"MIT · free · open source\" (4 words) is on screen 1.37 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "message": "The film's last line \"MIT · free · open source\" (4 words) is on screen 1.50 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
         "text": "MIT · free · open source",
         "selector": "#end-f3",
         "dataAttributes": {},
@@ -635,15 +755,15 @@
           "width": 339.44000000000005,
           "height": 36
         },
-        "time": 18.633,
+        "time": 28.508,
         "words": 4,
-        "seconds": 1.371,
+        "seconds": 1.496,
         "floorSeconds": 2
       },
       {
         "code": "line_unread",
         "severity": "warning",
-        "message": "The film's last line \"Your diff. Your model. Your machine.\" (6 words) is on screen 1.37 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "message": "The film's last line \"Your diff. Your model. Your machine.\" (6 words) is on screen 1.50 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
         "text": "Your diff. Your model. Your machine.",
         "selector": "#end-punch",
         "dataAttributes": {},
@@ -654,15 +774,15 @@
           "width": 1044.12,
           "height": 75
         },
-        "time": 18.633,
+        "time": 28.508,
         "words": 6,
-        "seconds": 1.371,
+        "seconds": 1.496,
         "floorSeconds": 2
       }
     ],
     "enabled": true,
     "step": 0.125,
-    "samples": 160
+    "samples": 240
   },
   "audio": {
     "ok": true,

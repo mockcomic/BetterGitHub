@@ -1,0 +1,387 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #f4f1e8;
+      font-family: Inter, sans-serif;
+    }
+    /* The client window: Aspen's light desk — paper panels, deep-green ink,
+       gold once. Rows arrive on the brand-bed beat grid (3.85 / 4.40 / 4.96 / 5.51 / 6.07). */
+    #desk-window {
+      position: absolute;
+      left: 140px;
+      top: 90px;
+      width: 1640px;
+      height: 900px;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid #d9d3c2;
+      box-shadow: 0 24px 60px rgba(38, 60, 48, 0.18);
+    }
+    #desk-band {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 64px;
+      border-radius: 14px 14px 0 0;
+      background: #eae5d6;
+      border-bottom: 1px solid #d9d3c2;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding-left: 24px;
+    }
+    #desk-band svg {
+      width: 40px;
+      height: 40px;
+      display: block;
+    }
+    #desk-band .word {
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #16382a;
+    }
+    #desk-strip {
+      position: absolute;
+      left: 0;
+      top: 64px;
+      width: 100%;
+      height: 76px;
+      background: #ffffff;
+      border-bottom: 1px solid #e2ddcd;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+    }
+    .chip {
+      height: 46px;
+      border-radius: 8px;
+      border: 1px solid #d4cebc;
+      background: #f6f3ea;
+      color: #4e5d52;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      gap: 10px;
+      white-space: nowrap;
+    }
+    .chip b {
+      color: #16382a;
+      font-weight: 600;
+    }
+    .chip .k {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 19px;
+      color: #5f6f64;
+      border: 1px solid #d4cebc;
+      border-radius: 5px;
+      padding: 1px 7px;
+    }
+    #desk-strip .push {
+      margin-left: auto;
+      background: #e3ac38;
+      color: #26190a;
+      border-color: #d29f2c;
+      font-weight: 600;
+    }
+    #desk-queue {
+      position: absolute;
+      left: 0;
+      top: 140px;
+      width: 560px;
+      bottom: 0;
+      border-right: 1px solid #e2ddcd;
+      padding: 22px;
+    }
+    #desk-queue .qhead {
+      display: flex;
+      justify-content: space-between;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 22px;
+      color: #5f6f64;
+      letter-spacing: 0.12em;
+      padding: 0 8px 14px;
+    }
+    .qrow {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      height: 64px;
+      border-radius: 8px;
+      padding: 0 14px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 25px;
+      color: #24402f;
+      opacity: 0;
+    }
+    .qrow .box {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: 2px solid #b9c2b0;
+      flex: none;
+      background: #ffffff;
+    }
+    .qrow.checked .box {
+      background: #2e7d55;
+      border-color: #2e7d55;
+    }
+    .qrow .m {
+      margin-left: auto;
+      font-size: 22px;
+    }
+    .qrow .add {
+      color: #2e7d3a;
+    }
+    .qrow .del {
+      color: #c04a48;
+    }
+    .qrow .mod {
+      color: #7d6318;
+    }
+    #desk-diff {
+      position: absolute;
+      left: 560px;
+      top: 140px;
+      right: 0;
+      bottom: 0;
+      padding: 26px 34px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 24px;
+      line-height: 52px;
+    }
+    #desk-diff .hunk {
+      color: #4e5d52;
+      background: #eef0e4;
+      border-radius: 6px;
+      padding: 0 12px;
+      display: inline-block;
+    }
+    #desk-diff .ln {
+      display: block;
+      padding: 0 12px;
+      border-radius: 6px;
+      white-space: nowrap;
+      color: #3c5445;
+    }
+    #desk-diff .ln.add {
+      background: #e2f3e5;
+      color: #1f6b33;
+    }
+    #desk-diff .ln.add b {
+      background: #c4e6cc;
+      font-weight: 400;
+    }
+    #desk-diff .ln.del {
+      background: #fbe7e5;
+      color: #b03a38;
+    }
+    #desk-diff .ln.del b {
+      background: #f5cfcc;
+      font-weight: 400;
+    }
+    #desk-diff .grow {
+      display: block;
+      height: 26px;
+    }
+    #desk-caption {
+      position: absolute;
+      left: 96px;
+      top: 22px;
+      width: 1728px;
+      text-align: center;
+      font-size: 34px;
+      color: #3d4b41;
+      opacity: 0;
+    }
+    /* the 0.2.0 terminal drawer: tabs, prompt, one typed git command */
+    #desk-term {
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      bottom: 0;
+      height: 320px;
+      background: #16382a;
+      border-radius: 0 0 14px 14px;
+      border-top: 1px solid #d9d3c2;
+      overflow: hidden;
+    }
+    #desk-term .tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 54px;
+      padding: 0 16px;
+      background: #0f2a1f;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 24px;
+      color: #cfd8cf;
+    }
+    #desk-term .tab {
+      padding: 6px 18px;
+      border-radius: 6px 6px 0 0;
+      background: #16382a;
+      color: #f0efe4;
+    }
+    #desk-term .tab-add {
+      color: #8fa396;
+      padding: 6px 12px;
+    }
+    #desk-term .body {
+      padding: 18px 26px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 26px;
+      line-height: 46px;
+      color: #dfe8dd;
+      white-space: nowrap;
+    }
+    #desk-term .ps1 {
+      color: #e3ac38;
+    }
+    #desk-term .ok {
+      color: #a8e0b4;
+    }
+    #desk-term .tcur {
+      display: inline-block;
+      width: 14px;
+      height: 30px;
+      background: #e3ac38;
+      vertical-align: -4px;
+    }
+  </style>
+
+  <div data-hf-id="hf-dsk0" id="root" data-composition-id="desk" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-dsk1" id="desk-window" class="clip" data-start="0" data-duration="5.6">
+      <div data-hf-id="hf-dsk2" id="desk-band">
+        <!-- The live mark, geometry lifted from resources/aspen-icon.svg -->
+        <svg data-hf-id="hf-dsk3" viewBox="0 0 512 512" aria-hidden="true">
+          <path fill="#215c4a" d="M 252.76 48.33 L 233.03 67.73 L 219.21 79.8 L 203.31 92.41 L 162.19 123.44 L 146.96 136.04 L 135.12 147.12 L 124.15 158.64 L 109.45 176.62 L 100.68 189.01 L 89.27 208.52 L 83.8 219.82 L 78.97 231.55 L 75.03 243.5 L 71.73 255.79 L 69.21 268.18 L 67.57 280.57 L 66.69 292.85 L 66.58 305.02 L 67.46 316.86 L 68.99 328.37 L 70.96 337.14 L 73.38 345.7 L 76.34 353.92 L 81.6 365.54 L 86.75 374.32 L 90.37 379.47 L 98.49 389.45 L 107.81 398.77 L 112.85 403.15 L 123.6 411.27 L 136.97 419.38 L 153.97 427.39 L 173.05 434.41 L 193.88 440.21 L 216.47 444.93 L 231.38 447.12 L 251.23 448 L 272.06 447.78 L 291.58 445.7 L 308.03 442.85 L 332.26 437.04 L 347.18 432.21 L 360.66 426.95 L 378.65 417.96 L 389.27 411.27 L 403.53 399.97 L 415.81 387.36 L 424.81 375.3 L 432.26 362.14 L 437.96 348 L 442.13 332.87 L 444.54 316.86 L 445.42 299.87 L 445.09 288.13 L 443.99 276.4 L 442.24 264.88 L 439.72 253.27 L 436.54 241.86 L 432.7 230.67 L 428.2 219.6 L 423.05 208.64 L 417.13 198 L 406.38 181.44 L 397.28 169.27 L 382.15 152.05 L 371.29 141.2 L 359.57 131 L 341.14 116.53 L 307.59 91.53 L 290.27 77.82 L 276.88 65.88 L 259.67 48.88 L 256.93 48 L 252.76 48.33 Z"/>
+          <rect x="244" y="444" width="24" height="40" rx="12" fill="#215c4a"/>
+          <g stroke="#fbf7ea" stroke-width="34" stroke-linecap="round" fill="none">
+            <line x1="256" y1="148" x2="256" y2="428"/>
+            <line x1="256" y1="322" x2="138" y2="256"/>
+            <line x1="256" y1="322" x2="374" y2="256"/>
+          </g>
+          <circle cx="256" cy="148" r="40" fill="#fbf7ea"/>
+          <circle cx="138" cy="256" r="40" fill="#fbf7ea"/>
+          <circle cx="374" cy="256" r="40" fill="#e3ac38"/>
+        </svg>
+        <span data-hf-id="hf-dsk4" class="word">Aspen</span>
+        <span data-hf-id="hf-dsk5" class="chip" style="margin-left:auto">main</span>
+        <span data-hf-id="hf-dsk6" class="chip"><span class="k">Ctrl K</span></span>
+      </div>
+
+      <div data-hf-id="hf-dsk7" id="desk-strip">
+        <span data-hf-id="hf-dsk8" class="chip"><b>portfolio</b></span>
+        <span data-hf-id="hf-dsk9" class="chip">main <b>↑1</b></span>
+        <span data-hf-id="hf-dsk10" class="chip">Fetch</span>
+        <span data-hf-id="hf-dsk11" class="chip">Pull &amp; Push</span>
+        <span data-hf-id="hf-dsk12" class="chip push">Push</span>
+      </div>
+
+      <div data-hf-id="hf-dsk13" id="desk-queue">
+        <div data-hf-id="hf-dsk14" class="qhead"><span>CHANGES</span><span>SELECT ALL</span></div>
+        <div data-hf-id="hf-dsk15" class="qrow checked" id="desk-row-1"><span class="box"></span>src/main/migrate.ts<span class="m add">+84</span></div>
+        <div data-hf-id="hf-dsk16" class="qrow checked" id="desk-row-2"><span class="box"></span>scripts/make-icons.mjs<span class="m mod">M</span></div>
+        <div data-hf-id="hf-dsk17" class="qrow" id="desk-row-3"><span class="box"></span>resources/aspen-icon.svg<span class="m add">+42</span></div>
+        <div data-hf-id="hf-dsk18" class="qrow checked" id="desk-row-4"><span class="box"></span>src/main/windows.ts<span class="m mod">M</span></div>
+        <div data-hf-id="hf-dsk19" class="qrow" id="desk-row-5"><span class="box"></span>README.md<span class="m del">−17</span></div>
+      </div>
+
+      <div data-hf-id="hf-dsk20" id="desk-diff">
+        <span data-hf-id="hf-dsk21" class="hunk">@@ -49,6 +49,9 @@ settings.ts</span>
+        <span data-hf-id="hf-dsk22" class="grow"></span>
+        <span data-hf-id="hf-dsk23" class="ln del">return join(dir, <b>'gitdesk</b>-settings.json')</span>
+        <span data-hf-id="hf-dsk24" class="ln add">+ return join(dir, <b>'aspen</b>-settings.json')</span>
+        <span data-hf-id="hf-dsk25" class="ln add">+ // the leaf keeps the record it grew from</span>
+        <span data-hf-id="hf-dsk26" class="ln">&nbsp;</span>
+        <span data-hf-id="hf-dsk27" class="ln">&nbsp;</span>
+        <span data-hf-id="hf-dsk28" class="ln add">+ app.mark('aspen-leaf')</span>
+      </div>
+
+      <!-- 0.2.0: the integrated terminal — tabs, prompt, one typed git command.
+           The drawer rides in from below the window frame: overflow intended. -->
+      <div data-hf-id="hf-dsk30" id="desk-term" data-layout-allow-overflow="true" data-layout-allow-occlusion="true">
+        <div data-hf-id="hf-dsk31" class="tabs">
+          <span data-hf-id="hf-dsk32" class="tab">bash</span>
+          <span data-hf-id="hf-dsk33" class="tab-add">+</span>
+        </div>
+        <div data-hf-id="hf-dsk34" class="body">
+          <div><span class="ps1">$</span> <span id="desk-term-cmd"></span><span class="tcur" id="desk-term-cur"></span></div>
+          <div class="ok" id="desk-term-out" style="opacity:0">main...origin/main [ahead 1]&nbsp;&nbsp;— pushed.</div>
+        </div>
+      </div>
+    </div>
+
+    <p data-hf-id="hf-dsk29" id="desk-caption">A visual desktop client for Git — with your terminal inside it</p>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // the window settles in (it replaces the hook ground at the cut)
+    tl.fromTo(
+      "#desk-window",
+      { opacity: 0, y: 26, scale: 0.985 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "power3.out" },
+      0.01,
+    );
+    // rows arrive on the bed beat grid (scene-local .45/1.0/1.56/2.11/2.67 = 3.85/4.40/4.96/5.51/6.07)
+    const rows = ["#desk-row-1", "#desk-row-2", "#desk-row-3", "#desk-row-4", "#desk-row-5"];
+    const beats = [0.45, 1.0, 1.56, 2.11, 2.67];
+    rows.forEach((r, i) => {
+      tl.fromTo(r, { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.24, ease: "power2.out" }, beats[i]);
+    });
+    // the diff wash paints after the list is complete
+    tl.fromTo(
+      ["#desk-diff .hunk", "#desk-diff .ln"],
+      { opacity: 0 },
+      { opacity: 1, duration: 0.3, stagger: 0.07, ease: "power1.out" },
+      2.0,
+    );
+    // a slow push toward the commit verbs comes next scene; caption holds
+    tl.fromTo(
+      "#desk-caption",
+      { opacity: 0, y: 12 },
+      { opacity: 1, y: 0, duration: 0.34, ease: "power2.out" },
+      1.2,
+    );
+    tl.to("#desk-window", { scale: 1.018, duration: 3.6, ease: "sine.inOut" }, 1.3);
+
+    // 0.2.0: the terminal drawer rises on the last row beat and types one verb
+    tl.fromTo(
+      "#desk-term",
+      { y: 320 },
+      { y: 0, duration: 0.42, ease: "power3.out" },
+      2.35,
+    );
+    const cmd = "git push";
+    const cmdEl = document.getElementById("desk-term-cmd");
+    cmdEl.innerHTML = cmd
+      .split("")
+      .map((c) => `<span style="opacity:0">${c === " " ? "&nbsp;" : c}</span>`)
+      .join("");
+    let ct = 2.5;
+    Array.from(cmdEl.children).forEach((el) => {
+      tl.to(el, { opacity: 1, duration: 0.02 }, ct);
+      ct += 0.07;
+    });
+    tl.to("#desk-term-cur", { opacity: 0, duration: 0.05 }, ct + 0.2);
+    tl.to("#desk-term-cur", { opacity: 1, duration: 0.05 }, ct + 0.32);
+    tl.fromTo(
+      "#desk-term-out",
+      { opacity: 0 },
+      { opacity: 1, duration: 0.18, ease: "power1.out" },
+      ct + 0.22,
+    );
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines["desk"] = tl;
+  </script>
+</template>
