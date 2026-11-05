@@ -4,6 +4,10 @@
 with Electron + React + TypeScript, featuring an integrated
 **AI commit-message agent** (any OpenAI-compatible API).
 
+▶ **[Watch the 30-second film](https://github.com/mockcomic/BetterGitHub/releases/download/v0.2.0/aspen-brag-0.2.0.mp4)** —
+any AI agent writes your message, conflicts resolve with one click, and 3D
+model changes render right in the diff view.
+
 Built from a reverse-engineering study of GitHub Desktop 3.6.7's shipped
 Electron artifact (typed IPC contract, porcelain-v2 status parsing, per-verb
 git modules, and the AI commit-message flow: fixed system prompt →
