@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { call } from '../api'
 import { useStore, useStoreState } from '../store'
-import type { AccountInfo, RemoteRepoSort } from '../../../shared/models'
+import type { AccountInfo, ProviderOwner, RemoteRepoSort } from '../../../shared/models'
 import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field, InfoTip } from './Dialog'
@@ -713,6 +713,308 @@ export function CloneDialog(): JSX.Element | null {
         </div>
       </Field>
       {state.busy === 'clone' && <p className="busy-line">Cloning…</p>}
+    </Dialog>
+  )
+}
+
+/**
+ * Create / Publish — one dialog, two modes, mirroring how the Clone dialog
+ * already grows a tab per signed-in account. 'new' builds a repository on
+ * disk and can take it online in the same breath; 'publish' does the online
+ * half for the selected repository that has no origin. The account tabs are
+ * the answer to "which one do I publish to" when several accounts are
+ * signed in, and each tab's owner dropdown adds that account's
+ * organizations / groups. Without write scope the provider's own 403 (made
+ * actionable by providerErrorMessage) shows here, not in a toast the user
+ * has already lost.
+ */
+export function NewRepositoryDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  const mode = state.repoDialog
+  const publishing = mode === 'publish'
+
+  const [tab, setTab] = useState<string>('signin')
+  const [owners, setOwners] = useState<Readonly<Record<string, ReadonlyArray<ProviderOwner>>>>({})
+  const [owner, setOwner] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [addReadme, setAddReadme] = useState(true)
+  const [baseDir, setBaseDir] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const accounts = state.accounts
+  const activeAccount = accounts.find(a => a.id === tab) ?? null
+  const busy = state.busy === 'create' || state.busy === 'publish'
+  const ownerList = activeAccount === null ? null : owners[activeAccount.id] ?? null
+
+  // Fresh fields on every open. The destination defaults to the folder used
+  // last, then the watch folder — a newcomer who set one never picks again.
+  useEffect(() => {
+    if (mode === null) return
+    setName(publishing ? state.selectedRepo?.name ?? '' : '')
+    setDescription('')
+    setIsPrivate(false)
+    setAddReadme(true)
+    setError(null)
+    setOwners({})
+    setOwner('')
+    setTab(accounts[0]?.id ?? 'signin')
+    setBaseDir(
+      window.localStorage.getItem('aspen.lastNewRepoDir') ??
+        state.settings?.scanFolder ??
+        ''
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
+  // A signed-out or vanished tab never stays selected; empty account lists
+  // own the Accounts (sign-in) tab, exactly like the Clone dialog.
+  useEffect(() => {
+    if (mode === null) return
+    if (tab === 'signin') return
+    if (activeAccount === null) setTab(accounts[0]?.id ?? 'signin')
+  }, [mode, tab, activeAccount, accounts])
+
+  const loadOwners = (account: AccountInfo): void => {
+    void store
+      .loadOwners(account.id)
+      .then(list => {
+        setOwners(prev => ({ ...prev, [account.id]: list }))
+        setOwner(prev => (list.some(o => o.name === prev) ? prev : list[0]?.name ?? account.login))
+      })
+      .catch(err =>
+        setError(err instanceof Error ? err.message : String(err))
+      )
+  }
+
+  // First view of an account tab fetches its owners automatically.
+  useEffect(() => {
+    if (activeAccount !== null && owners[activeAccount.id] === undefined) {
+      loadOwners(activeAccount)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, activeAccount?.id])
+
+  if (mode === null) return null
+
+  const canPublish =
+    activeAccount !== null && owner.length > 0 && name.trim().length > 0
+  const canCreateLocal = name.trim().length > 0 && baseDir.length > 0
+
+  const publishTarget = {
+    accountId: activeAccount?.id ?? '',
+    owner,
+    name,
+    description,
+    isPrivate
+  }
+  const rememberDir = (): void => {
+    try {
+      window.localStorage.setItem('aspen.lastNewRepoDir', baseDir)
+    } catch {
+      /* private-mode localStorage — the default just stays the scan folder */
+    }
+  }
+
+  return (
+    <Dialog
+      title={publishing ? 'Publish repository' : 'Create a repository'}
+      width={560}
+      onClose={() => store.setRepoDialog(null)}
+      footer={
+        <>
+          <button className="btn" onClick={() => store.setRepoDialog(null)}>
+            Cancel
+          </button>
+          {!publishing && (
+            <button
+              className="btn"
+              disabled={!canCreateLocal || busy}
+              onClick={() => {
+                rememberDir()
+                void store.createRepository({
+                  parentDir: baseDir,
+                  name,
+                  description,
+                  isPrivate,
+                  addReadme,
+                  publish: false,
+                  accountId: null,
+                  owner: ''
+                })
+              }}
+            >
+              Create on this machine only
+            </button>
+          )}
+          <button
+            className="btn primary"
+            disabled={!canPublish || busy}
+            onClick={() => {
+              rememberDir()
+              if (publishing) {
+                void store.publishRepository(publishTarget)
+              } else {
+                void store.createRepository({
+                  parentDir: baseDir,
+                  ...publishTarget,
+                  addReadme,
+                  publish: true
+                })
+              }
+            }}
+          >
+            {busy
+              ? publishing
+                ? 'Publishing…'
+                : 'Creating…'
+              : publishing
+                ? 'Publish repository'
+                : 'Create and Publish'}
+          </button>
+        </>
+      }
+    >
+      {publishing && state.selectedRepo !== null && (
+        <p className="field-hint">
+          Publishes <strong>{state.selectedRepo.name}</strong> (
+          {state.selectedRepo.path}) to the account you pick, then pushes the
+          current branch.
+        </p>
+      )}
+
+      <div className="clone-tabs" role="tablist">
+        {accounts.map(a => (
+          <button
+            key={a.id}
+            role="tab"
+            aria-selected={tab === a.id}
+            className={`clone-tab${tab === a.id ? ' active' : ''}`}
+            onClick={() => setTab(a.id)}
+            title={`Publish as ${a.login}`}
+          >
+            {a.provider === 'github' ? 'GitHub' : 'GitLab'} · {a.login}
+          </button>
+        ))}
+        {accounts.length === 0 && (
+          <button
+            role="tab"
+            aria-selected={tab === 'signin'}
+            className={`clone-tab${tab === 'signin' ? ' active' : ''}`}
+            onClick={() => setTab('signin')}
+          >
+            Accounts
+          </button>
+        )}
+      </div>
+
+      {tab === 'signin' && activeAccount === null && (
+        <SignInPanel onSuccess={account => setTab(account.id)} />
+      )}
+
+      {activeAccount !== null && (
+        <Field
+          label="Owner"
+          hint="Where the repository lives — your account, or an organization/group you can create in."
+        >
+          <div className="row">
+            <select
+              value={owner}
+              onChange={e => setOwner(e.target.value)}
+              disabled={ownerList === null}
+            >
+              {ownerList === null ? (
+                <option value="">Loading owners…</option>
+              ) : (
+                ownerList.map(o => (
+                  <option key={o.name} value={o.name}>
+                    {o.displayName}
+                    {o.kind === 'user' ? ' (you)' : ''}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              className="btn"
+              onClick={() => loadOwners(activeAccount)}
+              title="Reload the owners this token can publish into"
+            >
+              ↻
+            </button>
+          </div>
+        </Field>
+      )}
+
+      <Field
+        label="Name"
+        hint="Letters, numbers, dots, dashes and underscores — this becomes the repository and folder name."
+      >
+        <input
+          autoFocus
+          placeholder="my-project"
+          value={name}
+          onChange={e => setName(e.target.value)}
+        />
+      </Field>
+      <Field label="Description (optional)">
+        <input
+          placeholder="What this repository is for"
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
+      </Field>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={isPrivate}
+          onChange={e => setIsPrivate(e.target.checked)}
+        />
+        <span>Private repository — visible only to you and people you invite</span>
+      </label>
+      {!publishing && (
+        <>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={addReadme}
+              onChange={e => setAddReadme(e.target.checked)}
+            />
+            <span>Initialize with a README, staged for your first commit</span>
+          </label>
+          <Field label="Local path">
+            <div className="row">
+              <input
+                readOnly
+                placeholder="Choose a folder…"
+                value={baseDir}
+                onClick={async () => {
+                  const dir = await call('selectDirectory')
+                  if (dir !== null) setBaseDir(dir)
+                }}
+              />
+              <button
+                className="btn"
+                onClick={async () => {
+                  const dir = await call('selectDirectory')
+                  if (dir !== null) setBaseDir(dir)
+                }}
+              >
+                Choose…
+              </button>
+            </div>
+          </Field>
+        </>
+      )}
+      {error !== null && <p className="field-hint merge-error">{error}</p>}
+      {activeAccount === null && (
+        <p className="field-hint">
+          {publishing
+            ? 'Sign in above to publish this repository.'
+            : 'Sign in above to publish right away — or create it locally and publish later.'}
+        </p>
+      )}
     </Dialog>
   )
 }

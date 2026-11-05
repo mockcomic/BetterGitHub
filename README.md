@@ -32,6 +32,16 @@ parsing → cancellable request).
   a revoked one signs that account out with a toast instead of failing later.
   Tokens are stored encrypted (Electron `safeStorage`) and never enter the
   renderer.
+- **Create & publish** — **New repository…** (File menu, the first-run
+  screen, or the manager) makes a new git folder on disk — optionally with
+  a staged README — and can publish it in the same breath; any local repo
+  without an origin publishes from **Repository ▸ Publish repository…** or
+  the header's ⋯ menu. The dialog grows one tab per signed-in account —
+  signed into GitHub twice? you pick which one, and which organization or
+  group — then creates the hosted repo, adds `origin`, and pushes the
+  current branch with upstream set. The first push is pinned to the
+  publishing account's own token, so several accounts on one host can
+  never push as the wrong one.
 - **Branch picker** — filter, switch, create, rename and delete branches;
   remote-tracking branches listed separately and checked out as tracking
   branches; delete on the remote too.
@@ -59,6 +69,16 @@ parsing → cancellable request).
 - **Media previews** — selecting an image, video, or audio change shows it in
   the pane instead of the binary notice (Chromium playback, up to 128 MB);
   history previews read the exact committed blob, not the working tree.
+- **3D model previews** — `.glb`, `.gltf`, `.fbx`, `.obj`, `.stl`, `.ply` and
+  `.dae` changes open in an orbitable WebGL stage (three.js, imported lazily per
+  format, so the library never enters the startup chunk): drag to orbit, scroll
+  to zoom, plus Reset view, Wireframe and Grid toggles and a caption reporting
+  triangles, meshes and animations. A model is rarely the whole asset, so the
+  files it names are read alongside it — `.gltf` buffers and images, `.obj`
+  material libraries and the textures they map, Collada and FBX texture paths —
+  resolved from the same commit or working tree as the model (up to 48 files,
+  32 MB each, with the caption saying when the set is incomplete). A model whose
+  diff is readable text can be switched to it with one click, and back.
 - **Commit** — summary + description (two `-m` paragraphs), restricted to the
   selected files via `git commit --only`; commit-message drafts are persisted
   per repository; **Undo** and **Edit latest commit…** (amend) with a
@@ -221,8 +241,10 @@ Open **Clone a repository → Accounts** (or Preferences → Accounts).
   PKCE means no client secret travels. Access tokens expire after GitLab's
   two hours — Aspen refreshes them silently.
 - **Token sign-in — works for everything.** A GitHub classic PAT with the
-  `repo` scope (or a fine-grained token with repository contents: read), or
-  a GitLab PAT with `read_api` + `read_user`. Fill in the optional instance
+  `repo` scope (or a fine-grained token with repository contents: read —
+  enough to browse and clone; publishing needs the `repo` classic scope or
+  a fine-grained token with contents: write), or a GitLab PAT with
+  `read_api` + `read_user` (`api` to publish). Fill in the optional instance
   URL to sign a **GitHub Enterprise** or **self-hosted GitLab** server; that
   is the only way to use a server whose OAuth app you cannot register from
   the app. The token is validated against `/user` before anything is stored,
@@ -247,12 +269,18 @@ Once signed in, the Clone dialog gets one tab per account listing your
 repositories (owner, visibility, last push) with provider-side search,
 sorting and paging (GitHub's Search API covers your own and your
 organizations' repositories; typed text is also filtered client-side for
-instant feedback). Every launch re-checks stored tokens against the
-provider: names and avatars refresh, and a revoked token signs that account
-out with a toast. Clones, fetches, pulls and pushes still prefer your
-system credential helper; your account token is the automatic one-shot
-fallback that host rejects without — so a token-only private-repo setup
-works end to end, and an existing Git Credential Manager setup is untouched.
+instant feedback). The create/publish dialog grows the same per-account
+tabs plus an **owner** dropdown — your user, plus the organizations
+(GitLab: groups) the token can create repositories in. Every launch
+re-checks stored tokens against the provider: names and avatars refresh,
+and a revoked token signs that account out with a toast. Clones, fetches,
+pulls and pushes still prefer your system credential helper; your account
+token is the automatic one-shot fallback that host rejects without — so a
+token-only private-repo setup works end to end, and an existing Git
+Credential Manager setup is untouched. (Publishing is stricter on purpose:
+its first push authenticates with the publishing account's own token
+before any helper, so with two accounts on one host the repository is
+always created *and* pushed by the same one you picked.)
 
 ## Keeping Aspen up to date
 
@@ -299,7 +327,8 @@ Aspen updates itself from this repository's **GitHub Releases**
 src/shared/      models + typed IPC channel map (shared by all three sides)
 src/main/        Electron main process
   git/           exec wrapper, porcelain-v2 parser, status/diff/staging/
-                 commit/branches/log/sync/stash/ignore/workflow/github-url
+                 commit/branches/log/sync/stash/ignore/workflow/github-url/
+                 init (new-repo creation)
   watcher.ts     debounced recursive working-tree watcher (watch-filter.ts
                  holds the pure ignore logic)
   terminal.ts    integrated terminal: node-pty sessions, shell-choice

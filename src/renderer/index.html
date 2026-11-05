@@ -3,9 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <title>Aspen</title>
+    <!--
+      Previews are blob URLs, and the loaders differ in how they read them: an
+      <img>/<video>/<audio> tag is governed by img-src/media-src, but a 3D
+      loader fetches its sidecar files, which needs blob: in connect-src too —
+      otherwise a .gltf draws with no buffers or textures and no visible reason.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:"
     />
   </head>
   <body>

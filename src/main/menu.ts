@@ -49,6 +49,7 @@ const MENUS: ReadonlyArray<TopMenu> = [
       },
       { label: 'Add local repository…', action: 'add-repository' },
       { label: 'Clone repository…', action: 'clone-repository' },
+      { label: 'New repository…', action: 'new-repository' },
       { separator: true },
       {
         label: 'Preferences',
@@ -123,6 +124,8 @@ const MENUS: ReadonlyArray<TopMenu> = [
       },
       { label: 'Rename branch…', action: 'rename-branch' },
       { label: 'Delete branch…', action: 'delete-branch' },
+      { separator: true },
+      { label: 'Publish repository…', action: 'publish-repository' },
       { separator: true },
       {
         label: 'Fetch',

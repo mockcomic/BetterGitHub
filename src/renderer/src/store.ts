@@ -8,6 +8,7 @@ import type {
   AccountProvider,
   BranchInfo,
   CommitInfo,
+  CreateRepoRequest,
   ExternalApp,
   FilePreview,
   FileStatus,
@@ -21,8 +22,10 @@ import type {
   MergeExchange,
   MergeQuestion,
   PublicSettings,
+  ProviderOwner,
   RemoteRepoPage,
   RemoteRepoSort,
+  RemoteRepository,
   RepoScanOutcome,
   Repository,
   RepositoryStatus,
@@ -174,7 +177,7 @@ export interface AppState {
   readonly selectedFilePath: string | null
   readonly selectedFileDiff: string | null
   readonly selectedFileError: string | null
-  /** Media preview bytes when the selected file is an image/video/audio. */
+  /** Media preview bytes when the selected file is an image/video/audio/model. */
   readonly selectedFilePreview: FilePreview | null
   readonly selectedCommit: CommitInfo | null
   readonly commitFiles: ReadonlyArray<FileStatus>
@@ -205,6 +208,15 @@ export interface AppState {
    */
   readonly terminalOpen: boolean
   readonly busy: string | null
+  /**
+   * The last `git push` here was rejected because the remote branch moved
+   * ahead — a state with exactly one recovery (pull, then push), so the sync
+   * buttons convert into the compound Pull & Push verb instead of answering
+   * with an error toast. Transient renderer state: any successful sync op, a
+   * failed pull, or a repo/branch change retires it, and once a fresh status
+   * shows the branch genuinely diverged the verb persists on git truth alone.
+   */
+  readonly pushNeedsPull: boolean
   readonly aiBusy: boolean
   /** The AI merge agent's live conversation about one conflicted file. */
   readonly aiMerge: AiMergeState | null
@@ -232,6 +244,13 @@ export interface AppState {
   readonly settingsAiNote: boolean
   readonly hints: HintFlags
   readonly showClone: boolean
+  /**
+   * The create/publish dialog: `'new'` builds a local repo (and can publish
+   * it right away), `'publish'` takes the selected origin-less repository
+   * online. One dialog, two modes — the account/owner/visibility picker is
+   * identical.
+   */
+  readonly repoDialog: 'new' | 'publish' | null
   readonly showRepoManager: boolean
   /** The "Stash changes" dialog, opened by the Review toolbar's Stash verb. */
   readonly showStash: boolean
@@ -297,6 +316,7 @@ const initialState: AppState = {
   externalApps: [],
   terminalOpen: false,
   busy: null,
+  pushNeedsPull: false,
   aiBusy: false,
   aiMerge: null,
   celebration: null,
@@ -315,6 +335,7 @@ const initialState: AppState = {
     coachingDismissed: false
   },
   showClone: false,
+  repoDialog: null,
   showRepoManager: false,
   showNewBranch: false,
   newBranchBase: null,
@@ -655,6 +676,12 @@ export class AppStore {
       case 'clone-repository':
         this.setCloneOpen(true)
         break
+      case 'new-repository':
+        this.setRepoDialog('new')
+        break
+      case 'publish-repository':
+        this.openPublishDialog()
+        break
       case 'manage-repositories':
         this.setRepoManagerOpen(true)
         break
@@ -716,6 +743,7 @@ export class AppStore {
       selectedRepo: repo,
       status: null,
       statusError: null,
+      pushNeedsPull: false,
       selectedFilePath: null,
       selectedFileDiff: null,
       selectedFileError: null,
@@ -1052,6 +1080,135 @@ export class AppStore {
       this.update({ busy: null })
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
+  }
+
+  // ------------------------------------------------- create / publish (new)
+
+  /** Open/close the create/publish dialog; opening refreshes the accounts. */
+  setRepoDialog(mode: 'new' | 'publish' | null): void {
+    this.update({ repoDialog: mode })
+    if (mode !== null) void this.refreshAccounts()
+  }
+
+  /** Repository ▸ Publish: only meaningful for the selected origin-less repo. */
+  openPublishDialog(): void {
+    if (this.state.selectedRepo === null) return
+    if (this.state.remoteUrl !== null) {
+      this.toast(
+        'info',
+        'This repository already has an origin — Push publishes the current branch.'
+      )
+      return
+    }
+    this.setRepoDialog('publish')
+  }
+
+  /** Owners an account can create repositories under (self + orgs/groups). */
+  loadOwners(accountId: string): Promise<ProviderOwner[]> {
+    return call('listAccountOwners', accountId)
+  }
+
+  /**
+   * Create a repository on disk and — when publishing — take it online in
+   * the same breath. Mirrors clone(): list refresh, select the new repo,
+   * celebrate. A failed publish keeps the local repo (and any origin) so
+   * the retry is a plain Push.
+   */
+  async createRepository(o: {
+    parentDir: string
+    name: string
+    description: string
+    isPrivate: boolean
+    addReadme: boolean
+    publish: boolean
+    accountId: string | null
+    owner: string
+  }): Promise<void> {
+    if (o.publish && o.accountId === null) {
+      this.toast('error', 'Choose an account to publish to — or sign in first.')
+      return
+    }
+    this.update({ busy: 'create' })
+    let repo: Repository
+    try {
+      repo = await call('createLocalRepository', o.parentDir, o.name.trim(), o.addReadme)
+    } catch (err) {
+      this.update({ busy: null })
+      this.toast('error', err instanceof Error ? err.message : String(err))
+      return
+    }
+    this.update({ repositories: await call('listRepositories') })
+    if (!o.publish) {
+      this.update({ busy: null, repoDialog: null })
+      await this.selectRepo(repo)
+      this.toast(
+        'success',
+        `Created ${repo.name}. Commit something, then Publish takes it online.`
+      )
+      return
+    }
+    try {
+      const created = await call(
+        'publishRepository',
+        repo.path,
+        o.accountId as string,
+        {
+          owner: o.owner,
+          name: o.name.trim(),
+          description: o.description,
+          isPrivate: o.isPrivate
+        }
+      )
+      this.update({ busy: null, repoDialog: null })
+      await this.selectRepo(repo)
+      this.publishSuccessToast(created, o.accountId as string)
+    } catch (err) {
+      this.update({ busy: null })
+      await this.selectRepo(repo)
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Publish the selected repository under the chosen account/owner. */
+  async publishRepository(o: {
+    accountId: string
+    owner: string
+    name: string
+    description: string
+    isPrivate: boolean
+  }): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    this.update({ busy: 'publish' })
+    try {
+      const created = await call('publishRepository', repo.path, o.accountId, {
+        owner: o.owner,
+        name: o.name.trim(),
+        description: o.description,
+        isPrivate: o.isPrivate
+      } satisfies CreateRepoRequest)
+      this.update({ busy: null, repoDialog: null, remoteUrl: created.cloneUrl })
+      this.publishSuccessToast(created, o.accountId)
+      void Promise.all([this.refresh(), this.refreshBranches()])
+    } catch (err) {
+      this.update({ busy: null })
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Success line every publish ends with, with the in-place view button. */
+  private publishSuccessToast(created: RemoteRepository, accountId: string): void {
+    const site =
+      this.state.accounts.find(a => a.id === accountId)?.provider === 'gitlab'
+        ? 'GitLab'
+        : 'GitHub'
+    this.celebrate('push')
+    this.toast('success', `Published to ${created.fullName}.`, [
+      {
+        label: `View on ${site}`,
+        onClick: () => void call('openExternal', created.webUrl)
+      }
+    ])
   }
 
   // ------------------------------------------------------ hosted accounts
@@ -2276,7 +2433,10 @@ export class AppStore {
     this.update({ busy: op })
     try {
       const output = await call(op, repo.path)
-      this.update({ busy: null })
+      // Any sync that lands proves the remote picture again — retire the
+      // rejected-push flag; a still-diverged branch re-arms the verb from
+      // git truth on the refresh below.
+      this.update({ busy: null, pushNeedsPull: false })
       const lines = output
         .split('\n')
         .map(l => l.trim())
@@ -2293,18 +2453,29 @@ export class AppStore {
       if (this.state.view === 'history') void this.loadLog(false)
       return true
     } catch (err) {
-      this.update({ busy: null })
+      // A failed pull retires the compound-verb flag: the conflicts banner (or
+      // the raw error toast) owns the recovery from here, and a later
+      // divergence re-arms the verb from the next status read.
+      this.update({
+        busy: null,
+        ...(op === 'pull' ? { pushNeedsPull: false } : {})
+      })
       const message = err instanceof Error ? err.message : String(err)
       if (op === 'push' && isNeedsPullRejectionMessage(message)) {
         // The push was rejected only because the remote moved ahead — the
-        // recovery is one click away, so the toast carries it.
-        this.toast('error', message, [
-          { label: 'Pull first', onClick: () => void this.doSync('pull') },
-          {
-            label: 'Pull and push again',
-            onClick: () => void this.pullThenPush()
-          }
-        ])
+        // recovery is exactly one click, so the button carries it instead of
+        // an error toast: the sync verbs convert into Pull & Push (see
+        // progressive.ts). A rejected `(fetch first)` push leaves the
+        // remote-tracking refs stale, so fetch once first, best-effort, to
+        // make the ahead/behind counts honest before the refresh paints.
+        if (this.state.selectedRepo?.path === repo.path) {
+          void call('fetch', repo.path).catch(() => undefined)
+          this.update({ pushNeedsPull: true })
+          this.toast(
+            'info',
+            'Remote has new commits — the button will pull before it pushes.'
+          )
+        }
       } else {
         this.toast('error', message)
       }
@@ -2316,9 +2487,10 @@ export class AppStore {
   }
 
   /**
-   * The recovery for a push rejected as non-fast-forward: pull, and only if
-   * that lands cleanly (no conflict stopping it, no new failure) retry the
-   * push. A conflicted pull leaves the merge banner up instead.
+   * The action behind the compound Pull & Push verb: pull, and only if that
+   * lands cleanly (no conflict stopping it, no new failure) retry the push. A
+   * conflicted pull leaves the merge banner up instead; a push rejected again
+   * (the remote moved during the pull) simply re-arms the same verb.
    */
   async pullThenPush(): Promise<void> {
     if (!(await this.doSync('pull'))) return
@@ -2332,6 +2504,10 @@ export class AppStore {
     if (repo === null) return
     try {
       await call('checkoutBranch', repo.path, name, fromRemote)
+      // The rejected-push flag belongs to the branch it fired on — a switch
+      // retires it; the fresh status re-arms the verb if the new branch is
+      // genuinely diverged.
+      this.update({ pushNeedsPull: false })
       await this.refresh()
       await this.refreshBranches()
       void this.loadLog(false)

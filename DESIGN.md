@@ -380,6 +380,7 @@ What moves: buttons change face color on hover and press without moving a pixel,
 
 ### Dialogs
 - **Style:** canvas face, hairline border, 12px radius, Float shadow, unblurred scrim; capped at `min(92vw, 640px)` × 88vh, with one documented wide variant — the repository hub at `min(92vw, 720px)`. Anatomy: head on `--bg-panel` with a 14px/600 title, 12×16px padding and a ghost close; scrollable body at 14×16px; foot of right-aligned buttons at 8px gaps, destructive confirmations painting their verb `.btn.primary.destructive`.
+- **Account tabs.** Every dialog that touches hosted accounts (Clone; Create/Publish) reuses one tab strip — a tab per signed-in account spelled `GitHub · login` / `GitLab · login`, an `Accounts` sign-in tab only while none exist, and inline sign-in completion in place. The tab list refreshes on open so sign-ups from inside the dialog appear without a close.
 
 ### Toasts
 - **Style:** floating banners, not striped cards: the whole card takes the state's subtle ground (`--del-bg`, `--add-bg`, `--hunk-bg`) with a 35%-mixed border of the same hue, and the label takes that hue's strong tone — never gray text on a colored field. 6px radius, Float shadow, 9px × 12px padding, hairline border in the neutral case. Stacked bottom-right above the status bar, max 420px, body selectable, optional action row and a quiet 14px ×-close.

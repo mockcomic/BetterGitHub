@@ -25,6 +25,7 @@ import {
   ConfirmDialog,
   MergeBranchDialog,
   NewBranchDialog,
+  NewRepositoryDialog,
   RenameBranchDialog,
   SettingsDialog,
   StashDialog
@@ -171,6 +172,7 @@ export function App(): JSX.Element {
         <Toasts />
         <SettingsDialog />
         <CloneDialog />
+        <NewRepositoryDialog />
         <RepoManagerDialog />
         <NewBranchDialog />
         <MergeBranchDialog />
@@ -326,6 +328,7 @@ export function App(): JSX.Element {
       <Toasts />
       <SettingsDialog />
       <CloneDialog />
+      <NewRepositoryDialog />
       <RepoManagerDialog />
       <NewBranchDialog />
       <MergeBranchDialog />

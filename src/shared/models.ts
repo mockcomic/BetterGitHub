@@ -427,6 +427,28 @@ export interface RemoteRepoPage {
   readonly nextCursor: string | null
 }
 
+/**
+ * A place an account can create a repository: the account itself, plus the
+ * organizations (GitHub) or groups (GitLab) its token can publish into.
+ * `name` is the path segment the create API takes; `displayName` is what the
+ * picker shows.
+ */
+export interface ProviderOwner {
+  readonly name: string
+  readonly displayName: string
+  readonly kind: 'user' | 'organization' | 'group'
+}
+
+/** Payload for creating a hosted repository (create / publish flows). */
+export interface CreateRepoRequest {
+  /** Owner path segment: an account login, an org, or a group path. */
+  readonly owner: string
+  readonly name: string
+  /** '' is a real choice — the dialog's empty description field. */
+  readonly description: string
+  readonly isPrivate: boolean
+}
+
 export type RemoteRepoSort = 'pushed' | 'created' | 'name'
 
 export interface RemoteRepoQuery {
@@ -487,16 +509,31 @@ export type SignInStatus =
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: string }
 
 /** The media families the diff pane can preview natively. */
-export type PreviewKind = 'image' | 'video' | 'audio'
+export type PreviewKind = 'image' | 'video' | 'audio' | 'model'
+
+/**
+ * One file a 3D model references — a .gltf buffer or image, a .mtl, the
+ * textures a .mtl maps — read from the same place as the model itself.
+ */
+export interface PreviewResource {
+  /** Repository-relative path, the key the viewer matches loader URLs against. */
+  readonly path: string
+  readonly byteLength: number
+  readonly data: ArrayBuffer
+}
 
 /**
  * A media file's bytes for the diff pane's preview: from the working tree,
  * or from a commit's tree when fetched with a sha. `data` is absent when the
  * file exceeds the preview size limit — the pane says so instead of hanging.
+ * Models also carry their sidecars, since a bare .gltf/.obj is usually an
+ * empty shell; `resourcesTruncated` marks a set stopped by a cap.
  */
 export interface FilePreview {
   readonly kind: PreviewKind
   readonly mime: string
   readonly byteLength: number
   readonly data?: ArrayBuffer
+  readonly resources?: ReadonlyArray<PreviewResource>
+  readonly resourcesTruncated?: boolean
 }

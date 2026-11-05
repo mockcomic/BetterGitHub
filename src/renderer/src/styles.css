@@ -1255,6 +1255,28 @@ button {
   color: var(--btn-disabled-ink);
 }
 
+/* The compound Pull & Push verb wears Push Green: what the user aimed for
+   is the push, the pull is the road there — the ↓/↑ count pills on the
+   label carry the incoming half's amber caution themselves, so the face
+   stays one hue (the desk reads by colour alone; two gradients would say
+   nothing legible). */
+.btn.sync-verb {
+  background: var(--push-face);
+  border-color: var(--btn-border);
+  color: var(--on-accent);
+}
+
+.btn.sync-verb:hover:not(:disabled) {
+  background: var(--push-face-hover);
+  border-color: var(--btn-border);
+}
+
+.btn.sync-verb:disabled {
+  background: var(--btn-disabled-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-disabled-ink);
+}
+
 .icon-btn {
   background: transparent;
   border: none;
@@ -3915,6 +3937,98 @@ img.account-avatar {
   font-size: 12px;
 }
 
+/* ------------------------------------------------------------- 3D models */
+
+/*
+ * The WebGL stage inside the media panel (components/ModelPreview.tsx). The
+ * canvas owns the panel — a model needs the whole diff pane to be legible — so
+ * the toggles float over it and the loading/error notes are centered on it. The
+ * stage keeps its own inset gradient: a flat theme background behind a shaded
+ * model reads as a rendering error.
+ */
+.model-preview {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 320px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: radial-gradient(circle at 50% 36%, var(--bg-panel), var(--bg-inset) 82%);
+}
+
+.model-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  cursor: grab;
+  /* OrbitControls handles the pointer; without this, a drag pans the pane. */
+  touch-action: none;
+}
+
+.model-stage canvas:active {
+  cursor: grabbing;
+}
+
+.model-stage canvas:focus-visible {
+  box-shadow: inset var(--focus-ring);
+}
+
+.model-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--chip-face);
+}
+
+.model-toolbar .mini:disabled {
+  color: var(--btn-disabled-ink);
+  cursor: default;
+  text-decoration: none;
+}
+
+.model-toolbar .mini[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.model-note,
+.model-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.model-error .btn {
+  justify-self: center;
+  pointer-events: auto;
+}
+
+.model-error p {
+  margin: 0;
+}
+
 /* -------------------------------------------------------- context menu */
 
 .context-menu {
@@ -5032,7 +5146,8 @@ img.account-avatar {
 
 /* A caret on a filled verb face keeps the verb's own foreground. */
 .sync-split .btn.sync-caret.pull .caret,
-.sync-split .btn.sync-caret.push .caret {
+.sync-split .btn.sync-caret.push .caret,
+.sync-split .btn.sync-caret.sync-verb .caret {
   color: var(--on-accent);
   opacity: 0.8;
 }

@@ -3,13 +3,17 @@ import { existsSync, statSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
 import type {
+  AccountInfo,
+  CreateRepoRequest,
   ExternalApp,
   GeneratedCommitMessage,
   GitHubTarget,
   IgnoreRequest,
   IpcResult,
   MergeExchange,
+  ProviderOwner,
   RemoteRepoQuery,
+  RemoteRepository,
   RepoSummaryEntry,
   Repository
 } from '../shared/models'
@@ -79,11 +83,13 @@ import {
   getConfigInfo,
   getRemoteUrl,
   pull,
+  publishRepository as publishToRemote,
   push,
   setConfigInfo,
   suggestedCloneDirectory,
   verifyRepository
 } from './git/sync'
+import { createLocalRepository } from './git/init'
 import {
   addRepository,
   getAiConfig,
@@ -102,6 +108,7 @@ import {
 import { parentKey, pathKey } from './repo-scan-plan'
 import {
   accountAvatar,
+  accountGitCredential,
   addAccount,
   getAccount,
   getAccountToken,
@@ -209,6 +216,56 @@ async function openUrl(url: string): Promise<void> {
     throw new Error(`Refusing to open a non-http(s) URL: ${url}`)
   }
   await shell.openExternal(url)
+}
+
+/** The signed-in account behind an IPC account id, or an actionable error. */
+async function requireAccount(accountId: string): Promise<AccountInfo> {
+  const account = await getAccount(accountId)
+  if (account === null) {
+    throw new Error('That account is no longer signed in — sign in again.')
+  }
+  return account
+}
+
+/**
+ * Run a hosted-API call with the account's current token; an OAuth token
+ * rejected with 401 refreshes once and reruns — the same rule the
+ * repository listing follows, so a long-open publish dialog never dies on
+ * token expiry.
+ */
+async function withAccountToken<T>(
+  account: AccountInfo,
+  run: (token: string) => Promise<T>
+): Promise<T> {
+  const token = await getAccountToken(account)
+  if (token === null) {
+    throw new Error(
+      `Aspen could not read ${account.login}'s stored token — sign in again.`
+    )
+  }
+  try {
+    return await run(token)
+  } catch (err) {
+    if (
+      err instanceof ProviderHttpError &&
+      err.status === 401 &&
+      account.authKind === 'oauth'
+    ) {
+      const fresh = await getAccountToken(account, { forceRefresh: true })
+      if (fresh !== null && fresh !== token) return run(fresh)
+    }
+    throw err
+  }
+}
+
+/** The checks every create/publish runs before touching the network. */
+function validateCreateRepoRequest(request: CreateRepoRequest): void {
+  if (request.name.trim().length === 0) {
+    throw new Error('Enter a repository name.')
+  }
+  if (request.owner.trim().length === 0) {
+    throw new Error('Choose the account or organization to publish into.')
+  }
 }
 
 async function resolveWebRepo(repoPath: string) {
@@ -472,7 +529,7 @@ const handlers: Handlers = {
   async signInWithToken(provider: AccountProvider, token: string, apiBase?: string) {
     const trimmed = token.trim()
     if (trimmed.length === 0) {
-      throw new Error('Paste a token — GitHub classic needs the `repo` scope, GitLab `read_api` + `read_user`.')
+      throw new Error('Paste a token — GitHub needs the `repo` scope and GitLab the `api` scope, or Aspen cannot publish repositories with it.')
     }
     const base =
       provider === 'github'
@@ -546,6 +603,51 @@ const handlers: Handlers = {
       }
       throw err
     }
+  },
+
+  async listAccountOwners(accountId: string): Promise<ProviderOwner[]> {
+    const account = await requireAccount(accountId)
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    return withAccountToken(account, token =>
+      client.listOwners(account.apiBase, account, token, account.authKind)
+    )
+  },
+  async createRemoteRepository(accountId: string, request: CreateRepoRequest) {
+    const account = await requireAccount(accountId)
+    validateCreateRepoRequest(request)
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    return withAccountToken(account, token =>
+      client.createRepo(account.apiBase, account, token, account.authKind, {
+        ...request,
+        name: request.name.trim(),
+        owner: request.owner.trim()
+      })
+    )
+  },
+  async publishRepository(
+    repoPath: string,
+    accountId: string,
+    request: CreateRepoRequest
+  ): Promise<RemoteRepository> {
+    const account = await requireAccount(accountId)
+    validateCreateRepoRequest(request)
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    const created = await withAccountToken(account, token =>
+      client.createRepo(account.apiBase, account, token, account.authKind, {
+        ...request,
+        name: request.name.trim(),
+        owner: request.owner.trim()
+      })
+    )
+    // Pin the first push to the publishing account itself (git/sync.ts);
+    // an unreadable sidecar pushes unauthenticated and lets the standard
+    // helper/retry path speak for itself.
+    const credential = await accountGitCredential(account)
+    await publishToRemote(repoPath, created.cloneUrl, credential)
+    return created
+  },
+  async createLocalRepository(parentDir: string, name: string, addReadme: boolean) {
+    return createLocalRepository(parentDir, name, addReadme)
   },
 
   async startWatching(repoPath: string) {

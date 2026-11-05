@@ -23,6 +23,15 @@ export function EmptyState(): JSX.Element {
           <div className="onboarding-action">
             <button
               className="btn primary"
+              onClick={() => store.setRepoDialog('new')}
+            >
+              Create repository…
+            </button>
+            <small>Start a new project and publish it to your account</small>
+          </div>
+          <div className="onboarding-action">
+            <button
+              className="btn"
               onClick={() => void store.addLocalRepository()}
             >
               Add local repository…
@@ -38,7 +47,7 @@ export function EmptyState(): JSX.Element {
         </div>
 
         <ol className="onboarding-steps">
-          <li>Add a repository</li>
+          <li>Create or add a repository</li>
           <li>Tick the files you want to include</li>
           <li>Write a summary — or press ✨ Generate</li>
           <li>Commit, then Push sends it to GitHub</li>

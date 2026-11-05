@@ -291,9 +291,28 @@ export function accountRepoHost(account: AccountInfo): string {
 }
 
 /**
- * Credential for the one-off git auth retry: username + token whose Basic
- * auth the host accepts (GitHub: the account login with either token kind;
- * GitLab: the fixed `oauth2` user, valid for PATs and access tokens).
+ * The account's git-over-https Basic credential: username + token the host
+ * accepts (GitHub: the account login with either token kind; GitLab: the
+ * fixed `oauth2` user, valid for PATs and access tokens). Null when the
+ * sidecar is unreadable — the caller treats that as "this account cannot
+ * authenticate git right now".
+ */
+export async function accountGitCredential(
+  account: AccountInfo
+): Promise<{ user: string; token: string } | null> {
+  const token = await getAccountToken(account)
+  if (token === null) return null
+  return {
+    user: account.provider === 'gitlab' ? 'oauth2' : account.login,
+    token
+  }
+}
+
+/**
+ * Credential for the one-off git auth retry: the first account whose host
+ * matches the remote. (Publish pins its push to one chosen account via
+ * accountGitCredential instead, so several accounts on one host stay
+ * unambiguous there.)
  */
 export async function gitRetryCredential(
   remoteHost: string
@@ -301,12 +320,8 @@ export async function gitRetryCredential(
   const wanted = remoteHost.toLowerCase()
   for (const account of await load()) {
     if (accountRepoHost(account) !== wanted) continue
-    const token = await getAccountToken(account)
-    if (token === null) continue
-    return {
-      user: account.provider === 'gitlab' ? 'oauth2' : account.login,
-      token
-    }
+    const credential = await accountGitCredential(account)
+    if (credential !== null) return credential
   }
   return null
 }

@@ -6,6 +6,7 @@ import type {
   AiMergeOutcome,
   BranchList,
   CommitInfo,
+  CreateRepoRequest,
   ExternalApp,
   FilePreview,
   FileStatus,
@@ -19,8 +20,10 @@ import type {
   ManagedRepository,
   MergeExchange,
   PublicSettings,
+  ProviderOwner,
   RemoteRepoPage,
   RemoteRepoQuery,
+  RemoteRepository,
   RemoveRepositoriesResult,
   RepoSummaryEntry,
   RepoScanOutcome,
@@ -143,6 +146,43 @@ export interface RequestResponseChannels {
     accountId: string,
     query?: RemoteRepoQuery
   ) => RemoteRepoPage
+  /**
+   * Where an account may create a repository: itself plus its organizations
+   * (GitHub) or groups (GitLab). Powers the publish dialog's owner picker.
+   */
+  listAccountOwners: (accountId: string) => ProviderOwner[]
+  /**
+   * Create a hosted repository under the account (Publish's first step, and
+   * what "Create and Publish" runs against an already-created local repo).
+   */
+  createRemoteRepository: (
+    accountId: string,
+    request: CreateRepoRequest
+  ) => RemoteRepository
+  /**
+   * Publish a local repository in one shot: create the hosted repo under
+   * `accountId`, point `origin` at its clone URL, and push the current
+   * branch with upstream tracking. Requires no existing origin, at least
+   * one commit, and a checked-out branch. The push uses that account's own
+   * token first, so publishing works correctly with several accounts on the
+   * same host.
+   */
+  publishRepository: (
+    repoPath: string,
+    accountId: string,
+    request: CreateRepoRequest
+  ) => RemoteRepository
+  /**
+   * Create a new git repository on disk inside `parentDir` (optionally with
+   * a staged README) and add it to the app's repository list. Publishing is
+   * a separate verb, so a repo with no commits yet publishes right after
+   * the user's first commit.
+   */
+  createLocalRepository: (
+    parentDir: string,
+    name: string,
+    addReadme: boolean
+  ) => Repository
 
   // filesystem watching (main pushes REPO_CHANGED_CHANNEL)
   startWatching: (repoPath: string) => void
@@ -181,9 +221,10 @@ export interface RequestResponseChannels {
   getCommitFileDiff: (repoPath: string, sha: string, path: string) => string
   getCommitFiles: (repoPath: string, sha: string) => FileStatus[]
   /**
-   * Media preview bytes for image/video/audio files — the working-tree file,
-   * or the blob in commit `sha`'s tree when one is given. Null for anything
-   * the previewer doesn't handle or that vanished since the listing.
+   * Media preview bytes for image/video/audio/model files — the working-tree
+   * file, or the blob in commit `sha`'s tree when one is given. A model also
+   * brings the sidecar files it references, read from the same place. Null for
+   * anything the previewer doesn't handle or that vanished since the listing.
    */
   getPreview: (repoPath: string, path: string, sha?: string) => FilePreview | null
 
@@ -343,6 +384,8 @@ export type MenuAction =
   | 'show-preferences'
   | 'add-repository'
   | 'clone-repository'
+  | 'new-repository'
+  | 'publish-repository'
   | 'manage-repositories'
   | 'stash-all'
   | 'edit-last-commit'

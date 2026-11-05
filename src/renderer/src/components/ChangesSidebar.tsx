@@ -774,7 +774,13 @@ export function CommitTray(): JSX.Element {
   const busy = state.busy !== null
   const total = state.status?.files.length ?? 0
   const ahead = state.status?.ahead ?? 0
+  const behind = state.status?.behind ?? 0
   const hasUpstream = state.status?.upstream !== undefined
+  // The same conversion as the strip's Sync button: a diverged branch — or a
+  // push that just bounced off a moved-ahead remote — turns the tray's Push
+  // into the compound Pull & Push verb, whose click pulls first and pushes
+  // automatically (see store.pullThenPush and progressive.syncVerb).
+  const diverged = state.pushNeedsPull || (behind > 0 && ahead > 0)
   const checked = draft?.checked ?? new Set<string>()
   // Staged files are the commit baseline; ticking only adds to it.
   const staged = new Set(
@@ -903,16 +909,37 @@ export function CommitTray(): JSX.Element {
         </button>
         {/* The tray's Push joins the desk when it can act — it appears at the
             moment a commit lands ahead of the remote (or a branch is ready to
-            publish), instead of sitting permanently dead next to Commit. */}
+            publish), instead of sitting permanently dead next to Commit. When
+            the branch has diverged it converts to Pull & Push in place. */}
         {pushEnabled && (
           <button
-            className={`btn push${pushArmed ? ' arming' : ''}`}
-            onClick={() => void store.doSync('push')}
+            className={`btn push${pushArmed ? ' arming' : ''}${diverged ? ' sync-verb' : ''}`}
+            onClick={() =>
+              diverged ? void store.pullThenPush() : void store.doSync('push')
+            }
             title={pushTitle(state)}
           >
-            {state.busy === 'push' ? (
+            {diverged && state.busy === 'pull' ? (
+              <>
+                <span className="spinner" /> Pulling…
+              </>
+            ) : state.busy === 'push' ? (
               <>
                 <span className="spinner" /> Pushing…
+              </>
+            ) : diverged ? (
+              <>
+                ⇅ Pull &amp; Push
+                {behind > 0 && (
+                  <span className="count-pop" key={`tray-pull-count-${behind}`}>
+                    {' '}↓{behind}
+                  </span>
+                )}
+                {ahead > 0 && (
+                  <span className="count-pop" key={`tray-push-count-${ahead}`}>
+                    {' '}↑{ahead}
+                  </span>
+                )}
               </>
             ) : (
               <>
@@ -935,10 +962,14 @@ export function CommitTray(): JSX.Element {
 
 function pushTitle(state: AppState): string {
   if (state.status === null) return 'Loading repository status…'
+  const ahead = state.status.ahead ?? 0
+  const behind = state.status.behind ?? 0
+  if (state.pushNeedsPull || (behind > 0 && ahead > 0)) {
+    return 'The branches have diverged — Pull lands the remote\u2019s commits first, then your Push follows automatically'
+  }
   if (state.status.upstream === undefined) {
     return 'No upstream branch yet — Push publishes this branch and sets upstream on origin'
   }
-  const ahead = state.status.ahead ?? 0
   return ahead > 0
     ? `Push ${ahead} commit${ahead === 1 ? '' : 's'} to ${state.status.upstream}`
     : `Nothing to push — ${state.status.branch} is up to date with ${state.status.upstream}`

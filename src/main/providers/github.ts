@@ -1,4 +1,10 @@
-import type { RemoteRepoPage, RemoteRepoSort, RemoteRepository } from '../../shared/models'
+import type {
+  CreateRepoRequest,
+  ProviderOwner,
+  RemoteRepoPage,
+  RemoteRepoSort,
+  RemoteRepository
+} from '../../shared/models'
 import {
   apiFetch,
   bool,
@@ -211,6 +217,62 @@ function authHeaders(token: string): Record<string, string> {
   }
 }
 
+/**
+ * The POST /user/repos body for a create request. `organization` is added
+ * only when the chosen owner is not the account itself — GitHub treats a
+ * missing `organization` as "under the authenticated user".
+ */
+export function buildGitHubCreateRepoBody(
+  login: string,
+  request: CreateRepoRequest
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    name: request.name,
+    description: request.description,
+    private: request.isPrivate
+  }
+  if (ownerIsDifferent(login, request.owner)) body.organization = request.owner
+  return body
+}
+
+/** True when the request should land somewhere other than the user's own space. */
+function ownerIsDifferent(login: string, owner: string): boolean {
+  // GitHub logins (users and orgs) are case-insensitive.
+  return owner.trim().length > 0 && owner.trim().toLowerCase() !== login.toLowerCase()
+}
+
+/**
+ * Map a GET /user/orgs array to organization owners. Entries without a login
+ * are skipped rather than half-mapped; the account's own user entry is
+ * prepended by the caller, so it never appears twice here.
+ */
+export function mapGitHubOrgOwners(body: unknown): ProviderOwner[] {
+  const owners: ProviderOwner[] = []
+  if (!Array.isArray(body)) return owners
+  for (const value of body) {
+    if (value === null || typeof value !== 'object') continue
+    const login = str((value as Record<string, unknown>).login)
+    if (login === null) continue
+    owners.push({ name: login, displayName: login, kind: 'organization' })
+  }
+  return owners
+}
+
+/** The owner list for the publish picker: the account itself, then its orgs. */
+export function buildGitHubOwners(
+  login: string,
+  orgsBody: unknown
+): ProviderOwner[] {
+  const owners: ProviderOwner[] = [
+    { name: login, displayName: login, kind: 'user' }
+  ]
+  for (const org of mapGitHubOrgOwners(orgsBody)) {
+    if (org.name.toLowerCase() === login.toLowerCase()) continue
+    owners.push(org)
+  }
+  return owners
+}
+
 function fail(res: ApiResponse): never {
   throw new ProviderHttpError(res.status, providerErrorMessage('GitHub', res))
 }
@@ -253,5 +315,27 @@ export const githubClient: ProviderClient = {
     const mapped = mapGitHubRepoPage(res.json, account.id, page, perPage)
     rememberOwners(account.id, account.login, mapped.items)
     return mapped
+  },
+
+  async listOwners(apiBase, account, token) {
+    const res = await apiFetch(`${apiBase}/user/orgs?per_page=100`, {
+      headers: authHeaders(token)
+    })
+    if (!res.ok) fail(res)
+    return buildGitHubOwners(account.login, res.json)
+  },
+
+  async createRepo(apiBase, account, token, _authKind, request) {
+    const res = await apiFetch(`${apiBase}/user/repos`, {
+      method: 'POST',
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildGitHubCreateRepoBody(account.login, request))
+    })
+    if (!res.ok) fail(res)
+    const created = mapGitHubRepo(res.json, account.id)
+    if (created === null) {
+      throw new Error('GitHub created the repository but returned an unreadable record.')
+    }
+    return created
   }
 }

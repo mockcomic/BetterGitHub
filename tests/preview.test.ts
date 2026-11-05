@@ -24,6 +24,18 @@ describe('previewKindFor', () => {
     expect(previewKindFor('.png')).toEqual({ kind: 'image', mime: 'image/png' })
   })
 
+  it('classifies 3D models and none of their sidecars', () => {
+    expect(previewKindFor('art/robot.glb')).toEqual({ kind: 'model', mime: 'model/gltf-binary' })
+    expect(previewKindFor('art/robot.gltf')?.kind).toBe('model')
+    expect(previewKindFor('art/ROBOT.FBX')?.kind).toBe('model')
+    expect(previewKindFor('art/robot.obj')?.kind).toBe('model')
+    expect(previewKindFor('art/robot.stl')?.kind).toBe('model')
+    expect(previewKindFor('art/robot.ply')?.kind).toBe('model')
+    expect(previewKindFor('art/robot.dae')?.kind).toBe('model')
+    // A material library is only ever fetched as a model's sidecar.
+    expect(previewKindFor('art/body.mtl')).toBeNull()
+  })
+
   it('caps the preview payload size', () => {
     expect(PREVIEW_SIZE_LIMIT).toBe(128 * 1024 * 1024)
   })
