@@ -1452,7 +1452,7 @@ function updateSummary(update: UpdateState | null, currentVersion: string | null
       return 'Checking GitHub releases…'
     case 'available':
       return update.canInstall
-        ? `Aspen ${update.version ?? 'x'} is downloading in the background.`
+        ? `Aspen ${update.version ?? 'x'} is available — choose an action below.`
         : `Aspen ${update.version ?? 'x'} is available — this build updates from the releases page.`
     case 'downloading':
       return `Downloading Aspen ${update.version ?? 'x'} — ${update.percent ?? 0}%.`
@@ -1563,6 +1563,13 @@ export function AboutDialog(): JSX.Element | null {
               onClick={() => void store.checkForUpdatesNow()}
             >
               Restart to update
+            </button>
+          ) : update?.phase === 'available' && update.canInstall ? (
+            <button
+              className="btn primary"
+              onClick={() => void store.downloadAvailableUpdate()}
+            >
+              Download update
             </button>
           ) : (
             <button

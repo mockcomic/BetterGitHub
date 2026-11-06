@@ -93,6 +93,14 @@ export interface RequestResponseChannels {
    */
   checkForUpdates: () => UpdateCheckResult
   /**
+   * Start downloading an available update — only ever called after the
+   * user approves the prompt (nothing downloads unprompted). Progress and
+   * the ready verdict arrive on UPDATE_STATE_CHANNEL. Self-updating builds
+   * only; everywhere else it throws a "download from the releases page"
+   * message the generic toast displays.
+   */
+  downloadUpdate: () => void
+  /**
    * Apply an already-downloaded update and restart. Self-updating builds
    * only; everywhere else it throws a "download from the releases page"
    * message the generic toast displays.

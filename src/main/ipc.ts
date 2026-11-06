@@ -132,7 +132,7 @@ import {
   restoreEol
 } from './ai/merge-agent'
 import { dispatchMenuAction, getMenuBarSpec, runMenuRole } from './menu'
-import { checkForUpdates, quitAndInstallUpdate } from './updates'
+import { checkForUpdates, downloadApprovedUpdate, quitAndInstallUpdate } from './updates'
 import { applyTheme, getMainWindow, isTrustedSender } from './windows'
 import { getWatchedPath, startWatching, stopWatching } from './watcher'
 
@@ -514,6 +514,9 @@ const handlers: Handlers = {
     // Manual verdict for Help → "Check for updates…" (and the About
     // dialog's button). Background phases ride UPDATE_STATE_CHANNEL.
     return checkForUpdates(true)
+  },
+  async downloadUpdate() {
+    downloadApprovedUpdate()
   },
   async quitAndInstallUpdate() {
     quitAndInstallUpdate()

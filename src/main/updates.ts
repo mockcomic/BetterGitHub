@@ -23,8 +23,9 @@ import { isAutoUpdateChecksEnabled } from './settings'
  *
  * - *Full updater* — packaged win32 builds installed through the NSIS
  *   installer: electron-updater reads `latest.yml` from the GitHub release,
- *   downloads the new installer in the background and applies it via
- *   `quitAndInstall()`. electron-builder already emits `latest.yml` +
+ *   and — once the user approves the prompt — downloads the new installer
+ *   and applies it via `quitAndInstall()`. Nothing is ever fetched without
+ *   that approval. electron-builder already emits `latest.yml` +
  *   blockmap next to the Setup exe; a release must carry all three.
  * - *Releases-page check* — every other run (dev, macOS, Linux, the Windows
  *   portable exe): a plain `GET releases/latest` through the same HTTP
@@ -95,7 +96,9 @@ function wireUpdaterEvents(): void {
   if (wired) return
   wired = true
   autoUpdater.logger = null
-  autoUpdater.autoDownload = true
+  // Never fetch bytes without the user saying yes: the renderer prompts on
+  // 'available' and calls the downloadUpdate IPC to start the transfer.
+  autoUpdater.autoDownload = false
   autoUpdater.setFeedURL({
     provider: 'github',
     owner: UPDATE_REPO_OWNER,
@@ -271,6 +274,24 @@ export async function checkForUpdates(manual: boolean): Promise<UpdateCheckResul
   }
   void manual
   return checkViaReleasesApi(currentVersion)
+}
+
+/** Start the approved download (full mode). The renderer only calls this
+ *  after the user accepts the "update available" prompt; the download's
+ *  progress and the 'ready' verdict arrive back on UPDATE_STATE_CHANNEL.
+ *  Idempotent: a second call while a download is in flight is a no-op. */
+export function downloadApprovedUpdate(): void {
+  if (!canSelfUpdate()) {
+    throw new Error(
+      'This build cannot self-update — download the installer from the releases page.'
+    )
+  }
+  if (lastBroadcast?.phase === 'downloading' || lastBroadcast?.phase === 'ready') return
+  void autoUpdater.downloadUpdate().catch(err => {
+    // downloadUpdate rejects after the 'error' event already pushed the
+    // phase; the catch keeps the rejection from surfacing as unhandled.
+    broadcast({ phase: 'error', version: lastBroadcast?.version, error: messageOf(err) })
+  })
 }
 
 /** Apply the downloaded update (full mode). Throws a page-link verdict for

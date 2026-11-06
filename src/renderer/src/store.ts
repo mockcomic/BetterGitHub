@@ -3081,17 +3081,21 @@ export class AppStore {
     this.update({ update: state })
     if (repeated) return
     if (state.phase === 'ready') {
-      this.toast('success', `Aspen ${state.version ?? 'x'} is downloaded.`, [
-        {
-          label: 'Restart now',
-          onClick: () => {
+      this.update({
+        confirm: {
+          title: 'Restart to update',
+          message: `Aspen ${state.version ?? 'x'} is downloaded. Restart now to install it?`,
+          confirmLabel: 'Restart now',
+          altLabel: 'Later',
+          onConfirm: () => {
+            this.dismissConfirm()
             void this.applyDownloadedUpdate()
           }
         }
-      ])
+      })
     } else if (state.phase === 'available') {
       if (state.canInstall) {
-        this.toast('info', `Downloading Aspen ${state.version ?? 'x'}…`)
+        this.promptAvailableUpdate(state)
       } else {
         this.toast('info', `Aspen ${state.version ?? 'a newer version'} is available.`, [
           {
@@ -3102,6 +3106,50 @@ export class AppStore {
           }
         ])
       }
+    }
+  }
+
+  /** The approval gate for the full-update tier: nothing downloads until
+   *  the user says yes here — the app never fetches an installer
+   *  unprompted. Shared by the background push and manual checks (whose
+   *  phase dedupe would otherwise swallow a re-prompt after a dismiss). */
+  private promptAvailableUpdate(state: UpdateState): void {
+    this.update({
+      confirm: {
+        title: 'Update available',
+        message: `Aspen ${state.version ?? 'a newer version'} is available. Download and install it?`,
+        confirmLabel: 'Download update',
+        altLabel: 'View releases',
+        onConfirm: () => {
+          this.dismissConfirm()
+          void this.downloadAvailableUpdate()
+        },
+        onAlt: () => {
+          this.dismissConfirm()
+          void call('openExternal', state.releaseUrl)
+        }
+      }
+    })
+  }
+
+  /** Kick off the user-approved installer download (full-update tier).
+   *  Progress and the ready prompt arrive on the update-state push. */
+  async downloadAvailableUpdate(): Promise<void> {
+    try {
+      await call('downloadUpdate')
+    } catch (err) {
+      this.toast(
+        'error',
+        err instanceof Error ? err.message : String(err),
+        [
+          {
+            label: 'Open releases',
+            onClick: () => {
+              void call('openExternal', RELEASES_URL)
+            }
+          }
+        ]
+      )
     }
   }
 
@@ -3138,8 +3186,17 @@ export class AppStore {
           }
         ])
       }
-      // 'available': applyUpdatePush already toasted the right action for
-      // this build's tier; saying it twice from here would only jingle.
+      // 'available': re-prompt through the same gate. The background push
+      // usually fires first, but if the user dismissed the earlier prompt
+      // the phase dedupe would swallow the re-broadcast — saying nothing
+      // here would leave a manual check unanswered on self-update builds.
+      if (res.status === 'available') {
+        const pushed = this.state.update
+        if (pushed !== null && pushed.phase === 'available') {
+          if (pushed.canInstall) this.promptAvailableUpdate(pushed)
+          // The page-only tier already toasted via applyUpdatePush.
+        }
+      }
     } catch (err) {
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
