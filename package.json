@@ -96,6 +96,12 @@
         "AppImage",
         "deb"
       ]
+    },
+    "nsis": {
+      "artifactName": "Aspen-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "Aspen-portable.${ext}"
     }
   },
   "allowScripts": {
