@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  chooseAsset,
+  decide,
   isVersionNewer,
-  parseReleaseJson,
-  parseVersionCore
+  parseVersionCore,
+  sanitizeRelease
 } from '../src/shared/updates'
 
 describe('parseVersionCore', () => {
@@ -62,45 +64,135 @@ describe('isVersionNewer', () => {
   })
 })
 
-describe('parseReleaseJson', () => {
-  it('maps a real-shaped release payload', () => {
-    const info = parseReleaseJson({
+describe('sanitizeRelease', () => {
+  const DL = 'https://github.com/mockcomic/BetterGitHub/releases/download/v0.2.0'
+
+  it('maps a real-shaped GitHub release payload', () => {
+    const rel = sanitizeRelease({
       tag_name: 'v0.2.0',
       name: 'Aspen 0.2.0',
-      html_url: 'https://github.com/mockcomic/BetterGitHub/releases/tag/v0.2.0',
-      body: '## What changed\n- self-update\n',
+      published_at: '2026-05-01T00:00:00Z',
       draft: false,
-      prerelease: false
+      prerelease: false,
+      assets: [
+        { name: 'Aspen-Setup.exe', browser_download_url: `${DL}/Aspen-Setup.exe`, size: 100, digest: 'sha256:' + 'a'.repeat(64) },
+        { name: 'update-manifest.json', browser_download_url: `${DL}/update-manifest.json` },
+        { name: 'update-manifest.json.sig', browser_download_url: `${DL}/update-manifest.json.sig` }
+      ]
     })
-    expect(info).not.toBeNull()
-    expect(info?.version).toBe('0.2.0')
-    expect(info?.url).toBe(
-      'https://github.com/mockcomic/BetterGitHub/releases/tag/v0.2.0'
-    )
-    expect(info?.notes).toContain('self-update')
+    expect(rel).not.toBeNull()
+    expect(rel?.tag).toBe('v0.2.0')
+    expect(rel?.versionLabel).toBe('0.2.0')
+    expect(rel?.url).toBe('https://github.com/mockcomic/BetterGitHub/releases/tag/v0.2.0')
+    expect(rel?.manifestPair).toBe('pair')
+    expect(rel?.assets[0].sha256).toBe('a'.repeat(64))
   })
 
-  it('defaults notes to empty for a body-less release', () => {
-    const info = parseReleaseJson({
-      tag_name: '0.2.0',
-      html_url: 'https://example.test/releases/tag/0.2.0'
+  it('round-trips its own sanitized shape (the update-info.json cache path)', () => {
+    const first = sanitizeRelease({
+      tag_name: 'v0.3.1',
+      published_at: '2026-06-01T00:00:00Z',
+      assets: [{ name: 'Aspen-Setup.exe', browser_download_url: `${DL}/Aspen-Setup.exe`, sha256: 'b'.repeat(64) }]
     })
-    expect(info?.notes).toBe('')
+    const again = sanitizeRelease(first)
+    expect(again).not.toBeNull()
+    expect(again?.tag).toBe('v0.3.1')
+    expect(again?.assets[0].sha256).toBe('b'.repeat(64))
   })
 
-  it('rejects payloads without usable tag or url fields', () => {
-    expect(parseReleaseJson({})).toBeNull()
-    expect(parseReleaseJson({ tag_name: 'nightly', html_url: 'https://x.test' })).toBeNull()
-    expect(
-      parseReleaseJson({ tag_name: 123, html_url: 'https://x.test' })
-    ).toBeNull()
-    expect(parseReleaseJson({ tag_name: 'v1.0.0', html_url: 42 })).toBeNull()
+  it('rejects a payload with no usable tag or no date', () => {
+    expect(sanitizeRelease({})).toBeNull()
+    expect(sanitizeRelease({ tag_name: 'bad tag!', published_at: '2026-01-01T00:00:00Z' })).toBeNull()
+    expect(sanitizeRelease({ tag_name: 'v1.0.0' })).toBeNull()
+    expect(sanitizeRelease({ tag_name: 'v1.0.0', published_at: 'not-a-date' })).toBeNull()
+    // A tag-shaped string that is not a version survives sanitizing with a
+    // null core — decide() then treats it as "never newer", not as garbage.
+    const nightly = sanitizeRelease({ tag_name: 'nightly', published_at: '2026-01-01T00:00:00Z' })
+    expect(nightly?.version).toBeNull()
   })
 
-  it('keeps a blank html_url from becoming an empty page link', () => {
-    const info = parseReleaseJson({ tag_name: 'v1.0.0', html_url: '   ' })
-    // Whitespace-only URL still passes the string check; the fallback keeps
-    // the link pointing somewhere real.
-    expect(info?.url.trim().length === 0).toBe(false)
+  it('drops assets whose URL leaves the pinned hosts', () => {
+    const rel = sanitizeRelease({
+      tag_name: 'v1.0.0',
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [
+        { name: 'evil.exe', browser_download_url: 'http://github.com/mockcomic/BetterGitHub/releases/download/v1.0.0/evil.exe' },
+        { name: 'stranger.exe', browser_download_url: 'https://evil.test/setup.exe' },
+        { name: 'ok.exe', browser_download_url: `${DL}/ok.exe` }
+      ]
+    })
+    expect(rel?.assets.map(a => a.name)).toEqual(['ok.exe'])
+  })
+
+  it('flags a half manifest pair (fails closed like a bad signature)', () => {
+    const rel = sanitizeRelease({
+      tag_name: 'v1.0.0',
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [{ name: 'update-manifest.json', browser_download_url: `${DL}/update-manifest.json` }]
+    })
+    expect(rel?.manifestPair).toBe('half')
+  })
+})
+
+describe('decide', () => {
+  const rel = (tag: string, publishedAt = '2026-01-01T00:00:00Z') =>
+    sanitizeRelease({ tag_name: tag, published_at: publishedAt })!
+
+  it('a strictly newer version is a version update', () => {
+    expect(decide(rel('v0.2.0'), '0.1.0', Date.parse('2026-02-01'))).toEqual({ status: 'available', kind: 'version' })
+  })
+
+  it('an older release is up-to-date', () => {
+    expect(decide(rel('v0.1.0'), '0.2.0', 0)).toEqual({ status: 'up-to-date' })
+  })
+
+  it('the same version with a newer publish date is a build update', () => {
+    expect(decide(rel('v0.2.0', '2026-05-01T00:00:00Z'), '0.2.0', Date.parse('2026-04-01'))).toEqual({
+      status: 'available',
+      kind: 'build'
+    })
+  })
+
+  it('the same version with no build clock is up-to-date (no claim)', () => {
+    expect(decide(rel('v0.2.0', '2026-05-01T00:00:00Z'), '0.2.0', NaN)).toEqual({ status: 'up-to-date' })
+  })
+
+  it('a null release is nothing to show', () => {
+    expect(decide(null, '0.1.0', 0)).toEqual({ status: 'none' })
+  })
+
+  it('a prerelease or draft is nothing to show', () => {
+    const pre = sanitizeRelease({ tag_name: 'v9.9.9', published_at: '2026-01-01T00:00:00Z', prerelease: true })!
+    expect(decide(pre, '0.1.0', 0)).toEqual({ status: 'none' })
+  })
+})
+
+describe('chooseAsset', () => {
+  const DL = 'https://github.com/mockcomic/BetterGitHub/releases/download/v1.0.0'
+  const rel = sanitizeRelease({
+    tag_name: 'v1.0.0',
+    published_at: '2026-01-01T00:00:00Z',
+    assets: [
+      { name: 'update-manifest.json', browser_download_url: `${DL}/update-manifest.json` },
+      { name: 'Aspen-Setup.exe', browser_download_url: `${DL}/Aspen-Setup.exe`, sha256: 'c'.repeat(64) },
+      { name: 'Aspen-portable.exe', browser_download_url: `${DL}/Aspen-portable.exe` }
+    ]
+  })!
+
+  it('prefers the setup exe with a digest for an installed run', () => {
+    expect(chooseAsset(rel, false)?.name).toBe('Aspen-Setup.exe')
+  })
+
+  it('prefers the portable exe for a portable run', () => {
+    expect(chooseAsset(rel, true)?.name).toBe('Aspen-portable.exe')
+  })
+
+  it('never hands back a manifest file, and null with no exe at all', () => {
+    const docsOnly = sanitizeRelease({
+      tag_name: 'v1.0.0',
+      published_at: '2026-01-01T00:00:00Z',
+      assets: [{ name: 'update-manifest.json', browser_download_url: `${DL}/update-manifest.json` }]
+    })!
+    expect(chooseAsset(docsOnly, false)).toBeNull()
   })
 })

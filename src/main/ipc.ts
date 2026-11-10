@@ -527,7 +527,7 @@ const handlers: Handlers = {
     return checkForUpdates(true)
   },
   async downloadUpdate() {
-    downloadApprovedUpdate()
+    await downloadApprovedUpdate()
   },
   async quitAndInstallUpdate() {
     quitAndInstallUpdate()
