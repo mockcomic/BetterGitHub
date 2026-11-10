@@ -3072,9 +3072,9 @@ export class AppStore {
 
   /** Mirror main's push and speak only for the moments that matter:
    *  a found update (download note, or the page link for builds that
-   *  can't self-apply) and a finished download. Errors and up-to-date
-   *  answers come from the manual call itself, so the silent startup
-   *  pass never nags. */
+   *  can't self-apply or releases that never authenticated) and a
+   *  finished download. Errors and up-to-date answers come from the manual
+   *  call itself, so the silent startup pass never nags. */
   private applyUpdatePush(state: UpdateState): void {
     const repeated = this.lastUpdatePhase === state.phase
     this.lastUpdatePhase = state.phase
@@ -3094,10 +3094,15 @@ export class AppStore {
         }
       })
     } else if (state.phase === 'available') {
-      if (state.canInstall) {
+      if (state.canInstall && state.authenticated === true) {
         this.promptAvailableUpdate(state)
       } else {
-        this.toast('info', `Aspen ${state.version ?? 'a newer version'} is available.`, [
+        const why = state.authenticated === false
+          ? state.authReason
+            ? ` (${state.authReason})`
+            : ''
+          : ''
+        this.toast('info', `Aspen ${state.version ?? 'a newer version'} is available${why}.`, [
           {
             label: 'Open releases',
             onClick: () => {
@@ -3193,8 +3198,8 @@ export class AppStore {
       if (res.status === 'available') {
         const pushed = this.state.update
         if (pushed !== null && pushed.phase === 'available') {
-          if (pushed.canInstall) this.promptAvailableUpdate(pushed)
-          // The page-only tier already toasted via applyUpdatePush.
+          if (pushed.canInstall && pushed.authenticated === true) this.promptAvailableUpdate(pushed)
+          // The page-only / unauthenticated tier already toasted via applyUpdatePush.
         }
       }
     } catch (err) {

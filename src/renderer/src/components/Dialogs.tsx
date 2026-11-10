@@ -1451,6 +1451,9 @@ function updateSummary(update: UpdateState | null, currentVersion: string | null
     case 'checking':
       return 'Checking GitHub releases…'
     case 'available':
+      if (update.authenticated === false) {
+        return `Aspen ${update.version ?? 'x'} is available but not signed — install it from the releases page.`
+      }
       return update.canInstall
         ? `Aspen ${update.version ?? 'x'} is available — choose an action below.`
         : `Aspen ${update.version ?? 'x'} is available — this build updates from the releases page.`
@@ -1564,7 +1567,7 @@ export function AboutDialog(): JSX.Element | null {
             >
               Restart to update
             </button>
-          ) : update?.phase === 'available' && update.canInstall ? (
+          ) : update?.phase === 'available' && update.canInstall && update.authenticated === true ? (
             <button
               className="btn primary"
               onClick={() => void store.downloadAvailableUpdate()}

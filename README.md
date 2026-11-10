@@ -129,11 +129,14 @@ parsing → cancellable request).
   rely on is unchanged.
 - **Self-update from GitHub Releases** — packaged runs check this
   repository's Releases a few seconds after launch and whenever you press
-  **Help → Check for updates…**. On Windows NSIS installs the newer
-  installer downloads in the background and a **Restart now** toast (or the
-  About dialog) applies it; on every other build — and the portable exe —
-  Aspen points you at the release page instead. Toggle the automatic pass
-  in Preferences ▸ Behavior. See *Keeping Aspen up to date* below.
+  **Help → Check for updates…**. A newer release asks **Download and
+  install it?** and — only on your yes — the signed installer downloads to
+  your Downloads folder (progress in the About dialog) and a **Restart
+  now** toast applies it. A release whose signature doesn't verify is
+  offered as a releases-page link only, never auto-downloaded. On builds
+  that can't self-apply (macOS, Linux, the portable exe) Aspen points you
+  at the release page instead. Toggle the automatic pass in Preferences ▸
+  Behavior. See *Keeping Aspen up to date* below.
 - Toasts with actions (e.g. **Undo** after a commit) and manual dismiss.
 - Light / dark / system theme.
 
@@ -288,19 +291,30 @@ always created *and* pushed by the same one you picked.)
 
 ## Keeping Aspen up to date
 
-Aspen updates itself from this repository's **GitHub Releases**
-(`src/main/updates.ts`):
+Aspen updates itself from this repository's **GitHub Releases**, on the
+same fail-closed doctrine Nucleus uses (`src/main/update-core.ts` is the
+engine; `src/main/updates.ts` wires it to Electron):
 
-- **Windows (NSIS install).** The silent startup pass and the manual
-  **Help → Check for updates…** both go through `electron-updater`, which
-  reads `latest.yml` from the newest release, downloads the new Setup exe
-  in the background (progress shows in the About dialog), and finishes with
-  a **Restart now** toast. Restarting runs the installer and relaunches the
-  updated app — your profile and settings are untouched.
-- **macOS, Linux and the Windows portable exe.** The same check hits the
-  Releases API (`releases/latest`) and compares `tag_name` semantically.
-  A newer release offers an **Open releases** button; there is no
-  in-place install (mac self-update additionally requires signed and
+- **Check.** The silent startup pass and the manual **Help → Check for
+  updates…** both `GET releases/latest`, sanitize the response to the few
+  fields the app may use, and compare `tag_name` semantically. The last
+  good answer is cached under your profile so a restart reports it
+  instantly. A same-version release published *newer* than your install
+  counts too (reported as a new build).
+- **Ask.** A newer release prompts **Download and install it?** — nothing
+  touches the network until you say yes. (Your standing rule: the app
+  never fetches an installer unprompted.)
+- **Verify.** The release must carry a signed `update-manifest.json` +
+  `.sig` pair (ed25519, verified against a public key bundled in the app).
+  On your yes the installer streams to your **Downloads** folder and its
+  bytes are SHA-256-checked against that manifest; only a file this module
+  just verified is allowed to launch. An unsigned, tampered or half-pair
+  release is **browse-only**: shown, openable from the release page, never
+  auto-downloaded — there is no unsigned fallback.
+- **Apply.** On an NSIS install the verified Setup exe runs detached and
+  Aspen quits; relaunching gets the new version, profile and settings
+  untouched. macOS, Linux and the Windows portable exe get an **Open
+  releases** button instead (mac self-update additionally needs signed and
   notarized builds).
 - Manual checks always answer with a verdict: newest release already
   running, a version is available, or why the check failed — including the
@@ -315,14 +329,22 @@ Aspen updates itself from this repository's **GitHub Releases**
 
 1. Bump `version` in `package.json` (the number users see and the updater
    compares), commit, and tag it: `git tag vX.Y.Z && git push --tags`.
-2. `npm run dist:win` — electron-builder writes the installer **and the
-   updater metadata** into `release/`.
-3. Create a GitHub Release for `vX.Y.Z` and upload, for each platform you
-   ship, the installer **plus its `latest*.yml`** (and the `.blockmap` next
-   to the Windows installer). The filename recorded in the yml must match
-   the uploaded asset exactly, or the download 404s — when in doubt, upload
-   exactly what `release/` holds.
-4. Draft/prerelease versions are ignored by the stable updater channel, so
+2. `npm run dist:win` — electron-builder writes the installer into
+   `release/`.
+3. **Sign the release**: `node scripts/sign-release.mjs vX.Y.Z
+   release/Aspen-Setup.exe …` writes `update-manifest.json` +
+   `.sig` next to the assets, self-verified against the committed public
+   key (`src/main/update-key.pub.pem`; private key at
+   `~/.aspen/update-signing.key`, generated once by
+   `node scripts/update-keygen.mjs`). An unsigned release is browse-only
+   in-app by design — that is the fail-safe, not a bug. See
+   `docs/update-signing.md`.
+4. Create a GitHub Release for `vX.Y.Z` and upload, for each platform you
+   ship, the installer **plus the manifest pair** (and, if you keep
+   electron-builder's channel file around, its `latest*.yml`). The filename
+   recorded in the manifest must match the uploaded asset exactly, or the
+   download 404s — when in doubt, upload exactly what `release/` holds.
+5. Draft/prerelease versions are ignored by the stable updater channel, so
    beta tags don't reach normal installs.
 
 ## Project layout
@@ -342,9 +364,11 @@ src/main/        Electron main process
                  PKCE sign-in, token refresh, client-id config
   accounts.ts    signed-account store (encrypted per-account token sidecars)
   settings.ts    JSON settings + safeStorage-encrypted API key
-  updates.ts     GitHub Releases self-update: electron-updater on packaged
-                 win32 (latest.yml → background download → quitAndInstall),
-                 Releases-API check + release-page handoff everywhere else
+  updates.ts     GitHub Releases self-update: check → prompt → signed
+                 installer into Downloads (Nucleus doctrine, fail-closed)
+  update-core.ts the update engine (pure, injectable): sanitize, ed25519
+                 manifest verify, capped download, verified-path spawn
+  update-key.pub.pem  the bundled trust anchor (see docs/update-signing.md)
   windows.ts/menu.ts/ipc.ts  window, app menu, typed handle() registrar
 src/preload/     contextBridge surface (window.aspen)
 src/renderer/    React UI: Header, ChangesSidebar (+CommitBox, stash panel),
