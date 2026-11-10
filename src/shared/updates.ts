@@ -33,9 +33,9 @@ export const TAG_RE = /^[\w.\-+]{1,100}$/
 export const SHA256_RE = /^[a-f0-9]{64}$/
 export const ASSET_URL_RE = new RegExp(
   '^(?:https://github\\.com/' + UPDATE_REPO + '/releases/download/[\\w.\\-+%]{1,120}/[\\w.\\-+%]{1,120}' +
-  '|https://objects\\.githubusercontent\\.com/[^\\s]+)$'
+  '|https://(?:objects|release-assets)\\.githubusercontent\\.com/[^\\s]+)$'
 )
-export const FINAL_URL_HOSTS = ['github.com', 'objects.githubusercontent.com']
+export const FINAL_URL_HOSTS = ['github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com']
 
 /** The signed manifest pair every release should carry (docs/update-signing.md). */
 export const MANIFEST_NAME = 'update-manifest.json'
