@@ -10,6 +10,7 @@ import type {
   ExternalApp,
   FilePreview,
   FileStatus,
+  ForkPreflight,
   GeneratedCommitMessage,
   GitHubTarget,
   GitConfigInfo,
@@ -123,16 +124,14 @@ export interface RequestResponseChannels {
     apiBase?: string
   ) => AccountInfo
   /**
-   * Start a browser sign-in: GitHub authorization-code + PKCE (falling back
-   * to the device-code flow when the loopback port is busy or `prefer` says
-   * so) or GitLab OAuth PKCE; main already listens for the localhost
-   * redirect. Throws a clear message when the provider's client id is not
-   * configured.
+   * Start a browser sign-in: GitHub's device-code one-time code (the only
+   * code sign-in GitHub offers besides a personal access token) or GitLab
+   * OAuth PKCE (main already listens for the localhost redirect). Throws a
+   * clear message when the provider's client id is not configured.
    */
   beginSignIn: (
     provider: AccountProvider,
-    apiBase?: string,
-    prefer?: 'web' | 'device'
+    apiBase?: string
   ) => SignInChallenge
   /** Poll a pending challenge; 'pending' keeps the UI's wait state alive. */
   pollSignIn: (requestId: string) => SignInStatus
@@ -180,6 +179,26 @@ export interface RequestResponseChannels {
     accountId: string,
     request: CreateRepoRequest
   ) => RemoteRepository
+  /**
+   * What the fork dialog may offer: the parsed `origin` the fork would copy
+   * (already validated — a repository whose remotes make the flow ambiguous
+   * throws instead of opening the dialog) and the signed-in GitHub accounts
+   * on that host, filtered by main.
+   */
+  forkPreflight: (repoPath: string) => ForkPreflight
+  /**
+   * The fork flow in one verb: fork `origin`'s repository under `accountId`,
+   * rewire the remotes (parent → `upstream`, fork → `origin`), and push the
+   * current branch to the fork with upstream tracking. The answer to a
+   * permission-rejected push — and to "I cloned someone else's repository".
+   */
+  forkRepository: (repoPath: string, accountId: string) => RemoteRepository
+  /**
+   * Open the host's new-pull-request form for the current branch in the
+   * browser. Base repository is `upstream` when the origin is a fork of it,
+   * otherwise the origin; the branch must already be pushed to origin.
+   */
+  createPullRequest: (repoPath: string) => void
   /**
    * Create a new git repository on disk inside `parentDir` (optionally with
    * a staged README) and add it to the app's repository list. Publishing is
@@ -259,6 +278,12 @@ export interface RequestResponseChannels {
   ) => string
   /** Soft-reset the tip, but only while HEAD is still `expectedSha`. */
   undoLastCommit: (repoPath: string, expectedSha: string) => void
+  /**
+   * Uncommit any commit on the current branch: the tip uses the guarded soft
+   * reset; an older commit is rebased out and its diff left staged for the
+   * commit box (clean tree required; full rollback on any conflict).
+   */
+  uncommitCommit: (repoPath: string, sha: string) => void
   revertCommit: (repoPath: string, sha: string) => void
   cherryPickCommit: (repoPath: string, sha: string) => void
 
@@ -311,7 +336,17 @@ export interface RequestResponseChannels {
   addRemote: (repoPath: string, url: string) => void
   getConfigInfo: (repoPath: string) => GitConfigInfo
   setConfigInfo: (repoPath: string, name: string, email: string) => void
-  cloneRepository: (url: string, destinationPath: string) => string
+  /**
+   * Clone `url` into `<parentDir>/<folderName>` — the folder is created when
+   * missing, and an existing one must be empty — then add it to the app's
+   * repository list. Same parent + name shape as createLocalRepository, so
+   * path joining and folder layout stay on the main side of the boundary.
+   */
+  cloneRepository: (
+    url: string,
+    parentDir: string,
+    folderName: string
+  ) => Repository
   /** Resolve a GitHub-style web URL from origin and open it externally. */
   viewOnGitHub: (repoPath: string, target: GitHubTarget) => void
 
@@ -394,6 +429,8 @@ export type MenuAction =
   | 'clone-repository'
   | 'new-repository'
   | 'publish-repository'
+  | 'create-fork'
+  | 'create-pull-request'
   | 'manage-repositories'
   | 'stash-all'
   | 'edit-last-commit'

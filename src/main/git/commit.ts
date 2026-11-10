@@ -1,4 +1,5 @@
-import { execGit, GitExecError } from './exec'
+import { execGit, friendlyGitError, GitExecError } from './exec'
+import { getStatus } from './status'
 import { addPaths } from './staging'
 
 /**
@@ -156,6 +157,145 @@ export async function undoLastCommit(
     timeoutMs: 30_000
   })
   return head
+}
+
+/**
+ * The history view's "Uncommit", generalized: remove any commit from the
+ * current branch and move its changes back to the commit box (staged).
+ *
+ * The tip commit reuses undoLastCommit's guarded soft reset, which also
+ * tolerates a dirty tree. An older commit is dropped by rebasing its
+ * descendants onto its parent (`rebase --onto <sha>^ <sha>`) and its diff is
+ * re-applied to the index with `cherry-pick --no-commit`; if either step
+ * fails, the branch is rolled back to its original position untouched.
+ *
+ * Refusals: merge commits (uncommitting flattens the merge), the root commit,
+ * commits outside this branch's history, branches whose descendants contain a
+ * merge (a plain rebase would flatten it too), and an older commit with a
+ * dirty tree or a paused operation — rewriting history must not swallow or
+ * collide with uncommitted work.
+ */
+export async function uncommitCommit(
+  repoPath: string,
+  sha: string
+): Promise<void> {
+  const head = await revParseHead(repoPath)
+  if (head.length === 0) {
+    throw new Error('This repository has no commits to undo.')
+  }
+  const resolved = await execGit(
+    ['rev-parse', '--verify', '--quiet', `${sha}^{commit}`],
+    { cwd: repoPath, timeoutMs: 10_000 }
+  ).catch(() => null)
+  if (resolved === null || resolved.stdout.trim().length === 0) {
+    throw new Error('That commit no longer exists in this repository.')
+  }
+  const commitSha = resolved.stdout.trim()
+
+  // Tip: exactly the guarded soft reset the Undo flow already performs.
+  if (sameSha(head, commitSha)) {
+    await undoLastCommit(repoPath, commitSha)
+    return
+  }
+
+  const inHistory = await execGit(
+    ['merge-base', '--is-ancestor', commitSha, 'HEAD'],
+    {
+      cwd: repoPath,
+      timeoutMs: 10_000,
+      // Exit 1 is the documented "not an ancestor" answer, not a failure.
+      successExitCodes: new Set([0, 1])
+    }
+  )
+  if (inHistory.exitCode !== 0) {
+    throw new Error(
+      'This commit is not in the current branch’s history — switch to the branch that contains it first.'
+    )
+  }
+
+  const lineage = await execGit(
+    ['rev-list', '--parents', '-n', '1', commitSha],
+    { cwd: repoPath, timeoutMs: 10_000 }
+  )
+  // `rev-list --parents` prints "<commit> <parent>…"; the tail is the parents.
+  const parentShas = lineage.stdout
+    .trim()
+    .split(/\s+/)
+    .filter(l => l.length > 0)
+    .slice(1)
+  if (parentShas.length > 1) {
+    throw new Error(
+      'This is a merge commit; uncommitting it would flatten the merge. Revert it instead.'
+    )
+  }
+  if (parentShas.length === 0) {
+    throw new Error(
+      'This is the first commit in the repository; it cannot be undone.'
+    )
+  }
+
+  const laterMerges = await execGit(
+    ['rev-list', '--merges', `${commitSha}..HEAD`],
+    { cwd: repoPath, timeoutMs: 15_000 }
+  )
+  if (laterMerges.stdout.trim().length > 0) {
+    throw new Error(
+      'A later merge commit is built on this one; uncommitting would flatten the merge. Revert it instead.'
+    )
+  }
+
+  const status = await getStatus(repoPath)
+  const wf = status.inProgress
+  if (wf.merge || wf.rebase || wf.cherryPick || wf.revert) {
+    throw new Error(
+      'Finish the merge, rebase, cherry-pick or revert in progress before uncommitting.'
+    )
+  }
+  if (status.files.length > 0) {
+    throw new Error(
+      'Commit or stash your local changes before uncommitting an older commit.'
+    )
+  }
+
+  try {
+    await execGit(['rebase', '--onto', `${commitSha}^`, commitSha], {
+      cwd: repoPath,
+      timeoutMs: 120_000
+    })
+    await execGit(
+      ['cherry-pick', '--no-commit', '--end-of-options', commitSha],
+      { cwd: repoPath, timeoutMs: 60_000 }
+    )
+  } catch (err) {
+    await restoreAfterFailedUncommit(repoPath, head)
+    throw new Error(
+      `Later commits conflict with removing this commit, so it was left in history. (${friendlyGitError(err)})`
+    )
+  }
+}
+
+/**
+ * Best-effort rollback for a failed mid-history uncommit. The tree was
+ * verified clean before the first command ran, so the final `reset --hard`
+ * cannot clobber uncommitted work; the preceding aborts only ever cancel the
+ * sequencer states this function itself could have created.
+ */
+async function restoreAfterFailedUncommit(
+  repoPath: string,
+  origHead: string
+): Promise<void> {
+  const tolerate = {
+    cwd: repoPath,
+    timeoutMs: 30_000,
+    // "no cherry-pick/rebase in progress" is the expected steady state.
+    successExitCodes: new Set([0, 128])
+  }
+  await execGit(['cherry-pick', '--abort'], tolerate).catch(() => undefined)
+  await execGit(['rebase', '--abort'], tolerate).catch(() => undefined)
+  await execGit(['reset', '--hard', origHead], {
+    cwd: repoPath,
+    timeoutMs: 30_000
+  }).catch(() => undefined)
 }
 
 /** `git revert --no-edit <sha>` (merge commits need -m and are refused). */

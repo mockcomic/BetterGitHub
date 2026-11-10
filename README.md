@@ -35,16 +35,20 @@ parsing → cancellable request).
 
 - **Repository manager** — add local repos, clone from URL or **from your
   GitHub/GitLab account** (sign in, browse and search your repositories, pick
-  one and clone; folder name and destination suggested by main), recent list,
-  remove from the app.
+  one and clone; folder name and destination suggested by main, and the
+  destination folder is created for you inside the parent you pick), recent
+  list, remove from the app. Clone is reached from the sub-menus that hold the
+  other list verbs — the strip's **⋯** overflow menu, the repository picker's
+  footer, **Manage repositories ▸ Clone…**, and **File ▸ Clone repository…** —
+  plus the first-run screen.
 - **Watch folder** — point the manager at the folder that holds your repos
   (e.g. `~/Documents/GitHub`) and the list follows it: new git folders are
   added, folders you moved or trashed drop out, and repos you added from
   anywhere else are left alone. Manual removals stick (the folder is
   remembered as dismissed until it leaves the disk); rescans run on startup,
   on folder changes, and on window focus.
-- **Hosted accounts** — sign in with **GitHub** (browser OAuth, the device
-  code, or a personal access token) and **GitLab** (OAuth PKCE for gitlab.com,
+- **Hosted accounts** — sign in with **GitHub** (the device one-time code, or
+  a personal access token) and **GitLab** (OAuth PKCE for gitlab.com,
   token for self-hosted instances too); the Clone dialog grows a tab per
   account listing every repository you own, collaborate on, or see through an
   organization, with provider-side search (GitHub's Search API, GitLab's
@@ -118,22 +122,43 @@ parsing → cancellable request).
   rest of the app uses; closing the panel ends the shell.
 - **History** — searchable commit log (message + author filters) with paging,
   per-commit changed files and diffs, and commit actions: copy SHA, create
-  branch from commit, cherry-pick, revert, open on GitHub.
+  branch from commit, uncommit (any commit drops out of history and its
+  changes and message go back to the commit box; descendants are rewritten),
+  cherry-pick, revert, open on GitHub.
 - **Sync** — fetch / pull / push with ahead-behind badges and in-button
   spinners; first push sets upstream on `origin`. A push rejected because the
   remote moved ahead answers with a **Pull first / Pull and push again** toast
-  instead of raw git output. Remotes authenticate through
-  your system git credential helper (Git Credential Manager) — and when it
+  instead of raw git output; a push rejected because you have no write access
+  (the classic "cloned someone else's public repository") answers with
+  **Create Fork** instead — see *Fork & pull request* below. Remotes
+  authenticate through your system git credential helper
+  (Git Credential Manager) — and when it
   declines, Aspen silently reruns the command once with the signed-in
   account's token for that host (never in the command line or `.git/config`).
   Add an `origin` from the header when a repo has none.
+- **Fork & pull request** — the GitHub Desktop workflow, in-app. When Push is
+  refused for lack of write access, a **Create Fork** button opens the fork
+  dialog (also on the Repository menu as **Fork this repository…**): pick the
+  GitHub account, and one verb forks the repository under it, rewires the
+  remotes (your fork becomes `origin`, the parent is kept as `upstream`), and
+  pushes your current branch — so Pull, Push, and the ahead/behind counts
+  simply keep working, against the copy you own. A permission refusal from a
+  GitLab remote (or any remote with no signed-in GitHub account on its host)
+  stays a plain error instead of a dead button. **Create Pull Request** (the
+  push-success toast or Repository ▸ Create Pull Request, `Ctrl+Shift+R`)
+  opens the host's new-PR form for your branch: the parent is the base when
+  you're on a fork — GitHub's cross-repository `user:repo:branch` head — and
+  the origin otherwise; the base branch is that remote's real default branch;
+  an unpushed branch or the default branch itself answer with the reason
+  rather than an empty browser page.
 - **Git identity** — warns and blocks the commit until `user.name` /
   `user.email` are set, with inline fields that write the repo-local config.
 - **GitHub web links** — repo, branch, commit and compare URLs derived from
   the `origin` remote (hidden rather than guessed when it isn't mappable).
 - **Menus & shortcuts** — Ctrl+Enter commit, Ctrl+Shift+X/Z stage/unstage all,
   Ctrl+Shift+S stash, Ctrl+Shift+M edit latest commit, Ctrl+Shift+F/P/U
-  fetch/pull/push, Ctrl+Shift+G view on GitHub, Ctrl+R refresh,
+  fetch/pull/push, Ctrl+Shift+R create pull request, Ctrl+Shift+G view on GitHub,
+  Ctrl+R refresh,
   Ctrl+, preferences, plus a History menu for commit operations and an About
   dialog.
 - **Newcomer-friendly defaults** — progressive disclosure instead of a mode
@@ -247,19 +272,17 @@ is simply never consulted.
 
 Open **Clone a repository → Accounts** (or Preferences → Accounts).
 
-- **GitHub — browser sign-in (OAuth).** The browser opens GitHub's authorize
-  page and Aspen catches the redirect on a loopback server at
-  `http://127.0.0.1:8765/callback` (authorization code + PKCE — a public
-  client, so no secret travels and the token never expires until you sign
-  out). If something else holds that port, Aspen automatically falls back to
-  the **device flow** — the short code you type at github.com/login/device,
-  the same dance `gh` and GitHub Desktop do — and the sign-in panel always
-  offers "Use the one-time code instead" as the manual choice.
+- **GitHub — one-time code (device flow), and nothing else.** Aspen fetches
+  a short code, you type it at github.com/login/device (or your GitHub
+  Enterprise root's equivalent), Aspen polls until GitHub approves — the same
+  dance `gh` and GitHub Desktop do. GitHub's authorization-code + PKCE
+  browser redirect is deliberately not offered: GitHub sign-in is the
+  one-time code or a personal access token. No local callback port is needed.
 - **GitLab — browser sign-in (OAuth + PKCE).** The browser opens your
-  instance's authorize page; Aspen catches the redirect on the same
-  loopback server (it dispatches purely on the unguessable `state`
-  parameter, so GitHub and GitLab sign-ins can even be pending at once).
-  PKCE means no client secret travels. Access tokens expire after GitLab's
+  instance's authorize page; Aspen catches the redirect on a loopback server
+  at `http://127.0.0.1:8765/callback` (dispatch purely on the unguessable
+  `state` parameter). PKCE means no client secret travels. Access tokens
+  expire after GitLab's
   two hours — Aspen refreshes them silently.
 - **Token sign-in — works for everything.** A GitHub classic PAT with the
   `repo` scope (or a fine-grained token with repository contents: read —
@@ -271,17 +294,18 @@ Open **Clone a repository → Accounts** (or Preferences → Accounts).
   the app. The token is validated against `/user` before anything is stored,
   then kept encrypted next to the settings file.
 
-Browser sign-in needs an OAuth application you register once (or bake into
-`src/main/providers/config.ts` and rebuild): GitHub — an OAuth App whose
-Authorization callback URL is `http://127.0.0.1:8765/callback` with *Enable
-Device Flow* ticked, one app serving both GitHub flows; GitLab — an
+The code/browser sign-ins need an OAuth application you register once (or
+bake into `src/main/providers/config.ts` and rebuild): GitHub — an OAuth App
+with *Enable Device Flow* ticked and no callback URL at all, since the
+one-time code never redirects back; GitLab — an
 application, confidential **off**, redirect URI exactly
 `http://127.0.0.1:8765/callback`, scope `api`. The ids are public, so they
 ship empty — and both sign-in buttons are always clickable either way: with
-an id on file they go straight to your browser for authorization, and without
+an id on file GitHub shows the one-time code immediately and GitLab goes
+straight to your browser for authorization, and without
 one they first open a one-step setup **in the sign-in panel** (registration
-page, copyable callback URL, the steps, one paste box) and start the same
-authorization the moment you paste and press **Save & sign in**. The
+page, the steps, one paste box — plus a copyable callback URL for GitLab) and
+start the same sign-in the moment you paste and press **Save & sign in**. The
 **Browser sign-in apps** fields in Preferences are the same two ids, for
 replacing them later; the token path needs none of this and covers servers
 whose application you cannot register.

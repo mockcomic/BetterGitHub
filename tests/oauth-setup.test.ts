@@ -89,10 +89,12 @@ describe('appRegistrationUrl', () => {
 })
 
 describe('appSetupSteps', () => {
-  it('gives GitHub the callback, the Device Flow tick box and the secret note', () => {
+  it('gives GitHub the Device Flow tick box, no callback, and the secret note', () => {
     const steps = appSetupSteps('github')
     expect(steps).toHaveLength(4)
-    expect(steps.join('\n')).toContain('http://127.0.0.1:8765/callback')
+    // GitHub signs in with the device one-time code only — nothing may
+    // instruct the user to register a loopback callback.
+    expect(steps.join('\n')).not.toContain('127.0.0.1:8765')
     expect(steps.some(s => s.includes('Enable Device Flow'))).toBe(true)
     expect(steps.some(s => s.includes('Client ID'))).toBe(true)
     expect(steps[0]).toContain('github.com')

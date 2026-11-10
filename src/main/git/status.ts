@@ -6,7 +6,11 @@ import type {
   WorkflowState
 } from '../../shared/models'
 import { execGit } from './exec'
-import { parsePorcelainStatus, type PorcelainEntry } from './porcelain'
+import {
+  parsePorcelainStatus,
+  type PorcelainEntry,
+  type PorcelainHeader
+} from './porcelain'
 
 /**
  * Reads repository status using the same git invocation observed in the
@@ -45,11 +49,41 @@ export async function getStatus(repoPath: string): Promise<RepositoryStatus> {
     upstream: header.upstream,
     ahead: header.ahead,
     behind: header.behind,
+    upstreamGone: await upstreamGone(repoPath, header),
     detached: header.detached,
     files,
     conflictCount,
     inProgress: await detectInProgress(repoPath)
   }
+}
+
+/**
+ * Does the tracked upstream ref still exist? Porcelain v2 keeps printing
+ * `+0 -0` after the remote branch is deleted, so the header alone cannot tell
+ * "in sync" from "the ref you were comparing against is gone" — and an ahead
+ * count of 0 on a deleted upstream silently strands local work.
+ *
+ * Only the ambiguous case is worth a subprocess: non-zero counts are proof the
+ * ref was there, because git had to read it to produce them. Untracked
+ * branches and measured branches therefore cost nothing, and the status poll
+ * that runs on every watch tick only pays for the probe when the probe is the
+ * only way to answer.
+ */
+async function upstreamGone(
+  repoPath: string,
+  header: PorcelainHeader
+): Promise<boolean> {
+  if (header.upstream === undefined || header.upstream.length === 0) return false
+  if (header.ahead !== 0 || header.behind !== 0) return false
+  const probe = await execGit(
+    ['--no-optional-locks', 'rev-parse', '--verify', '--quiet', '--end-of-options', header.upstream],
+    {
+      cwd: repoPath,
+      successExitCodes: new Set([0, 1]),
+      timeoutMs: 10_000
+    }
+  )
+  return probe.exitCode !== 0
 }
 
 export function toFileStatus(entry: PorcelainEntry): FileStatus {

@@ -23,12 +23,19 @@ export type SyncVerb = 'fetch' | 'pull' | 'push' | 'sync'
  * moment before the next status read can show `behind > 0`. It only ever
  * *adds* the compound verb — clearing it falls back to the same decision a
  * fresh status would produce.
+ *
+ * A branch whose upstream ref was deleted on the remote (`upstreamGone`) is
+ * the one state ahead of that ladder: git reports `+0 -0` against a ref that
+ * is not there, so "nothing to do" would strand the work. Pull is impossible
+ * and Push is the only recovery — it republishes the branch and re-sets the
+ * upstream — which is why a rejected push cannot outrank it either.
  */
 export function syncVerb(
   status: RepositoryStatus | null,
   pushNeedsPull = false
 ): SyncVerb {
   if (status === null) return 'fetch'
+  if (status.upstreamGone === true) return 'push'
   if (pushNeedsPull || ((status.behind ?? 0) > 0 && (status.ahead ?? 0) > 0))
     return 'sync'
   if ((status.behind ?? 0) > 0) return 'pull'

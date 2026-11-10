@@ -1,6 +1,6 @@
 {
   "name": "aspen",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "A visual desktop client for Git.",
   "main": "./out/main/index.js",
   "author": {

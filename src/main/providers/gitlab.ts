@@ -237,5 +237,20 @@ export const gitlabClient: ProviderClient = {
       throw new Error('GitLab created the project but returned an unreadable record.')
     }
     return created
+  },
+
+  /**
+   * GitLab's fork API is a different shape again (project ids, fork status
+   * polling, namespace choice) than the GitHub flow this app runs. Rather
+   * than a half-fork, the app says so — and names the manual path that
+   * already works with the rest of the app, since a hand-forked project
+   * wired up as `origin` (with the parent as `upstream`) drives the same
+   * create-pull-request URL builder.
+   */
+  async forkRepo(_apiBase, _account, _token, _authKind, parentFullName) {
+    throw new Error(
+      `Forking from the app is only supported for GitHub repositories. ` +
+        `Fork ${parentFullName} on GitLab, then point this repository's origin at your fork.`
+    )
   }
 }

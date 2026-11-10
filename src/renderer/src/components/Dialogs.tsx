@@ -7,15 +7,32 @@ import type { AccountInfo, ProviderOwner, RemoteRepoSort } from '../../../shared
 import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field, InfoTip } from './Dialog'
-import { BranchDivergence, divergenceTitleSuffix } from './BranchBadges'
+import { BranchDivergence } from './BranchBadges'
+import { branchAriaLabel, divergenceTitleSuffix } from '../divergence'
 import { AccountList, EMPTY_PANE, RemoteRepoPane, SignInPanel, type RepoPaneState } from './AccountsUi'
 
 import { DONATE_URL } from '../../../shared/links'
 import { RELEASES_URL, type UpdateState } from '../../../shared/updates'
+import {
+  AUTO_FETCH_CHOICES,
+  DEFAULT_AUTO_FETCH_MINUTES,
+  isAutoFetchMinutes
+} from '../../../shared/auto-fetch'
+import type { AutoFetchMinutes } from '../../../shared/auto-fetch'
 
 const autoEntries = THEME_ENTRIES.filter(e => e.group === 'auto')
 const lightEntries = THEME_ENTRIES.filter(e => e.group === 'light')
 const darkEntries = THEME_ENTRIES.filter(e => e.group === 'dark')
+
+/** How each offered fetch cadence is named in Preferences ▸ Behavior. */
+const AUTO_FETCH_LABELS: Record<AutoFetchMinutes, string> = {
+  0: 'Off — fetch only when I press Fetch',
+  1: 'Every minute',
+  5: 'Every 5 minutes',
+  15: 'Every 15 minutes',
+  30: 'Every 30 minutes',
+  60: 'Every hour'
+}
 
 /** The preferences rail, in panel order. Accounts leads: it is the first
  *  thing a fresh install needs; the AI pointer note overrides on open. */
@@ -45,6 +62,8 @@ export function SettingsDialog(): JSX.Element | null {
   const [gitlabClientId, setGitLabClientId] = useState('')
   const [confirmOverride, setConfirmOverride] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoFetchMinutes, setAutoFetchMinutes] =
+    useState<AutoFetchMinutes>(DEFAULT_AUTO_FETCH_MINUTES)
   const [hintsEnabled, setHintsEnabled] = useState(true)
   const [autoUpdateChecks, setAutoUpdateChecks] = useState(true)
   const [theme, setTheme] = useState<ThemeId>('system')
@@ -61,6 +80,7 @@ export function SettingsDialog(): JSX.Element | null {
       setCustomInstructions(settings.ai.customInstructions)
       setConfirmOverride(settings.confirmOverrideWithGeneratedMessage)
       setAutoRefresh(settings.autoRefresh)
+      setAutoFetchMinutes(settings.autoFetchMinutes)
       setHintsEnabled(settings.hintsEnabled)
       setAutoUpdateChecks(settings.autoUpdateChecks)
       setTheme(settings.theme)
@@ -136,6 +156,7 @@ export function SettingsDialog(): JSX.Element | null {
                   },
                   confirmOverrideWithGeneratedMessage: confirmOverride,
                   autoRefresh,
+                  autoFetchMinutes,
                   hintsEnabled,
                   autoUpdateChecks,
                   theme
@@ -287,7 +308,7 @@ export function SettingsDialog(): JSX.Element | null {
         >
           <summary>
             Browser sign-in apps
-            <InfoTip text={'Both browser buttons are always clickable. With an id here they go straight to your browser for authorization; without one the button first asks for the id, in place. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
+            <InfoTip text={'Both sign-in buttons are always clickable. With an id here GitHub goes straight to the one-time code and GitLab straight to your browser for authorization; without one the button first asks for the id, in place. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
           </summary>
           <p className="field-hint">
             The browser buttons sign you in through an OAuth application you register
@@ -298,8 +319,8 @@ export function SettingsDialog(): JSX.Element | null {
           </p>
           <Field
             label="GitHub OAuth App client id"
-            hint="github.com/settings/developers → new OAuth App → Authorization callback URL http://127.0.0.1:8765/callback and tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback. Public by design; leave empty to fall back to the id baked in at build time."
-            tip={'GitHub → Settings → Developer settings → OAuth Apps → New OAuth App.\nHomepage URL: anything. Authorization callback URL: exactly http://127.0.0.1:8765/callback.\nTick “Enable Device Flow” — the one app covers both the browser sign-in and the code fallback.\nOnly the Client ID is used; Aspen never needs the secret.'}
+            hint="github.com/settings/developers → new OAuth App → tick “Enable Device Flow” (no callback URL needed — GitHub signs in with the one-time code only). Public by design; leave empty to fall back to the id baked in at build time."
+            tip={'GitHub → Settings → Developer settings → OAuth Apps → New OAuth App.\nHomepage URL: anything. No callback URL — the device flow never redirects.\nTick “Enable Device Flow” — without it the one-time-code sign-in cannot start.\nOnly the Client ID is used; Aspen never needs the secret.'}
           >
             <input
               placeholder={
@@ -351,6 +372,25 @@ export function SettingsDialog(): JSX.Element | null {
           <span>Refresh the changes list automatically when files change on disk</span>
           <InfoTip text={'When off, the changes list refreshes after git actions and when you press Refresh — handy if watching a very large working tree feels heavy.'} />
         </label>
+        <Field
+          label="Check the remote for new commits"
+          hint={'Also once each time you switch repository, so the counts on arrival are today\'s. Nothing downloads into your working tree — Pull still does that.'}
+          tip={'An automatic fetch updates the remote-tracking refs the ↓ chip, the route readout and the Pull verb read — it never merges, rebases or touches your files. It stays silent: no spinner, no toast, and a failed one (offline, an expired token) simply tries again on the next tick. The Fetch button in the bar always works, whatever is set here, and says out loud what a background fetch swallowed.'}
+        >
+          <select
+            value={String(autoFetchMinutes)}
+            onChange={e => {
+              const next = Number(e.target.value)
+              if (isAutoFetchMinutes(next)) setAutoFetchMinutes(next)
+            }}
+          >
+            {AUTO_FETCH_CHOICES.map(minutes => (
+              <option key={minutes} value={String(minutes)}>
+                {AUTO_FETCH_LABELS[minutes]}
+              </option>
+            ))}
+          </select>
+        </Field>
         <label className="check-row">
           <input
             type="checkbox"
@@ -451,6 +491,14 @@ export function CloneDialog(): JSX.Element | null {
       setPanes({})
       return
     }
+    // The destination defaults to the folder used last, then the watch
+    // folder — the same rule the Create dialog runs, so the Clone verb is
+    // live the moment a URL lands in the box instead of waiting on a picker.
+    setBaseDir(
+      window.localStorage.getItem('aspen.lastCloneDir') ??
+        state.settings?.scanFolder ??
+        ''
+    )
     // The tab list must reflect accounts added since the app booted — and
     // sign-ins completed from inside this very dialog.
     void store.refreshAccounts()
@@ -477,8 +525,6 @@ export function CloneDialog(): JSX.Element | null {
     if (activeAccount === null && (tab === 'signin' || accounts.length === 0)) return
     if (activeAccount === null) setTab(accounts[0]?.id ?? 'signin')
   }, [state.showClone, tab, activeAccount, accounts])
-
-  if (!state.showClone) return null
 
   const pane = activeAccount === null ? null : panes[activeAccount.id] ?? null
 
@@ -533,8 +579,15 @@ export function CloneDialog(): JSX.Element | null {
     }
   }
 
-  // First view of an account tab fetches its first page automatically.
+  // First view of an account tab fetches its first page automatically. Every
+  // hook of this component sits above the closed-render `return null` below:
+  // a hook beneath it changes the hook count between the closed and open
+  // render, React then throws "Rendered more hooks than during the previous
+  // render", and — with no error boundary — the whole window goes blank the
+  // moment Clone is clicked. That is what used to make the Clone verb look
+  // dead from every one of its entry points.
   useEffect(() => {
+    if (!state.showClone) return
     if (activeAccount !== null && panes[activeAccount.id] === undefined) {
       void loadPane(activeAccount, '', DEFAULT_SORT, false)
     }
@@ -568,6 +621,9 @@ export function CloneDialog(): JSX.Element | null {
     void loadPane(account, search, value, false)
   }
 
+  // All hooks have run: only now is it safe to skip the closed render.
+  if (!state.showClone) return null
+
   const derivedName = folderTouched ? folderName : suggested
 
   return (
@@ -584,9 +640,19 @@ export function CloneDialog(): JSX.Element | null {
           <button
             className="btn primary"
             disabled={
+              state.busy !== null ||
               url.trim().length === 0 ||
               baseDir.length === 0 ||
               derivedName.trim().length === 0
+            }
+            title={
+              url.trim().length === 0
+                ? 'Paste a URL or pick one from an account tab first'
+                : baseDir.length === 0
+                  ? 'Choose the folder to clone into first'
+                  : state.busy !== null
+                    ? 'Wait for the current operation to finish'
+                    : `Clone into ${baseDir}`
             }
             onClick={() =>
               void store.clone(url, baseDir, derivedName.trim())
@@ -690,7 +756,14 @@ export function CloneDialog(): JSX.Element | null {
           }}
         />
       </Field>
-      <Field label="Local path">
+      <Field
+        label="Local path"
+        hint={
+          baseDir.length === 0
+            ? 'Pick the folder that will hold it — a folder named after the repository is created inside, so Clone unlocks once a URL and a destination are set.'
+            : 'The repository folder is created inside this one.'
+        }
+      >
         <div className="row">
           <input
             readOnly
@@ -713,6 +786,64 @@ export function CloneDialog(): JSX.Element | null {
         </div>
       </Field>
       {state.busy === 'clone' && <p className="busy-line">Cloning…</p>}
+    </Dialog>
+  )
+}
+
+/**
+ * Fork — the recovery behind a permission-rejected push and the Repository
+ * menu's own verb. Main's preflight already proved the flow can run here
+ * (a parseable origin, a free-or-matching `upstream` name, a checked-out
+ * branch, at least one GitHub account on the host), so this dialog is just
+ * the last question: *into which account?* One click forks the repository,
+ * rewires origin → fork / parent → upstream, and pushes the current branch
+ * (src/main/git/fork.ts).
+ */
+export function ForkDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  if (!state.showFork || state.forkPreflight === null) return null
+  const pre = state.forkPreflight
+  const busy = state.busy === 'fork'
+
+  return (
+    <Dialog
+      title="Fork this repository"
+      width={520}
+      maxWidth={520}
+      onClose={() => store.closeForkDialog()}
+      footer={
+        <button className="btn" onClick={() => store.closeForkDialog()}>
+          Cancel
+        </button>
+      }
+    >
+      <p className="confirm-message">
+        You cannot push to <strong>{pre.parentFullName}</strong> — forking it
+        gives you a copy you own. Aspen will point <code>origin</code> at your
+        fork, keep the parent as the <code>upstream</code> remote, and push
+        your current branch. Afterwards, Pull &amp; Push work against your
+        fork; <em>Create Pull Request</em> opens the parent&apos;s new-PR form
+        with your branch pre-filled.
+      </p>
+      <div className="dialog-branch-list">
+        {pre.accounts.map(a => (
+          <button
+            key={a.id}
+            className="popover-item"
+            disabled={busy}
+            title={`Fork ${pre.parentFullName} into ${a.login} and push there`}
+            onClick={() => void store.createFork(a.id)}
+          >
+            <span className="branch-line">
+              <span className="branch-name">
+                Fork into GitHub · {a.login}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {busy && <p className="busy-line">Forking, rewiring remotes, pushing…</p>}
     </Dialog>
   )
 }
@@ -1238,11 +1369,12 @@ export function MergeBranchDialog(): JSX.Element | null {
           <button
             key={`merge-local-${b.name}`}
             className={`popover-item${isSelected(b.name) ? ' active' : ''}`}
+            aria-label={branchAriaLabel(b)}
             title={`Merge "${b.name}" into "${current}"${divergenceTitleSuffix(b)}`}
             onClick={() => setSelected({ name: b.name })}
           >
             <span className="branch-line">
-              {b.name}
+              <span className="branch-name">{b.name}</span>
               <BranchDivergence branch={b} current={current} />
             </span>
           </button>
@@ -1257,13 +1389,14 @@ export function MergeBranchDialog(): JSX.Element | null {
                 className={`popover-item${
                   isSelected(b.name, b.remote) ? ' active' : ''
                 }`}
+                aria-label={branchAriaLabel(b)}
                 title={`Merge the remote-tracking branch ${b.remote}/${b.name} into "${current}"${divergenceTitleSuffix(b)}`}
                 onClick={() =>
                   setSelected({ name: b.name, remote: b.remote })
                 }
               >
                 <span className="branch-line">
-                  {b.name}
+                  <span className="branch-name">{b.name}</span>
                   <BranchDivergence branch={b} current={current} />
                 </span>
                 <small className="popover-path">

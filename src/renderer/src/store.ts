@@ -12,6 +12,7 @@ import type {
   ExternalApp,
   FilePreview,
   FileStatus,
+  ForkPreflight,
   GeneratedCommitMessage,
   GitConfigInfo,
   GitHubTarget,
@@ -39,7 +40,14 @@ import type { ThemeId } from '../../shared/themes'
 import { themeBase } from '../../shared/themes'
 import { DONATE_URL } from '../../shared/links'
 import { RELEASES_URL, type UpdateState } from '../../shared/updates'
-import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
+import {
+  isNeedsForkRejectionMessage,
+  isNeedsPullRejectionMessage
+} from '../../shared/push-rejection'
+import {
+  autoFetchDelayMs,
+  autoFetchSkipReason
+} from '../../shared/auto-fetch'
 import { aiLooksUnconfigured } from './progressive'
 import { call, onMenuAction, onRepoChanged, onReposChanged, onUpdateState } from './api'
 
@@ -217,6 +225,15 @@ export interface AppState {
    * shows the branch genuinely diverged the verb persists on git truth alone.
    */
   readonly pushNeedsPull: boolean
+  /**
+   * The fork dialog: open, plus main's validated preflight (the parent
+   * repository and the accounts allowed to carry the fork). Opening goes
+   * through main, so the dialog never renders a flow that would fail — a
+   * repository whose remotes make it ambiguous throws before `showFork`
+   * turns true.
+   */
+  readonly showFork: boolean
+  readonly forkPreflight: ForkPreflight | null
   readonly aiBusy: boolean
   /** The AI merge agent's live conversation about one conflicted file. */
   readonly aiMerge: AiMergeState | null
@@ -231,7 +248,7 @@ export interface AppState {
    * unavailable (initials render instead).
    */
   readonly avatars: Readonly<Record<string, string | null>>
-  /** An in-flight browser sign-in (device code / PKCE redirect), if any. */
+  /** An in-flight browser sign-in (GitHub one-time code / GitLab PKCE redirect), if any. */
   readonly signIn: SignInChallenge | null
   /** Last sign-in failure, shown inline by the sign-in panel. */
   readonly signInError: string | null
@@ -317,6 +334,8 @@ const initialState: AppState = {
   terminalOpen: false,
   busy: null,
   pushNeedsPull: false,
+  showFork: false,
+  forkPreflight: null,
   aiBusy: false,
   aiMerge: null,
   celebration: null,
@@ -410,6 +429,10 @@ export class AppStore {
   private inited = false
   private draftSaveTimer: ReturnType<typeof setTimeout> | null = null
   private logDebounce: ReturnType<typeof setTimeout> | null = null
+  /** Cadence timer for the background fetch; null = automatic fetch is off. */
+  private autoFetchTimer: ReturnType<typeof setInterval> | null = null
+  /** Path of the repo whose background fetch is still in flight. */
+  private autoFetchInFlight: string | null = null
   private refreshing = false
   private pendingRefresh = false
   private mediaQuery: MediaQueryList | null = null
@@ -542,6 +565,12 @@ export class AppStore {
       })
       this.toast('error', err instanceof Error ? err.message : String(err))
     }
+
+    // Arm the cadence even when the list was empty: a tick against no
+    // repository says nothing at all, and selecting the first repo re-phases
+    // the timer anyway. Placed above the listeners guard so a retried init
+    // still arms it.
+    this.restartAutoFetchTimer()
 
     if (this.listenersBound) return
     this.listenersBound = true
@@ -682,6 +711,12 @@ export class AppStore {
       case 'publish-repository':
         this.openPublishDialog()
         break
+      case 'create-fork':
+        await this.openForkDialog()
+        break
+      case 'create-pull-request':
+        await this.createPullRequest()
+        break
       case 'manage-repositories':
         this.setRepoManagerOpen(true)
         break
@@ -744,6 +779,8 @@ export class AppStore {
       status: null,
       statusError: null,
       pushNeedsPull: false,
+      showFork: false,
+      forkPreflight: null,
       selectedFilePath: null,
       selectedFileDiff: null,
       selectedFileError: null,
@@ -782,6 +819,14 @@ export class AppStore {
     } catch {
       this.update({ remoteUrl: null })
     }
+    // Switching repositories is itself a fetch: the desk should open on
+    // today's counts, not the ones from whenever this repo was last in the
+    // chair. Fire-and-forget and after the origin lookup, so a repository with
+    // no remote is known to be one; a slow network never delays the switch.
+    void this.autoFetch()
+    // Re-phase the cadence to the switch, so the first tick is a full interval
+    // away rather than seconds after the fetch that just ran.
+    this.restartAutoFetchTimer()
   }
 
   async addLocalRepository(): Promise<void> {
@@ -1065,20 +1110,45 @@ export class AppStore {
     }
   }
 
+  /**
+   * Clone a URL into `<baseDir>/<folderName>`. Main joins the two, creates the
+   * folder and hands back the repository it added, so the desk switches to the
+   * clone by object — matching paths across Windows separators by hand is what
+   * used to leave a successful clone unselected.
+   *
+   * `busy` is cleared in a `finally`: a verb that leaves it set on any path
+   * other than its own failure silently greys every busy-gated control on the
+   * strip, and the next Clone click then looks like a dead button.
+   */
   async clone(url: string, baseDir: string, folderName: string): Promise<void> {
-    const dest = `${baseDir.replace(/[\\/]+$/, '')}/${folderName}`
     this.update({ busy: 'clone' })
+    let repo: Repository
     try {
-      const output = await call('cloneRepository', url, dest)
-      const repositories = await call('listRepositories')
-      this.update({ repositories, busy: null, showClone: false })
-      const added = repositories.find(r => r.path.replace(/\\/g, '/') === dest)
-      if (added !== undefined) await this.selectRepo(added)
-      const tail = output.split('\n').filter(l => l.trim().length > 0).slice(-2).join(' ')
-      this.toast('success', `Cloned.${tail.length > 0 ? ` ${tail}` : ''}`)
+      repo = await call('cloneRepository', url, baseDir, folderName)
     } catch (err) {
       this.update({ busy: null })
       this.toast('error', err instanceof Error ? err.message : String(err))
+      return
+    }
+    try {
+      window.localStorage.setItem('aspen.lastCloneDir', baseDir)
+    } catch {
+      /* private-mode localStorage — the dialog's default just stays the scan folder */
+    }
+    try {
+      const repositories = await call('listRepositories')
+      this.update({ repositories, showClone: false })
+      await this.selectRepo(repo)
+      this.toast('success', `Cloned ${repo.name} into ${repo.path}.`)
+    } catch (err) {
+      // The clone landed; only the celebration failed. Say so with the repo
+      // still openable from Manage repositories rather than claiming victory.
+      this.toast(
+        'error',
+        `Cloned ${repo.name}, but Aspen could not open it: ${err instanceof Error ? err.message : String(err)}`
+      )
+    } finally {
+      this.update({ busy: null })
     }
   }
 
@@ -1287,24 +1357,22 @@ export class AppStore {
   }
 
   /**
-   * Browser sign-in: GitHub authorization-code + PKCE (falling back to the
-   * device-code flow when the loopback port is busy, or when `prefer` says
-   * 'device'), GitLab OAuth PKCE. The main process owns the token exchange;
+   * Browser sign-in: GitHub's device-code one-time code (the only code
+   * sign-in GitHub offers besides a token), GitLab OAuth PKCE. The main
+   * process owns the token exchange;
    * this loop only asks "is it done" at the provider's own cadence, so
    * closing the dialog never strands the sign-in — it completes on the next
    * poll wherever the UI happens to be.
    */
   async startBrowserSignIn(
     provider: AccountProvider,
-    apiBase?: string,
-    prefer?: 'web' | 'device'
+    apiBase?: string
   ): Promise<{ ok: boolean; message: string }> {
     try {
       const challenge = await call(
         'beginSignIn',
         provider,
-        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined,
-        prefer
+        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined
       )
       this.update({ signIn: challenge, signInError: null })
       const openUrl =
@@ -2241,19 +2309,14 @@ export class AppStore {
   /**
    * Uncommits the selected commit — the history view's counterpart to
    * Revert: the commit leaves the branch and its changes land in the commit
-   * box, instead of a new inverse commit being added.
+   * box, instead of a new inverse commit being added. The tip leaves by soft
+   * reset; any older commit is rebased out in main, which refuses a dirty
+   * tree or a rewrite that would conflict (the rollback keeps history whole).
    */
   uncommitSelectedCommit(): void {
     const commit = this.state.selectedCommit
     if (this.state.selectedRepo === null || commit === null) {
       this.toast('error', 'Select a commit first.')
-      return
-    }
-    if (this.state.commits[0]?.sha !== commit.sha) {
-      this.toast(
-        'error',
-        'Only the latest commit can be uncommitted — older commits need Revert or a rebase.'
-      )
       return
     }
     if (commit.isMerge) {
@@ -2267,7 +2330,7 @@ export class AppStore {
   }
 
   /**
-   * Shared confirm → guarded soft-reset → refill-the-commit-box flow behind
+   * Shared confirm → guarded uncommit → refill-the-commit-box flow behind
    * Undo and Uncommit. `paths` rides along when Aspen just produced the
    * commit (the toast's Undo); otherwise the scope is read from the commit
    * itself when the dialog is confirmed.
@@ -2284,13 +2347,28 @@ export class AppStore {
       return
     }
     const status = this.state.status
+    const isTip = this.state.commits[0]?.sha === sha
+    // A commit that is already in the upstream needs a force-push to leave
+    // history. The tip is pushed whenever the branch is not ahead; an older
+    // commit is pushed unless it sits inside the unpushed window at the tip.
+    // That position is only meaningful on an unfiltered list, so a filtered
+    // view (or a commit missing from it) warns whenever an upstream exists.
+    const index = this.state.commits.findIndex(c => c.sha === sha)
+    const filtered =
+      this.state.logSearch.trim().length > 0 ||
+      this.state.logAuthor.trim().length > 0
+    const ahead = status?.ahead ?? 0
     const pushed =
-      status !== null && status.upstream !== undefined && status.ahead === 0
+      status?.upstream !== undefined &&
+      (isTip ? ahead === 0 : filtered || index === -1 ? true : index >= ahead)
     this.update({
       confirm: {
         title: 'Uncommit this commit?',
         message:
-          `"${summary.slice(0, 70)}" will be removed from history. Its changes stay staged and its message goes back to the commit box` +
+          `"${summary.slice(0, 70)}" will be removed from history. ` +
+          (isTip
+            ? 'Its changes stay staged and its message goes back to the commit box'
+            : 'Later commits will be rewritten onto its parent, and its changes and message go back to the commit box') +
           (pushed
             ? ' — it was already pushed, so your next push will need a force-push.'
             : '.'),
@@ -2312,10 +2390,11 @@ export class AppStore {
               }
             }
             // runGit reports failure via its boolean, not a rejection: on a
-            // refused uncommit (tip moved, repo moved on) the user's current
-            // draft must survive untouched and the Undo offer must stay alive.
+            // refused uncommit (tip moved, repo moved on, conflicting
+            // rewrite) the user's current draft must survive untouched and
+            // the Undo offer must stay alive.
             const ok = await this.runGit(async () => {
-              await call('undoLastCommit', repo.path, sha)
+              await call(isTip ? 'undoLastCommit' : 'uncommitCommit', repo.path, sha)
             }, 'undo')
             if (!ok) return
             this.setDraft(repo.path, {
@@ -2442,11 +2521,22 @@ export class AppStore {
         .map(l => l.trim())
         .filter(l => l.length > 0)
       const summary = lines.length > 0 ? lines[lines.length - 1] : 'Done.'
-      this.toast(
-        'success',
-        `${op === 'fetch' ? 'Fetched' : op === 'pull' ? 'Pulled' : 'Pushed'} — ${summary.slice(0, 140)}`
-      )
-      if (op === 'push') this.celebrate('push')
+      const done =
+        op === 'fetch' ? 'Fetched' : op === 'pull' ? 'Pulled' : 'Pushed'
+      if (op === 'push') {
+        // The contribution half of the push verb: the branch is on the
+        // remote, so the natural next step is offered right here. When the
+        // branch is the default branch (or nothing sensible to compare),
+        // main's createPullRequest answers with the reason as a toast.
+        this.toast(
+          'success',
+          `Pushed — ${summary.slice(0, 140)}`,
+          [{ label: 'Create Pull Request', onClick: () => void this.createPullRequest() }]
+        )
+        this.celebrate('push')
+      } else {
+        this.toast('success', `${done} — ${summary.slice(0, 140)}`)
+      }
       await this.refresh()
       void this.refreshBranches()
       void this.refreshStashes()
@@ -2476,6 +2566,16 @@ export class AppStore {
             'Remote has new commits — the button will pull before it pushes.'
           )
         }
+      } else if (op === 'push' && isNeedsForkRejectionMessage(message)) {
+        // No write access — the other one-click recovery: fork the
+        // repository and push to the fork (git/fork.ts). Main only throws
+        // this message when a signed-in GitHub account could carry it, so
+        // the button always has a dialog with at least one row to show.
+        this.toast(
+          'error',
+          'No write access to this repository — fork it and push to your fork.',
+          [{ label: 'Create Fork', onClick: () => void this.openForkDialog() }]
+        )
       } else {
         this.toast('error', message)
       }
@@ -2495,6 +2595,139 @@ export class AppStore {
   async pullThenPush(): Promise<void> {
     if (!(await this.doSync('pull'))) return
     await this.doSync('push')
+  }
+
+  // ------------------------------------------------------- forks & PRs
+
+  /**
+   * Open the fork dialog for the selected repository. The preflight call is
+   * the gate: main validates the remotes and the host's signed-in GitHub
+   * accounts first, so a dialog that opens always has at least one account
+   * row to render — and a repository it cannot serve answers with the
+   * reason as a toast, exactly like any other refused verb.
+   */
+  async openForkDialog(): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) {
+      this.toast('info', 'Select a repository to fork first.')
+      return
+    }
+    try {
+      const preflight = await call('forkPreflight', repo.path)
+      this.update({ showFork: true, forkPreflight: preflight })
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  closeForkDialog(): void {
+    this.update({ showFork: false })
+  }
+
+  /**
+   * The one-verb fork flow (main: git/fork.ts): fork under `accountId`,
+   * rewire origin→fork / parent→upstream, push the current branch. The
+   * origin moved, so the header's remote readout is updated from the fork
+   * record — the next refresh re-reads the truth anyway, and a failed flow
+   * leaves whatever state main reported.
+   */
+  async createFork(accountId: string): Promise<void> {
+    const repo = this.state.selectedRepo
+    const pre = this.state.forkPreflight
+    if (repo === null || pre === null) return
+    this.update({ busy: 'fork' })
+    try {
+      const fork = await call('forkRepository', repo.path, accountId)
+      this.update({
+        busy: null,
+        showFork: false,
+        forkPreflight: null,
+        pushNeedsPull: false,
+        remoteUrl: fork.cloneUrl
+      })
+      this.toast(
+        'success',
+        `Forked ${pre.parentFullName} — your branch is on ${fork.fullName}.`,
+        [{ label: 'Create Pull Request', onClick: () => void this.createPullRequest() }]
+      )
+      await this.refresh()
+      void this.refreshBranches()
+    } catch (err) {
+      this.update({ busy: null })
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /**
+   * Open the host's new-pull-request form for the current branch. The whole
+   * decision (base repository, default branch, fork-vs-same-repo head ref,
+   * "pushed yet?") lives in main (git/fork.ts); this is the click.
+   */
+  async createPullRequest(): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) {
+      this.toast('info', 'Select a repository first.')
+      return
+    }
+    try {
+      await call('createPullRequest', repo.path)
+    } catch (err) {
+      this.toast('error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /**
+   * Re-arm the background-fetch cadence from the stored setting. Called
+   * whenever the setting or the selection changes, so a Save takes effect
+   * immediately and a repo switch restarts the quiet window after the fetch it
+   * just triggered. Idempotent; an `Off` setting leaves no timer behind.
+   */
+  private restartAutoFetchTimer(): void {
+    if (this.autoFetchTimer !== null) {
+      clearInterval(this.autoFetchTimer)
+      this.autoFetchTimer = null
+    }
+    const every = autoFetchDelayMs(this.state.settings?.autoFetchMinutes)
+    if (every === null) return
+    this.autoFetchTimer = setInterval(() => void this.autoFetch(), every)
+  }
+
+  /**
+   * The automatic half of the Fetch verb: one `git fetch --prune origin` on the
+   * selected repository, on the configured cadence and once when the selection
+   * changes. Deliberately silent — no busy state, no toast — so the desk never
+   * disables itself every few minutes and an offline laptop never cries on the
+   * clock: the counts, the route readout and the Pull verb are the whole story,
+   * updated from git truth by the refresh this lands. The manual verb in the
+   * strip is untouched and still reports errors like any other verb.
+   */
+  async autoFetch(): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    const skip = autoFetchSkipReason({
+      autoFetchMinutes: this.state.settings?.autoFetchMinutes,
+      repoPath: repo.path,
+      remoteUrl: this.state.remoteUrl,
+      busy: this.state.busy,
+      inFlightPath: this.autoFetchInFlight
+    })
+    if (skip !== null) return
+    const path = repo.path
+    this.autoFetchInFlight = path
+    try {
+      await call('fetch', path)
+      // The switch may have happened mid-flight; dropping the refresh keeps
+      // repo A's counts from painting over repo B (same rule as refresh()).
+      if (this.state.selectedRepo?.path !== path) return
+      await this.refresh()
+      void this.refreshBranches()
+      if (this.state.view === 'history') void this.loadLog(false)
+    } catch {
+      // Offline, an expired token, a dead remote: the next tick tries again,
+      // and a manual Fetch says out loud what this one swallowed.
+    } finally {
+      if (this.autoFetchInFlight === path) this.autoFetchInFlight = null
+    }
   }
 
   // --------------------------------------------------------------- branches
@@ -3233,6 +3466,8 @@ export class AppStore {
     try {
       const settings = await call('saveSettings', patch)
       this.update({ settings })
+      // A new cadence (or Off) takes effect on Save, not on the next launch.
+      this.restartAutoFetchTimer()
       this.applyTheme(settings.theme)
       this.toast('success', 'Settings saved.')
       return settings

@@ -8,7 +8,11 @@ import type { AccountProvider } from './models'
  * contract is unit-testable.
  */
 
-/** The loopback redirect to type into the registration form, byte for byte. */
+/**
+ * The loopback redirect to type into the registration form, byte for byte.
+ * Only GitLab's browser sign-in needs it — GitHub signs in with the device
+ * one-time code, which never redirects back to Aspen.
+ */
 export const OAUTH_CALLBACK_URL = 'http://127.0.0.1:8765/callback'
 
 const CLOUD_ROOT: Record<AccountProvider, string> = {
@@ -76,9 +80,11 @@ export function appRegistrationUrl(
 }
 
 /**
- * Ordered registration steps shown in the panel's one-step setup. The two
- * traps that silently break the flow afterwards — GitHub's Device Flow tick
- * box and GitLab's confidential flag — are spelled out rather than assumed.
+ * Ordered registration steps shown in the panel's one-step setup. The trap
+ * that silently breaks each flow afterwards — GitHub's Device Flow tick box,
+ * GitLab's confidential flag and redirect URI — is spelled out rather than
+ * assumed. GitHub signs in with the device one-time code only, so its app
+ * needs no callback URL; GitLab's browser redirect does.
  */
 export function appSetupSteps(
   provider: AccountProvider,
@@ -88,8 +94,8 @@ export function appSetupSteps(
   if (provider === 'github') {
     return [
       `On ${host}, register a new OAuth application — any name, any homepage URL.`,
-      `Authorization callback URL: exactly ${OAUTH_CALLBACK_URL}.`,
-      'Tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback.',
+      'No callback URL is needed — Aspen signs you in with the one-time code (device flow), never a browser redirect.',
+      'Tick “Enable Device Flow” — without it, the one-time-code sign-in cannot start.',
       'Paste the Client ID below. It is public by design; Aspen never needs the secret.'
     ]
   }

@@ -7,6 +7,7 @@
  */
 
 import type { ThemeId } from './themes'
+import type { AutoFetchMinutes } from './auto-fetch'
 
 /** UI-facing classification of a file's git status. */
 export type FileStatusKind =
@@ -92,6 +93,13 @@ export interface RepositoryStatus {
   readonly upstream?: string
   readonly ahead: number
   readonly behind: number
+  /**
+   * The configured upstream no longer exists on the remote (git's `[gone]`).
+   * `upstream` stays set — the name is the fact worth showing — while
+   * `ahead`/`behind` are git's zeroes against a ref that is not there, which
+   * is why "in sync" would be a lie and this flag exists.
+   */
+  readonly upstreamGone?: boolean
   readonly detached: boolean
   readonly files: ReadonlyArray<FileStatus>
   /** Files currently carrying merge conflict markers (porcelain `u` records). */
@@ -122,6 +130,8 @@ export interface BranchInfo {
    */
   readonly upstreamAhead?: number
   readonly upstreamBehind?: number
+  /** True when `%(upstream:track)` read `[gone]`: the tracked ref is deleted. */
+  readonly upstreamGone?: boolean
 }
 
 /** Local + remote branches, as returned by the getBranches channel. */
@@ -231,6 +241,14 @@ export interface RepoSummary {
   readonly behind: number
   /** False when the branch tracks no upstream (push would set one). */
   readonly hasUpstream: boolean
+  /** The tracked upstream ref name ('origin/main'), when the branch has one. */
+  readonly upstream?: string
+  /**
+   * The tracked upstream ref no longer exists on the remote (git's `[gone]`).
+   * Only meaningful with `hasUpstream`; the counts beside it are zeroes git
+   * could not compare, not evidence of a branch in sync.
+   */
+  readonly upstreamGone?: boolean
   /** ISO 8601 date of the tip commit; null when the repo has no commits. */
   readonly lastCommitAt: string | null
   readonly unreadable: boolean
@@ -328,10 +346,11 @@ export interface PublicSettings {
     readonly hasApiKey: boolean
   }
   /**
-   * Whether browser sign-in can start immediately per provider. Device flow
-   * and OAuth PKCE need an app client id (see providers/config.ts); without
-   * one the buttons still work — they open the sign-in panel's one-step
-   * setup that asks for the id — and token sign-in is always offered.
+   * Whether the code-based sign-in can start immediately per provider.
+   * GitHub's one-time device-code flow and GitLab's OAuth PKCE both need an
+   * app client id (see providers/config.ts); without one the buttons still
+   * work — they open the sign-in panel's one-step setup that asks for the
+   * id — and token sign-in is always offered.
    */
   readonly accounts: {
     readonly hasGitHubClientId: boolean
@@ -339,6 +358,14 @@ export interface PublicSettings {
   }
   readonly confirmOverrideWithGeneratedMessage: boolean
   readonly autoRefresh: boolean
+  /**
+   * Cadence of the automatic `git fetch` against the *selected* repository
+   * (minutes; 0 = manual only), plus the one fetch that fires when the
+   * selection changes. Background work never merges anything: a fetch updates
+   * the remote-tracking refs the counts and the Pull verb read, and stops
+   * there. See src/shared/auto-fetch.ts for the rules.
+   */
+  readonly autoFetchMinutes: AutoFetchMinutes
   readonly theme: ThemeId
   /**
    * Silent GitHub Releases check a few seconds after launch (packaged runs
@@ -377,6 +404,8 @@ export interface SettingsPatch {
   }
   readonly confirmOverrideWithGeneratedMessage?: boolean
   readonly autoRefresh?: boolean
+  /** undefined = leave unchanged; 0 = stop automatic fetching. */
+  readonly autoFetchMinutes?: AutoFetchMinutes
   readonly theme?: ThemeId
   readonly autoUpdateChecks?: boolean
   /** undefined = leave unchanged, '' = stop watching a folder. */
@@ -449,6 +478,18 @@ export interface CreateRepoRequest {
   readonly isPrivate: boolean
 }
 
+/**
+ * What the fork dialog is allowed to offer: the repository the fork would
+ * copy (`origin`, parsed and pre-checked by main) and the signed-in GitHub
+ * accounts on that host — the same filter the failed-push offer uses, so a
+ * dialog that opens never has an empty account row list.
+ */
+export interface ForkPreflight {
+  readonly parentFullName: string
+  readonly parentWebUrl: string
+  readonly accounts: ReadonlyArray<AccountInfo>
+}
+
 export type RemoteRepoSort = 'pushed' | 'created' | 'name'
 
 export interface RemoteRepoQuery {
@@ -466,6 +507,7 @@ export interface RemoteRepoQuery {
 /** Kick-off data for a browser sign-in; the renderer decides when to open it. */
 export type SignInChallenge =
   | {
+      /** GitHub's device flow — the only code sign-in GitHub offers (plus PATs). */
       readonly kind: 'github-device'
       readonly requestId: string
       /** The XXXX-XXXX code the user types at verificationUrl. */
@@ -474,12 +516,6 @@ export type SignInChallenge =
       /** Unix ms when the device code expires. */
       readonly expiresAt: number
       readonly intervalMs: number
-    }
-  | {
-      /** GitHub authorization-code + PKCE (public client, loopback redirect). */
-      readonly kind: 'github-browser'
-      readonly requestId: string
-      readonly authorizeUrl: string
     }
   | {
       readonly kind: 'gitlab-browser'

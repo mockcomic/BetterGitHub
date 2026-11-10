@@ -3,17 +3,23 @@ import {
   buildGitHubCreateRepoBody,
   buildGitHubOwners,
   buildGitHubSearchQuery,
+  expectedForkFullName,
+  githubForkUrl,
   githubListSortParams,
   githubRepoHost,
+  githubRepoUrl,
   githubSiteRoot,
   mapGitHubIdentity,
   mapGitHubRepo,
   mapGitHubRepoPage,
   mapGitHubSearchPage,
-  normalizeGitHubApiBase
+  normalizeGitHubApiBase,
+  pollGitHubForkReady,
+  type ForkPollingDeps
 } from '../src/main/providers/github'
 import {
   buildGitLabCreateRepoBody,
+  gitlabClient,
   gitLabNamespaceIdFor,
   mapGitLabIdentity,
   mapGitLabOwners,
@@ -21,6 +27,10 @@ import {
   mapGitLabRepoPage,
   normalizeGitLabApiBase
 } from '../src/main/providers/gitlab'
+import {
+  ProviderHttpError,
+  type ApiResponse
+} from '../src/main/providers/http'
 
 describe('normalizeGitHubApiBase', () => {
   it('defaults to the cloud REST root', () => {
@@ -426,5 +436,129 @@ describe('buildGitLabCreateRepoBody', () => {
       visibility: 'public',
       namespace_id: 42
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Forking — URL shapes, readiness polling, and the provider split.
+
+function apiRes(status: number, json: Record<string, unknown> = {}): ApiResponse {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: new Headers(),
+    json,
+    text: ''
+  }
+}
+
+const FORK_RECORD = {
+  name: 'repo',
+  full_name: 'octo/repo',
+  private: false,
+  clone_url: 'https://github.com/octo/repo.git',
+  ssh_url: 'git@github.com:octo/repo.git',
+  html_url: 'https://github.com/octo/repo',
+  default_branch: 'main'
+}
+
+describe('fork URL building', () => {
+  it('POSTs to the parent forks endpoint and polls its own repo record', () => {
+    expect(githubForkUrl('https://api.github.com', 'parent/repo')).toBe(
+      'https://api.github.com/repos/parent/repo/forks'
+    )
+    expect(githubRepoUrl('https://ghe.corp.example/api/v3', 'octo/repo')).toBe(
+      'https://ghe.corp.example/api/v3/repos/octo/repo'
+    )
+  })
+
+  it('a personal fork keeps the parent name under the account login', () => {
+    expect(expectedForkFullName('octo', 'parent/repo')).toBe('octo/repo')
+  })
+})
+
+describe('pollGitHubForkReady', () => {
+  const base = 'https://api.github.com'
+
+  it('waits through 404s and returns the fresh record', async () => {
+    let calls = 0
+    const urls: string[] = []
+    const deps: ForkPollingDeps = {
+      fetchJson: async url => {
+        urls.push(url)
+        calls++
+        return calls < 3 ? apiRes(404) : apiRes(200, FORK_RECORD)
+      },
+      sleep: async () => undefined,
+      deadlineMs: 10_000,
+      intervalMs: 5
+    }
+    const fork = await pollGitHubForkReady(
+      deps,
+      base,
+      'tok',
+      'acct-1',
+      'octo/repo',
+      'https://github.com/octo/repo'
+    )
+    expect(fork.fullName).toBe('octo/repo')
+    expect(fork.cloneUrl).toBe('https://github.com/octo/repo.git')
+    expect(urls).toEqual([
+      'https://api.github.com/repos/octo/repo',
+      'https://api.github.com/repos/octo/repo',
+      'https://api.github.com/repos/octo/repo'
+    ])
+  })
+
+  it('the deadline message names the fork page — the fork will exist, soon', async () => {
+    const deps: ForkPollingDeps = {
+      fetchJson: async () => apiRes(404),
+      sleep: async () => undefined,
+      deadlineMs: 0,
+      intervalMs: 1_000
+    }
+    await expect(
+      pollGitHubForkReady(
+        deps,
+        base,
+        'tok',
+        'acct-1',
+        'octo/repo',
+        'https://github.com/octo/repo'
+      )
+    ).rejects.toThrow(/still creating octo\/repo.*octo\/repo/)
+  })
+
+  it('a provider failure other than 404 surfaces immediately', async () => {
+    const deps: ForkPollingDeps = {
+      fetchJson: async () => apiRes(403, { message: 'no scopes' }),
+      sleep: async () => undefined,
+      deadlineMs: 10_000,
+      intervalMs: 5
+    }
+    await expect(
+      pollGitHubForkReady(
+        deps,
+        base,
+        'tok',
+        'acct-1',
+        'octo/repo',
+        'https://github.com/octo/repo'
+      )
+    ).rejects.toBeInstanceOf(ProviderHttpError)
+  })
+})
+
+describe('gitlabClient.forkRepo', () => {
+  it('answers with the manual path instead of half-forking', async () => {
+    await expect(
+      gitlabClient.forkRepo(
+        'https://gitlab.com',
+        { id: 'acct-1', login: 'octo' },
+        'tok',
+        'pat',
+        'group/proj'
+      )
+    ).rejects.toThrow(/only supported for GitHub repositories[\s\S]*group\/proj/)
   })
 })

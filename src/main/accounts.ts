@@ -291,6 +291,19 @@ export function accountRepoHost(account: AccountInfo): string {
 }
 
 /**
+ * True when some signed-in GitHub account serves `remoteHost` — the gate on
+ * main turning a push permission refusal into the needs-fork message, so a
+ * GitLab-only (or signed-out) user is never offered a Create Fork button
+ * that could not work (git/sync.ts push).
+ */
+export async function githubAccountCoversHost(remoteHost: string): Promise<boolean> {
+  const wanted = remoteHost.toLowerCase()
+  return (await load()).some(
+    a => a.provider === 'github' && accountRepoHost(a) === wanted
+  )
+}
+
+/**
  * The account's git-over-https Basic credential: username + token the host
  * accepts (GitHub: the account login with either token kind; GitLab: the
  * fixed `oauth2` user, valid for PATs and access tokens). Null when the

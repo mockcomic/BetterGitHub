@@ -52,7 +52,7 @@ export function HistoryView(): JSX.Element {
                 Edit latest
               </button>
             )}
-            {state.commits[0]?.sha === commit.sha && !commit.isMerge && (
+            {!commit.isMerge && (
               <button
                 className="mini"
                 title="Drop this commit and move its changes back to the commit box"

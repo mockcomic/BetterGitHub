@@ -147,10 +147,11 @@ export function AccountList(): JSX.Element {
 }
 
 /**
- * Sign-in panel: the two browser buttons — always clickable, running the real
- * OAuth flow when an application id is configured and opening the one-step
- * setup in place when it is not — plus the token form that works everywhere
- * (self-hosted included). Pending browser sign-ins render their waiting state
+ * Sign-in panel: the two code/browser buttons — always clickable, running the
+ * real flow when an application id is configured and opening the one-step
+ * setup in place when it is not (GitHub: the device one-time code only;
+ * GitLab: browser OAuth) — plus the token form that works everywhere
+ * (self-hosted included). Pending sign-ins render their waiting state
  * here; polling lives in the store so closing the dialog never strands the
  * flow.
  */
@@ -230,8 +231,8 @@ export function SignInPanel({
                 onClick={() => startBrowser('github')}
                 title={
                   support && !support.hasGitHubClientId
-                    ? 'Signs you in in your browser (GitHub authorization, one-time-code fallback) — needs a free OAuth App id first, which the next step asks for.'
-                    : 'Sign in in your browser (GitHub authorization); falls back to the one-time code if the local port is busy.'
+                    ? 'GitHub one-time-code sign-in (the device flow) — needs a free OAuth App id first, which the next step asks for. Or use a personal access token below.'
+                    : 'GitHub one-time-code sign-in (the device flow): type a short code at github.com/login/device. Or use a personal access token below.'
                 }
               >
                 Sign in with GitHub
@@ -328,12 +329,13 @@ export function SignInPanel({
 }
 
 /**
- * The one-step OAuth-app setup a browser sign-in needs the first time: the
- * registration page for the server being signed into, the callback URL to
- * type in (copyable, since a single wrong character silently breaks the
- * redirect), the two traps, and one paste box. Saving is the same settings
+ * The one-step OAuth-app setup a code/browser sign-in needs the first time:
+ * the registration page for the server being signed into, the callback URL
+ * to type in (copyable, since a single wrong character silently breaks the
+ * redirect — GitLab only; GitHub's device flow registers no callback), the
+ * traps, and one paste box. Saving is the same settings
  * write the Browser-sign-in-apps drawer does, so the id shows up there
- * afterwards; the caller then starts the browser flow immediately.
+ * afterwards; the caller then starts the sign-in flow immediately.
  */
 function SignInAppSetup({
   provider,
@@ -378,32 +380,58 @@ function SignInAppSetup({
   return (
     <div className="signin-setup">
       <p className="signin-setup-lede">
-        {provider === 'github' ? 'GitHub' : 'GitLab'} sign-in needs one free OAuth
-        application on <strong>{oauthInstanceLabel(provider, instance)}</strong> —
-        about a minute, once, and Aspen never needs the secret.
+        {provider === 'github' ? (
+          <>
+            GitHub sign-in needs one free OAuth application on{' '}
+            <strong>{oauthInstanceLabel(provider, instance)}</strong> — about a
+            minute, once. The app only needs “Enable Device Flow”: Aspen signs
+            you in with the one-time code, never a browser redirect, and never
+            needs the secret.
+          </>
+        ) : (
+          <>
+            GitLab sign-in needs one free OAuth application on{' '}
+            <strong>{oauthInstanceLabel(provider, instance)}</strong> — about a
+            minute, once, and Aspen never needs the secret.
+          </>
+        )}
       </p>
-      <div className="signin-setup-callback">
-        <code>{OAUTH_CALLBACK_URL}</code>
-        <button
-          className="mini"
-          title="Copy the callback/redirect URL to type into the registration form"
-          onClick={() =>
-            void call('writeClipboard', OAUTH_CALLBACK_URL).then(() =>
-              setNotice('Callback URL copied.')
-            )
-          }
-        >
-          Copy
-        </button>
-        <button
-          className="mini link"
-          onClick={() =>
-            void call('openExternal', appRegistrationUrl(provider, instance))
-          }
-        >
-          Open the registration page
-        </button>
-      </div>
+      {provider === 'gitlab' && (
+        <div className="signin-setup-callback">
+          <code>{OAUTH_CALLBACK_URL}</code>
+          <button
+            className="mini"
+            title="Copy the redirect URL to type into the registration form"
+            onClick={() =>
+              void call('writeClipboard', OAUTH_CALLBACK_URL).then(() =>
+                setNotice('Callback URL copied.')
+              )
+            }
+          >
+            Copy
+          </button>
+          <button
+            className="mini link"
+            onClick={() =>
+              void call('openExternal', appRegistrationUrl(provider, instance))
+            }
+          >
+            Open the registration page
+          </button>
+        </div>
+      )}
+      {provider === 'github' && (
+        <div className="signin-setup-callback">
+          <button
+            className="mini link"
+            onClick={() =>
+              void call('openExternal', appRegistrationUrl(provider, instance))
+            }
+          >
+            Open the registration page
+          </button>
+        </div>
+      )}
       <ol className="signin-setup-steps">
         {appSetupSteps(provider, instance).map(step => (
           <li key={step}>{step}</li>
@@ -501,15 +529,6 @@ function BrowserSignInProgress({
         <span className="spinner" /> Waiting for you to approve the request…
       </p>
       <p className="signin-progress-alt">
-        {challenge.kind === 'github-browser' && (
-          <button
-            className="mini"
-            title="Use GitHub's device-code flow instead (no local callback port needed)"
-            onClick={() => void store.startBrowserSignIn('github', undefined, 'device')}
-          >
-            Use the one-time code instead
-          </button>
-        )}{' '}
         <button className="mini" onClick={() => store.cancelBrowserSignIn()}>
           Cancel sign-in
         </button>

@@ -11,6 +11,8 @@ import {
   type ContextMenuState
 } from './ContextMenu'
 import { Dialog } from './Dialog'
+import { DivergenceChips, UpstreamGoneChip } from './BranchBadges'
+import { divergenceSentence } from '../divergence'
 
 /**
  * Manage repositories — the repository hub. Rows carry live git truth
@@ -137,7 +139,10 @@ export function RepoManagerDialog(): JSX.Element | null {
       case 'changes':
         return s.conflicts * 100_000 + s.dirty
       case 'sync':
-        return s.hasUpstream ? s.ahead + s.behind : null
+        // A deleted upstream has no measurable divergence — sorting by sync
+        // sinks it with the rows that have no upstream at all, rather than
+        // ranking its two meaningless zeroes against real counts.
+        return s.hasUpstream && s.upstreamGone !== true ? s.ahead + s.behind : null
       case 'last':
         return s.lastCommitAt === null ? null : Date.parse(s.lastCommitAt)
     }
@@ -500,10 +505,16 @@ export function RepoManagerDialog(): JSX.Element | null {
         >
           Add…
         </button>
+        {/* Handing off closes this dialog: every dialog shares one overlay
+            z-index, so a clone dialog opened on top of the manager would
+            paint underneath it — and one Escape would close both. */}
         <button
           className="btn"
           disabled={fetching}
-          onClick={() => store.setCloneOpen(true)}
+          onClick={() => {
+            store.setRepoManagerOpen(false)
+            store.setCloneOpen(true)
+          }}
           title="Clone a repository from a URL"
         >
           Clone…
@@ -660,7 +671,10 @@ export function RepoManagerDialog(): JSX.Element | null {
                 <div className="onboarding-actions">
                   <button
                     className="btn"
-                    onClick={() => store.setRepoDialog('new')}
+                    onClick={() => {
+                      store.setRepoManagerOpen(false)
+                      store.setRepoDialog('new')
+                    }}
                   >
                     Create repository…
                   </button>
@@ -670,7 +684,13 @@ export function RepoManagerDialog(): JSX.Element | null {
                   >
                     Add repositories…
                   </button>
-                  <button className="btn" onClick={() => store.setCloneOpen(true)}>
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      store.setRepoManagerOpen(false)
+                      store.setCloneOpen(true)
+                    }}
+                  >
                     Clone repository…
                   </button>
                 </div>
@@ -802,20 +822,27 @@ function RepoRow({
     : summary.conflicts > 0
       ? `${summary.conflicts} conflicted of ${summary.dirty} changed`
       : 'changed files'
-  const syncText = unavailable
-    ? '—'
-    : !summary.hasUpstream || (summary.ahead === 0 && summary.behind === 0)
-      ? '—'
-      : `↑${summary.ahead} ↓${summary.behind}`
+  // The sync column speaks in the same divergence chips as the strip and the
+  // branch rows; a dash means "this row has no divergence to report", never
+  // "zero". A deleted upstream gets the word instead of two zeroes that would
+  // claim a sync git could not actually measure.
+  const gone = !unavailable && summary.upstreamGone === true
   const syncIdle =
-    unavailable || !summary.hasUpstream || (summary.ahead === 0 && summary.behind === 0)
+    unavailable ||
+    !summary.hasUpstream ||
+    (!gone && summary.ahead === 0 && summary.behind === 0)
   const syncTitle = unavailable
     ? summary?.unreadable === true
       ? 'git status failed for this folder'
       : 'checking…'
-    : summary !== null && !summary.hasUpstream
-      ? 'no upstream branch — push sets one on origin'
-      : 'ahead / behind upstream'
+    : gone
+      ? `The upstream branch ${summary.upstream ?? ''} no longer exists on the remote — opening the repo and pushing republishes it`
+      : !summary.hasUpstream
+        ? 'no upstream branch — push sets one on origin'
+        : summary.ahead === 0 && summary.behind === 0
+          ? 'in sync with its upstream'
+          : divergenceSentence(summary.ahead, summary.behind)
+  const syncAria = syncTitle
   const lastText = unavailable
     ? '—'
     : summary.lastCommitAt === null
@@ -884,11 +911,22 @@ function RepoRow({
             {dirtyText}
           </span>
           <span
-            className={`repo-cell repo-sync mono${syncIdle ? ' idle' : ''}`}
+            className="repo-cell repo-sync"
             role="gridcell"
+            aria-label={syncAria}
             title={syncTitle}
           >
-            {syncText}
+            {gone ? (
+              <UpstreamGoneChip upstream={summary.upstream ?? 'its upstream'} />
+            ) : syncIdle ? (
+              '—'
+            ) : (
+              <DivergenceChips
+                ahead={summary.ahead}
+                behind={summary.behind}
+                reference={summary.upstream}
+              />
+            )}
           </span>
           <span className="repo-cell repo-last" role="gridcell">
             {lastText}

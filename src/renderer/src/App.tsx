@@ -23,6 +23,7 @@ import {
   AiMergeDialog,
   CloneDialog,
   ConfirmDialog,
+  ForkDialog,
   MergeBranchDialog,
   NewBranchDialog,
   NewRepositoryDialog,
@@ -170,10 +171,16 @@ export function App(): JSX.Element {
         <Header />
         <EmptyState />
         <Toasts />
+        {/* Every dialog paints on the same overlay z-index, so this mount
+            order *is* the stacking order: Preferences sits under the dialogs
+            that can open it to sign in, and the repository manager under the
+            clone/create dialogs it hands off to. Confirmations and the merge
+            agent stay on top of everything. */}
         <SettingsDialog />
-        <CloneDialog />
-        <NewRepositoryDialog />
         <RepoManagerDialog />
+        <CloneDialog />
+        <ForkDialog />
+        <NewRepositoryDialog />
         <NewBranchDialog />
         <MergeBranchDialog />
         <RenameBranchDialog />
@@ -327,9 +334,10 @@ export function App(): JSX.Element {
       <StatusBar />
       <Toasts />
       <SettingsDialog />
-      <CloneDialog />
-      <NewRepositoryDialog />
       <RepoManagerDialog />
+      <CloneDialog />
+      <ForkDialog />
+      <NewRepositoryDialog />
       <NewBranchDialog />
       <MergeBranchDialog />
       <RenameBranchDialog />

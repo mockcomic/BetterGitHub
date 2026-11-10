@@ -1,51 +1,107 @@
 import type { JSX } from 'react'
 import type { BranchInfo } from '../../../shared/models'
+import { divergenceSentence } from '../divergence'
 
 /**
- * The ↑/↓ divergence badges branch rows carry in the branch switcher and
- * the merge dialog. Two flavours per row, both hidden when there is
- * nothing to report (undefined = not comparable, 0/0 = identical):
+ * The divergence chip: the app's one way to draw an ahead/behind count.
  *
- * - `.branch-div`        — the branch vs the currently checked-out branch
- * - `.branch-div.upstream` — the branch vs the upstream it tracks (dimmer)
+ * A chip is the counter pill DESIGN.md already specifies — mono, tabular
+ * digits, pill radius, 10.5px — carrying one direction: `↓2` behind, `↑3`
+ * ahead. Hue is not decoration here, it names the verb the number points at:
+ * `behind` wears the Pull face's amber (incoming work worth a second of
+ * caution), `ahead` the Push face's green (outgoing work you completed). Both
+ * hues come from the `--pull-face` / `--push-face` tokens every theme ships,
+ * so a re-ink re-lights the chips along with the verbs they point to. On a
+ * filled verb face the chips take the inverted on-accent treatment instead —
+ * there the button's own face is already the hue.
  *
- * The machine-truth cells convention applies: tabular digits, muted color,
- * and the full sentence lives in the tooltip.
+ * Order is ↓ before ↑ everywhere, matching the Pull-before-Push story the
+ * compound verb runs. A zero count renders nothing: `↓0` is noise, and an
+ * all-zero pair renders no group at all.
+ *
+ * The chips are always `aria-hidden` and their `title` carries the sentence
+ * from divergence.ts for a sighted hover; whatever control hosts them has to
+ * speak the same words (`aria-label` on the sync verb, `branchAriaLabel` on a
+ * branch row), so the glyphs are never the only channel.
  */
 
-function plural(n: number): string {
-  return `${n} commit${n === 1 ? '' : 's'}`
+/**
+ * The chips themselves. Returns null when there is nothing to say, so callers
+ * can drop the whole group into a flex row without an empty wrapper.
+ *
+ * `reference` appears only in the tooltip — what the counts compare against,
+ * which is the one thing two arrows and two digits cannot say for themselves.
+ */
+export function DivergenceChips({
+  ahead,
+  behind,
+  reference,
+  quiet = false
+}: {
+  readonly ahead: number | undefined
+  readonly behind: number | undefined
+  /** What the counts compare against — the sentence's tail. */
+  readonly reference?: string
+  /** Neutral face instead of the verb hues, for a secondary comparison. */
+  readonly quiet?: boolean
+}): JSX.Element | null {
+  if (ahead === undefined || behind === undefined) return null
+  if (ahead <= 0 && behind <= 0) return null
+  const title = `${divergenceSentence(ahead, behind)}${
+    reference === undefined ? '' : ` to ${reference}`
+  }`
+  const suffix = quiet ? ' quiet' : ''
+  return (
+    <>
+      {behind > 0 && (
+        <span aria-hidden="true" className={`badge div behind${suffix}`} title={title}>
+          ↓{behind}
+        </span>
+      )}
+      {ahead > 0 && (
+        <span aria-hidden="true" className={`badge div ahead${suffix}`} title={title}>
+          ↑{ahead}
+        </span>
+      )}
+    </>
+  )
 }
 
-/** "3 commits ahead · 1 behind" / "2 commits ahead" / "in sync". */
-export function divergenceText(ahead: number, behind: number): string {
-  const parts: string[] = []
-  if (ahead > 0) parts.push(`${plural(ahead)} ahead`)
-  if (behind > 0) parts.push(`${plural(behind)} behind`)
-  return parts.length > 0 ? parts.join(' · ') : 'in sync'
+/**
+ * The `[gone]` marker: this branch still names an upstream, but the ref is no
+ * longer on the remote. Its counts would read `0 0` and claim a sync that is
+ * really a stranded branch, so the word replaces the numbers — in caution
+ * amber, the same hue the deleted upstream's Pull verb would have worn.
+ */
+export function UpstreamGoneChip({
+  upstream
+}: {
+  readonly upstream: string
+}): JSX.Element {
+  return (
+    <span
+      aria-hidden="true"
+      className="badge div gone"
+      title={`The upstream branch ${upstream} no longer exists on the remote — pushing republishes it`}
+    >
+      deleted
+    </span>
+  )
 }
 
-function glyphs(ahead: number, behind: number): string {
-  const parts: string[] = []
-  if (ahead > 0) parts.push(`↑${ahead}`)
-  if (behind > 0) parts.push(`↓${behind}`)
-  return parts.join(' ')
-}
-
-/** True when the row carries a vs-current badge. */
-export function hasDivergence(branch: BranchInfo): boolean {
-  const { ahead, behind } = branch
-  return ahead !== undefined && behind !== undefined && (ahead > 0 || behind > 0)
-}
-
-/** " — 3 commits ahead · 1 behind" for row tooltips; '' when unknown/identical. */
-export function divergenceTitleSuffix(branch: BranchInfo): string {
-  const { ahead, behind } = branch
-  if (ahead === undefined || behind === undefined) return ''
-  if (ahead === 0 && behind === 0) return ''
-  return ` — ${divergenceText(ahead, behind)}`
-}
-
+/**
+ * The chips a branch row carries, in two explicitly different groups:
+ *
+ * - **vs the checked-out branch** — tinted, because this is the pair the row's
+ *   own Merge verb acts on.
+ * - **vs the upstream the row itself tracks** — the neutral `quiet` pair, for
+ *   the branch's own remote bookkeeping. Only local branches can have one.
+ *
+ * The two used to look identical and differed only by 65% opacity, which made
+ * `↑3 ↓1` on a row mean whichever of two things the reader happened to guess.
+ * Hue now carries the reference, both tooltips spell it out, and a row whose
+ * upstream is gone says so in words instead of showing no chips at all.
+ */
 export function BranchDivergence({
   branch,
   current
@@ -54,44 +110,32 @@ export function BranchDivergence({
   /** Name of the checked-out branch, for the tooltips. */
   current: string
 }): JSX.Element | null {
-  const badges: JSX.Element[] = []
+  const vsCurrent = (
+    <DivergenceChips
+      ahead={branch.ahead}
+      behind={branch.behind}
+      reference={`"${current}"`}
+    />
+  )
+  const vsUpstream =
+    branch.remote === undefined && branch.upstream !== undefined ? (
+      branch.upstreamGone === true ? (
+        <UpstreamGoneChip upstream={branch.upstream} />
+      ) : (
+        <DivergenceChips
+          ahead={branch.upstreamAhead}
+          behind={branch.upstreamBehind}
+          reference={branch.upstream}
+          quiet
+        />
+      )
+    ) : null
 
-  if (
-    branch.ahead !== undefined &&
-    branch.behind !== undefined &&
-    (branch.ahead > 0 || branch.behind > 0)
-  ) {
-    badges.push(
-      <span
-        key="vs-current"
-        className="branch-div"
-        title={`${divergenceText(branch.ahead, branch.behind)} compared to "${current}"`}
-      >
-        {glyphs(branch.ahead, branch.behind)}
-      </span>
-    )
-  }
-
-  if (
-    branch.remote === undefined &&
-    branch.upstream !== undefined &&
-    branch.upstreamAhead !== undefined &&
-    branch.upstreamBehind !== undefined &&
-    (branch.upstreamAhead > 0 || branch.upstreamBehind > 0)
-  ) {
-    badges.push(
-      <span
-        key="vs-upstream"
-        className="branch-div upstream"
-        title={`${divergenceText(
-          branch.upstreamAhead,
-          branch.upstreamBehind
-        )} compared to ${branch.upstream}`}
-      >
-        {glyphs(branch.upstreamAhead, branch.upstreamBehind)}
-      </span>
-    )
-  }
-
-  return badges.length > 0 ? <>{badges}</> : null
+  if (vsCurrent === null && vsUpstream === null) return null
+  return (
+    <>
+      {vsCurrent}
+      {vsUpstream}
+    </>
+  )
 }

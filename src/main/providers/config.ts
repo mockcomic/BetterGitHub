@@ -1,12 +1,12 @@
 /**
- * Compiled defaults for browser sign-in. Both GitHub flows (web OAuth with
- * PKCE and the device-code fallback) and GitLab's PKCE flow need one
+ * Compiled defaults for the code/browser sign-ins. GitHub's device-code
+ * one-time-code flow and GitLab's PKCE browser flow each need one
  * application the user registers once:
  *
  * - GitHub: Settings → Developer settings → OAuth Apps → new app, homepage
- *   URL anything, **Authorization callback URL**
- *   `http://127.0.0.1:<OAUTH_REDIRECT_PORT>/callback`, and tick
- *   "Enable Device Flow"; one app serves both flows.
+ *   URL anything, and tick "Enable Device Flow" — no callback URL is needed,
+ *   since GitHub sign-in is the one-time code only (or a personal access
+ *   token).
  * - GitLab: User settings → Applications, confidential **off** (Aspen is a
  *   public PKCE client), redirect URI exactly
  *   `http://127.0.0.1:<OAUTH_REDIRECT_PORT>/callback`, scope `api`.
@@ -30,12 +30,11 @@ export const DEFAULT_GITHUB_CLIENT_ID = ''
 export const DEFAULT_GITLAB_CLIENT_ID = ''
 
 /**
- * Fixed loopback port for the browser sign-in redirect. It serves **both**
- * providers' authorization-code flows through one shared callback server
- * (dispatch on the `state` parameter), and it must match the redirect URI
- * registered on each application, so it is not ephemeral; a busy port
- * makes the web flow fail with an actionable message (GitHub then falls
- * back to the device flow, where a port is not needed).
+ * Fixed loopback port for the GitLab browser sign-in redirect. GitHub's
+ * device flow needs no port at all, so the callback server serves only
+ * GitLab's authorization-code flow (dispatch on the `state` parameter), and
+ * the port must match the redirect URI registered on the application; a
+ * busy port makes the GitLab web flow fail with an actionable message.
  */
 export const OAUTH_REDIRECT_PORT = 8765
 export const OAUTH_REDIRECT_URI = `http://127.0.0.1:${OAUTH_REDIRECT_PORT}/callback`
