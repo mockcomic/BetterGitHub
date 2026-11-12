@@ -66,6 +66,7 @@ export function AttentionDialog(): JSX.Element | null {
   // but the paint must not briefly lie.
   if (conflicted.length === 0 && kind === null) return null
   const busy = state.busy !== null
+  const batch = state.aiBatch
 
   const abort = (): void => {
     if (kind === null) return
@@ -106,6 +107,26 @@ export function AttentionDialog(): JSX.Element | null {
               Abort {workflowNoun(kind)}
             </button>
           )}
+          {conflicted.length > 1 && batch === null && (
+            <button
+              className="btn ai"
+              disabled={busy || state.aiMerge !== null}
+              title="Run the merge agent over every conflicted file, one after another. It will not stop to ask in this mode — anything it refuses to guess stays conflicted for you."
+              onClick={() => store.resolveAllConflictsWithAi()}
+            >
+              ✨ Resolve all
+            </button>
+          )}
+          {batch !== null && (
+            <button
+              className="btn ai"
+              title="Stop the pass; files it already merged stay merged"
+              onClick={() => store.stopAiBatch()}
+            >
+              <span className="spinner" /> Stop —{' '}
+              {Math.min(batch.outcomes.length + 1, batch.total)} of {batch.total}
+            </button>
+          )}
           <button
             className="btn primary"
             onClick={() => {
@@ -136,6 +157,13 @@ export function AttentionDialog(): JSX.Element | null {
               : `${conflicted.length} files are conflicted.`}{' '}
             Keep your side, take the incoming one, or let ✨ AI combine both —
             then finish or abandon the operation.
+            {conflicted.length > 1 && (
+              <>
+                {' '}
+                <b>✨ Resolve all</b> runs the agent over the whole list: it
+                merges what it can and leaves the rest conflicted.
+              </>
+            )}
           </p>
           <ul className="attention-files" aria-label="Conflicted files">
             {conflicted.map(path => (
@@ -154,17 +182,23 @@ export function AttentionDialog(): JSX.Element | null {
                 </button>
                 <span className="conflict-actions">
                   <button
-                    className="mini ai"
-                    title="Ask the AI merge agent to combine both sides — it asks you when unsure"
-                    disabled={state.aiMerge !== null}
+                    className={`mini ai${
+                      batch?.current === path ? ' thinking' : ''
+                    }`}
+                    title={
+                      batch !== null
+                        ? 'The ✨ Resolve all pass is working through the conflicted list'
+                        : 'Ask the AI merge agent to combine both sides — it asks you when unsure'
+                    }
+                    disabled={state.aiMerge !== null || batch !== null}
                     onClick={() => store.startAiMerge(path)}
                   >
-                    ✨ AI
+                    {batch?.current === path ? '…' : '✨ AI'}
                   </button>
                   <button
                     className="mini"
                     title="Keep the version from your branch"
-                    disabled={busy}
+                    disabled={busy || batch !== null}
                     onClick={() => store.resolveConflict(path, 'ours')}
                   >
                     ours
@@ -172,7 +206,7 @@ export function AttentionDialog(): JSX.Element | null {
                   <button
                     className="mini"
                     title="Take the incoming version"
-                    disabled={busy}
+                    disabled={busy || batch !== null}
                     onClick={() => store.resolveConflict(path, 'theirs')}
                   >
                     theirs

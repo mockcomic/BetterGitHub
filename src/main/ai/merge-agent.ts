@@ -107,6 +107,14 @@ export interface BuildMessagesInput {
   readonly stageBlocks: string
   readonly exchanges: ReadonlyArray<MergeExchange>
   readonly tags: MergePromptTags
+  /**
+   * Batch mode: the caller cannot answer questions (a "resolve all" pass runs
+   * files one after another with no dialog in front of them), so the agent is
+   * told to decide now and note its assumption in the summary instead of
+   * asking. A reply that asks anyway is not a failure — the caller reports
+   * that file as still needing the user.
+   */
+  readonly forceResolve?: boolean
 }
 
 /**
@@ -127,13 +135,22 @@ export function buildMergeMessages(
       ? `${input.tags.fileOpen}\n${input.content}\n${input.tags.fileClose}`
       : '(no working-tree file — it was deleted on one side)'
 
+  const forcing =
+    input.forceResolve === true
+      ? `
+
+Resolve it now in a single answer: do not ask questions. Merge both sides as
+best the file itself allows and record any assumption you had to make in
+"summary".`
+      : ''
+
   messages.push({
     role: 'user',
     content: `Resolve the merge conflict in "${input.path}". The file was ${input.stageDescription}.
 
 Working-tree content:
 ${working}
-${input.stageBlocks}`
+${input.stageBlocks}${forcing}`
   })
 
   for (const exchange of input.exchanges) {

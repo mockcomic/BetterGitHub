@@ -409,11 +409,16 @@ export interface RequestResponseChannels {
    * Ask the agent to merge one conflicted file. `exchanges` replays the
    * earlier question rounds; on a `resolved` outcome main has already
    * written the merged content to disk and staged the path.
+   *
+   * `forceResolve` is the batch pass talking: the agent is told to decide
+   * rather than ask, so an `ask` outcome back only means this file still
+   * needs the one-at-a-time conversation.
    */
   aiResolveConflict: (
     repoPath: string,
     path: string,
-    exchanges: ReadonlyArray<MergeExchange>
+    exchanges: ReadonlyArray<MergeExchange>,
+    forceResolve?: boolean
   ) => AiMergeOutcome
   /** Abort an in-flight merge request for one path. */
   cancelAiResolve: (repoPath: string, path: string) => void

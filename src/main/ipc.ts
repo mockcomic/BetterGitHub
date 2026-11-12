@@ -1090,7 +1090,8 @@ const handlers: Handlers = {
   async aiResolveConflict(
     repoPath: string,
     path: string,
-    exchanges: ReadonlyArray<MergeExchange>
+    exchanges: ReadonlyArray<MergeExchange>,
+    forceResolve?: boolean
   ) {
     const cfg = await getAiConfig()
     if (cfg.apiKey === null || cfg.apiKey.length === 0) {
@@ -1136,6 +1137,7 @@ const handlers: Handlers = {
           stageDescription: describeStages(stages),
           stageBlocks,
           exchanges,
+          forceResolve: forceResolve === true,
           tags: generateMergePromptTags()
         }),
         baseUrl: cfg.baseUrl,

@@ -62,6 +62,8 @@ import {
   autoFetchSkipReason
 } from '../../shared/auto-fetch'
 import { aiLooksUnconfigured } from './progressive'
+import type { AiBatchOutcome, AiBatchState } from './ai-batch'
+import { summarizeAiBatch } from './ai-batch'
 import { call, onMenuAction, onRepoChanged, onReposChanged, onUpdateState } from './api'
 
 export interface ToastAction {
@@ -275,6 +277,8 @@ export interface AppState {
   readonly aiBusy: boolean
   /** The AI merge agent's live conversation about one conflicted file. */
   readonly aiMerge: AiMergeState | null
+  /** A running ✨ Resolve all pass over every conflicted file, if any. */
+  readonly aiBatch: AiBatchState | null
   /** Last completing-verb success, so the button that did it can celebrate. */
   readonly celebration: CelebrationPulse | null
   readonly settings: PublicSettings | null
@@ -386,6 +390,7 @@ const initialState: AppState = {
   forkPreflight: null,
   aiBusy: false,
   aiMerge: null,
+  aiBatch: null,
   celebration: null,
   settings: null,
   accounts: [],
@@ -865,6 +870,7 @@ export class AppStore {
       lastCommit: null,
       stashes: [],
       aiMerge: null,
+      aiBatch: null,
       attention: null,
       packageScripts: null,
       terminalRun: null,
@@ -2019,6 +2025,9 @@ export class AppStore {
   startAiMerge(path: string): void {
     const repo = this.state.selectedRepo
     if (repo === null) return
+    // One merge-agent conversation at a time: a question mid-batch would talk
+    // over the pass that is already working the list (and the other way round).
+    if (this.state.aiMerge !== null || this.state.aiBatch !== null) return
     // Same progressive rule as ✨ Generate: an obviously unconfigured agent
     // goes to Preferences instead of firing a doomed request.
     if (aiLooksUnconfigured(this.state.settings)) {
@@ -2115,6 +2124,103 @@ export class AppStore {
         this.toast('error', message)
       }
     }
+  }
+
+  // --------------------------------------------- AI merge agent: the batch pass
+
+  /**
+   * Run the merge agent over every conflicted file, one after another.
+   *
+   * Sequential on purpose: an endpoint fired in parallel answers with 429s, and
+   * a reader watching the queue wants each row to clear in turn. No file may ask
+   * back mid-pass — the agent runs in forced mode and anything it still will not
+   * guess is reported as untouched rather than interrupting the run with the
+   * conversation the per-file ✨ AI button already offers. Every conflicted path
+   * the status holds goes into the pass, not just the filtered subset the queue
+   * happens to show.
+   */
+  resolveAllConflictsWithAi(): void {
+    const repo = this.state.selectedRepo
+    const status = this.state.status
+    if (repo === null || status === null) return
+    // One merge-agent conversation at a time: a batch would talk over the top of
+    // an open question, and a question would strand a batch mid-flight.
+    if (this.state.aiMerge !== null || this.state.aiBatch !== null) return
+    if (this.state.busy !== null) return
+    if (aiLooksUnconfigured(this.state.settings)) {
+      this.update({ showSettings: true, settingsAiNote: true })
+      return
+    }
+    const paths = conflictedPaths(status)
+    if (paths.length === 0) return
+    this.aiBatchSeq++
+    this.update({
+      aiBatch: { total: paths.length, current: paths[0], outcomes: [] }
+    })
+    void this.runAiBatch(this.aiBatchSeq, repo.path, paths)
+  }
+
+  /** Quit the pass between files; an in-flight request is aborted as well. */
+  stopAiBatch(): void {
+    const current = this.state.aiBatch
+    const repo = this.state.selectedRepo
+    if (current === null || repo === null) return
+    this.aiBatchSeq++
+    void call('cancelAiResolve', repo.path, current.current).catch(
+      () => undefined
+    )
+    const report = summarizeAiBatch(current.outcomes, current.total, 'stopped')
+    this.update({ aiBatch: null })
+    this.toast(report.tone, report.message)
+  }
+
+  private aiBatchSeq = 0
+
+  private async runAiBatch(
+    seq: number,
+    repoPath: string,
+    paths: ReadonlyArray<string>
+  ): Promise<void> {
+    // A pass that Stop or a repo switch superseded must stop painting state.
+    const mine = (): boolean => this.aiBatchSeq === seq
+    const outcomes: AiBatchOutcome[] = []
+    for (const path of paths) {
+      if (!mine()) return
+      this.update({
+        aiBatch: { total: paths.length, current: path, outcomes: [...outcomes] }
+      })
+      try {
+        const outcome = await call('aiResolveConflict', repoPath, path, [], true)
+        outcomes.push(
+          outcome.kind === 'resolved'
+            ? { path, kind: 'resolved', detail: outcome.summary }
+            : {
+                path,
+                kind: 'asked',
+                detail: 'The agent refused to guess without an answer.'
+              }
+        )
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        // Stopped mid-file: main aborted this path and the sequence moved on.
+        if (message === 'cancelled' || !mine()) return
+        outcomes.push({ path, kind: 'failed', detail: message })
+      }
+    }
+    if (!mine()) return
+    this.update({ aiBatch: null })
+    await this.refresh()
+    // The viewer may sit on a file the pass just merged — its diff is the one
+    // pane a silent status refresh cannot repair.
+    const selected = this.state.selectedFilePath
+    if (
+      selected !== null &&
+      outcomes.some(o => o.path === selected && o.kind === 'resolved')
+    ) {
+      void this.selectFile(selected)
+    }
+    const report = summarizeAiBatch(outcomes, paths.length)
+    this.toast(report.tone, report.message)
   }
 
   continueWorkflow(kind: WorkflowKind): void {

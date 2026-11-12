@@ -169,6 +169,32 @@ describe('buildMergeMessages', () => {
       'answer with action "resolve" now'
     )
   })
+
+  it('tells the forced pass to decide instead of asking', () => {
+    const messages = buildMergeMessages({
+      path: 'a.txt',
+      content: 'x',
+      stageDescription: 'both sides modified it',
+      stageBlocks: '',
+      exchanges: [],
+      tags: generateMergePromptTags(),
+      forceResolve: true
+    })
+    expect(messages[1].content).toContain('do not ask questions')
+    expect(messages[1].content).toContain('record any assumption')
+  })
+
+  it('keeps the ordinary one-file conversation free to ask', () => {
+    const messages = buildMergeMessages({
+      path: 'a.txt',
+      content: 'x',
+      stageDescription: 'both sides modified it',
+      stageBlocks: '',
+      exchanges: [],
+      tags: generateMergePromptTags()
+    })
+    expect(messages[1].content).not.toContain('do not ask questions')
+  })
 })
 
 describe('write-back safety', () => {

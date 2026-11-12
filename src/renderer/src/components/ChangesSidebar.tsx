@@ -553,6 +553,7 @@ export function ResolveHelp(): JSX.Element {
   const conflicted = (state.status?.files ?? []).filter(
     f => f.kind === 'conflicted'
   ).length
+  const batch = state.aiBatch
   const workflow = workflowKindOf(
     state.status?.inProgress ?? { merge: false, rebase: false, cherryPick: false, revert: false }
   )
@@ -571,6 +572,42 @@ export function ResolveHelp(): JSX.Element {
             after editing the markers by hand. The diff shows the conflict
             markers as they sit on disk.
           </p>
+          {(conflicted > 1 || batch !== null) && (
+            <div className="batch-actions">
+              {batch === null ? (
+                <button
+                  className="btn ai"
+                  disabled={state.aiMerge !== null || state.busy !== null}
+                  title="Run the merge agent over every conflicted file, one after another. It will not stop to ask in this mode — anything it refuses to guess stays conflicted for you."
+                  onClick={() => store.resolveAllConflictsWithAi()}
+                >
+                  ✨ Resolve all with AI
+                </button>
+              ) : (
+                <>
+                  <span className="batch-progress" title={batch.current}>
+                    <span className="spinner" />{' '}
+                    {Math.min(batch.outcomes.length + 1, batch.total)} of{' '}
+                    {batch.total}
+                    <code className="batch-current">{batch.current}</code>
+                  </span>
+                  <button
+                    className="mini danger"
+                    title="Stop the pass; files it already merged stay merged"
+                    onClick={() => store.stopAiBatch()}
+                  >
+                    Stop
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {batch !== null && (
+            <p>
+              Asking one file at a time lets the agent ask you back; the batch
+              pass merges what it can and leaves the rest conflicted.
+            </p>
+          )}
           {workflow !== null && (
             <>
               <p>
@@ -1136,21 +1173,28 @@ function FileRow({
         <span className="conflict-actions" onClick={e => e.stopPropagation()}>
           <button
             className={`mini ai${
-              state.aiMerge?.path === file.path && state.aiMerge.busy
+              (state.aiMerge?.path === file.path && state.aiMerge.busy) ||
+              state.aiBatch?.current === file.path
                 ? ' thinking'
                 : ''
             }`}
-            title="Ask the AI merge agent to combine both sides — it asks you when unsure"
-            disabled={state.aiMerge !== null}
+            title={
+              state.aiBatch !== null
+                ? 'The ✨ Resolve all pass is working through the conflicted list'
+                : 'Ask the AI merge agent to combine both sides — it asks you when unsure'
+            }
+            disabled={state.aiMerge !== null || state.aiBatch !== null}
             onClick={() => store.startAiMerge(file.path)}
           >
-            {state.aiMerge?.path === file.path && state.aiMerge.busy
+            {(state.aiMerge?.path === file.path && state.aiMerge.busy) ||
+            state.aiBatch?.current === file.path
               ? '…'
               : '✨ AI'}
           </button>
           <button
             className="mini"
             title="Keep the version from your branch"
+            disabled={state.aiBatch !== null}
             onClick={() => store.resolveConflict(file.path, 'ours')}
           >
             ours
@@ -1158,6 +1202,7 @@ function FileRow({
           <button
             className="mini"
             title="Take the incoming version"
+            disabled={state.aiBatch !== null}
             onClick={() => store.resolveConflict(file.path, 'theirs')}
           >
             theirs
@@ -1165,6 +1210,7 @@ function FileRow({
           <button
             className="mini"
             title="Stage the file as it is (markers edited away by hand)"
+            disabled={state.aiBatch !== null}
             onClick={() => store.resolveConflict(file.path, 'resolved')}
           >
             done
