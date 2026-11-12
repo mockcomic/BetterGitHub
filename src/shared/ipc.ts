@@ -36,6 +36,7 @@ import type {
   TerminalSessionInfo,
   WorkflowKind
 } from './models'
+import type { PackageScripts } from './scripts'
 import type { UpdateCheckResult } from './updates'
 
 /**
@@ -123,16 +124,15 @@ export interface RequestResponseChannels {
     apiBase?: string
   ) => AccountInfo
   /**
-   * Start a browser sign-in: GitHub authorization-code + PKCE (falling back
-   * to the device-code flow when the loopback port is busy or `prefer` says
-   * so) or GitLab OAuth PKCE; main already listens for the localhost
-   * redirect. Throws a clear message when the provider's client id is not
-   * configured.
+   * Start a browser sign-in: GitHub's device-code flow (the short code the
+   * user pastes at github.com/login/device — no authorize redirect and no
+   * local port) or GitLab OAuth PKCE, for which main already listens for the
+   * localhost redirect. Throws a clear message when the provider's client id
+   * is not configured.
    */
   beginSignIn: (
     provider: AccountProvider,
-    apiBase?: string,
-    prefer?: 'web' | 'device'
+    apiBase?: string
   ) => SignInChallenge
   /** Poll a pending challenge; 'pending' keeps the UI's wait state alive. */
   pollSignIn: (requestId: string) => SignInStatus
@@ -327,6 +327,16 @@ export interface RequestResponseChannels {
   listExternalApps: (refresh?: boolean) => ExternalApp[]
   /** Launch a detected target with the repository root (by catalog id). */
   openInExternalApp: (repoPath: string, appId: string) => void
+
+  /**
+   * The repository root's package.json scripts for the Scripts desk
+   * (src/main/package-scripts.ts). Missing file or no `scripts` map answers
+   * an empty list (the tab stays hidden); a malformed file answers with the
+   * reason in `error` so the section can say why it is empty. `manager` is
+   * the lockfile-detected package manager the Run buttons type their
+   * command with.
+   */
+  getPackageScripts: (repoPath: string) => PackageScripts
 
   // integrated terminal (main pushes TERMINAL_OUTPUT/EXIT channels)
   /**

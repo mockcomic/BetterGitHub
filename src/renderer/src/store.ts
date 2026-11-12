@@ -35,11 +35,24 @@ import type {
   WorkflowKind
 } from '../../shared/models'
 import type { MenuAction } from '../../shared/ipc'
+import { scriptCommandLine, type PackageScripts } from '../../shared/scripts'
 import type { ThemeId } from '../../shared/themes'
 import { themeBase } from '../../shared/themes'
 import { DONATE_URL } from '../../shared/links'
 import { RELEASES_URL, type UpdateState } from '../../shared/updates'
 import { isNeedsPullRejectionMessage } from '../../shared/push-rejection'
+import type { AttentionNoticeId, AttentionRequest } from './attention'
+import {
+  authRevokedAttention,
+  conflictedPaths,
+  conflictSignature,
+  conflictsAttention,
+  mergeAttentionCause,
+  pullAttentionCause,
+  pushRejectedAttention,
+  updateAvailableAttention,
+  workflowKindOf
+} from './attention'
 import { aiLooksUnconfigured } from './progressive'
 import { call, onMenuAction, onRepoChanged, onReposChanged, onUpdateState } from './api'
 
@@ -72,8 +85,23 @@ export interface ConfirmRequest {
   readonly onConfirm: () => void
 }
 
-/** The four work modes of the command desk. */
-export type DeskView = 'review' | 'history' | 'conflicts' | 'stash'
+/** The work modes of the command desk; Scripts joins when the repo has a
+ *  package.json with scripts (see visibleDeskTabs in App.tsx). */
+export type DeskView = 'review' | 'history' | 'conflicts' | 'stash' | 'scripts'
+
+/**
+ * One pending "run this script in the terminal" request, handed from the
+ * Scripts desk to the terminal panel. `nonce` bumps on every press, so
+ * clicking the same script twice opens two tabs; the panel consumes the
+ * request (clearTerminalRun) once it has added its tab.
+ */
+export interface TerminalRunRequest {
+  /** The exact line to type, e.g. `npm run dev`. */
+  readonly command: string
+  /** Tab-strip label, e.g. `npm run dev`. */
+  readonly label: string
+  readonly nonce: number
+}
 
 /**
  * The AI merge agent's conversation for one conflicted file. While `busy`
@@ -207,6 +235,16 @@ export interface AppState {
    * the panel component owns its xterm instance and IPC.
    */
   readonly terminalOpen: boolean
+  /**
+   * The selected repository's package.json scripts (Scripts desk). Null
+   * while unloaded or after a read failure — the tab simply stays hidden.
+   */
+  readonly packageScripts: PackageScripts | null
+  /**
+   * A script Run press waiting for the terminal panel to open a tab for it
+   * (see TerminalRunRequest); transient renderer state, never persisted.
+   */
+  readonly terminalRun: TerminalRunRequest | null
   readonly busy: string | null
   /**
    * The last `git push` here was rejected because the remote branch moved
@@ -262,6 +300,14 @@ export interface AppState {
   /** The self-update flow's latest phase (main pushes UPDATE_STATE_CHANNEL). */
   readonly update: UpdateState | null
   readonly confirm: ConfirmRequest | null
+  /**
+   * The needs-attention prompt: a centered dialog for states that wait on
+   * the user — conflicts that just appeared, a rejected push, a revoked
+   * account, an update. Unlike `confirm` it approves nothing, and unlike a
+   * toast it stands until acted on or deferred with Later. See
+   * src/renderer/src/attention.ts.
+   */
+  readonly attention: AttentionRequest | null
   readonly initError: string | null
   readonly lastRefreshedAt: number | null
 }
@@ -315,6 +361,8 @@ const initialState: AppState = {
   remoteUrl: null,
   externalApps: [],
   terminalOpen: false,
+  packageScripts: null,
+  terminalRun: null,
   busy: null,
   pushNeedsPull: false,
   aiBusy: false,
@@ -344,6 +392,7 @@ const initialState: AppState = {
   showAbout: false,
   update: null,
   confirm: null,
+  attention: null,
   initError: null,
   lastRefreshedAt: null
 }
@@ -412,6 +461,23 @@ export class AppStore {
   private logDebounce: ReturnType<typeof setTimeout> | null = null
   private refreshing = false
   private pendingRefresh = false
+  /**
+   * Monotonic Run-press counter; the terminal panel dedupes on it, so it
+   * must never rewind — the request itself is cleared once taken, and a
+   * nonce derived from it would let a second press of the same script look
+   * already-seen.
+   */
+  private runNonce = 0
+  /**
+   * The cause line the next conflict raise should carry, set by the verb
+   * whose operation paused (`Merging "feat" into "main"`). Consumed once by
+   * the raise that follows, so a stale caption can never ride an unrelated
+   * later episode.
+   */
+  private attentionCause: string | null = null
+  /** The conflicted set dismissed with Later; it does not re-prompt until
+   *  the set changes or the count returns to zero (a fresh episode). */
+  private attentionDismissedSig: string | null = null
   private mediaQuery: MediaQueryList | null = null
   private mediaHandler: ((e: MediaQueryListEvent) => void) | null = null
 
@@ -738,6 +804,10 @@ export class AppStore {
     // exactly what Enter/Ctrl+Enter would actually commit.
     const drafts = new Map(this.state.drafts)
     drafts.set(repo.path, this.draftFor(repo.path))
+    // A prompt about the old repository's state must not ride into the new
+    // one, and neither may a cause line or a dismissed set.
+    this.attentionCause = null
+    this.attentionDismissedSig = null
     this.update({
       drafts,
       selectedRepo: repo,
@@ -758,6 +828,9 @@ export class AppStore {
       lastCommit: null,
       stashes: [],
       aiMerge: null,
+      attention: null,
+      packageScripts: null,
+      terminalRun: null,
       view: 'review',
       deskFilter: '',
       mergeBranchOpen: false,
@@ -775,7 +848,8 @@ export class AppStore {
       this.refresh(),
       this.refreshBranches(),
       this.refreshIdentity(),
-      this.refreshStashes()
+      this.refreshStashes(),
+      this.refreshPackageScripts()
     ])
     try {
       this.update({ remoteUrl: await call('getRemoteUrl', repo.path) })
@@ -1227,19 +1301,22 @@ export class AppStore {
   /**
    * Boot-time re-validation of every stored account (main owns the logic):
    * updated names/avatars land in the list, and an account whose token was
-   * revoked signs itself out with a toast explaining why.
+   * revoked signs itself out — a centered prompt, since everything hosted
+   * stops working the moment it happens.
    */
   async syncAccounts(): Promise<void> {
     try {
       const report = await call('syncAccounts')
       this.update({ accounts: report.accounts })
-      for (const gone of report.signedOut) {
-        this.toast(
-          'info',
-          `Signed out of ${gone.login} — ${gone.provider === 'github' ? 'GitHub' : 'GitLab'} no longer accepts the stored token.`
+      if (report.signedOut.length > 0) {
+        this.raiseAttention(
+          authRevokedAttention(
+            report.signedOut,
+            () => this.setSettingsOpen(true)
+          )
         )
+        void this.loadAvatars()
       }
-      if (report.signedOut.length > 0) void this.loadAvatars()
     } catch {
       /* Offline at boot: the identities simply stay as last seen. */
     }
@@ -1287,24 +1364,21 @@ export class AppStore {
   }
 
   /**
-   * Browser sign-in: GitHub authorization-code + PKCE (falling back to the
-   * device-code flow when the loopback port is busy, or when `prefer` says
-   * 'device'), GitLab OAuth PKCE. The main process owns the token exchange;
-   * this loop only asks "is it done" at the provider's own cadence, so
-   * closing the dialog never strands the sign-in — it completes on the next
-   * poll wherever the UI happens to be.
+   * Browser sign-in: GitHub's device-code flow (the short code to paste at
+   * github.com/login/device), GitLab OAuth PKCE. The main process owns the
+   * token exchange; this loop only asks "is it done" at the provider's own
+   * cadence, so closing the dialog never strands the sign-in — it completes
+   * on the next poll wherever the UI happens to be.
    */
   async startBrowserSignIn(
     provider: AccountProvider,
-    apiBase?: string,
-    prefer?: 'web' | 'device'
+    apiBase?: string
   ): Promise<{ ok: boolean; message: string }> {
     try {
       const challenge = await call(
         'beginSignIn',
         provider,
-        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined,
-        prefer
+        apiBase !== undefined && apiBase.trim().length > 0 ? apiBase.trim() : undefined
       )
       this.update({ signIn: challenge, signInError: null })
       const openUrl =
@@ -1430,16 +1504,33 @@ export class AppStore {
             lastRefreshedAt: Date.now(),
             initError: null
           })
+          // One cheap root read per refresh keeps the Scripts desk honest
+          // when package.json is edited outside the app; it guards the repo
+          // itself and never disturbs the status flow around it.
+          void this.refreshPackageScripts()
           // A pull or edit that newly produces conflicts interrupts the
-          // review flow — the one state allowed to move the visitor.
-          if (
-            status.conflictCount > 0 &&
-            prevConflicts === 0 &&
-            this.state.view === 'review'
-          ) {
-            // The desk moves on its own: the incoming queue and pane fade in,
-            // and nothing that did not change is asked to move.
-            this.update({ view: 'conflicts' })
+          // review flow — the one state allowed to move the visitor — and
+          // raises the centered prompt that names the files and the options.
+          if (status.conflictCount > 0 && prevConflicts === 0) {
+            if (this.state.view === 'review') {
+              // The desk moves on its own: the incoming queue and pane fade
+              // in, and nothing that did not change is asked to move.
+              this.update({ view: 'conflicts' })
+            }
+            this.maybeRaiseConflicts(status, false)
+          }
+          if (status.conflictCount === 0) {
+            // A fresh episode may prompt again, and a prompt about conflicts
+            // that are gone retires itself — unless a paused operation still
+            // wants finishing, in which case the dialog flips to its
+            // continue-or-abort question.
+            this.attentionDismissedSig = null
+            if (
+              this.state.attention?.kind === 'conflicts' &&
+              workflowKindOf(status.inProgress) === null
+            ) {
+              this.update({ attention: null })
+            }
           }
           if (checked.size !== draft.checked.size) {
             this.setDraft(repo.path, { checked })
@@ -1514,6 +1605,42 @@ export class AppStore {
     } catch {
       this.update({ identity: null })
     }
+  }
+
+  /**
+   * Re-read the repository root's package.json scripts for the Scripts desk
+   * — the same shape as refreshStashes: a read failure just hides the tab
+   * (null), never a toast, because refresh runs on every watcher push.
+   */
+  async refreshPackageScripts(): Promise<void> {
+    const repo = this.state.selectedRepo
+    if (repo === null) return
+    try {
+      const packageScripts = await call('getPackageScripts', repo.path)
+      if (this.state.selectedRepo?.path !== repo.path) return
+      this.update({ packageScripts })
+    } catch {
+      this.update({ packageScripts: null })
+    }
+  }
+
+  /**
+   * Press ▶ on a Scripts row: dock the terminal panel if it is closed and
+   * hand the panel a one-line run request (typed into the new tab's shell).
+   * The nonce bumps per press, so the same script twice opens two tabs.
+   */
+  runScript(name: string): void {
+    const info = this.state.packageScripts
+    if (info === null) return
+    if (!this.state.terminalOpen) this.toggleTerminal()
+    const command = scriptCommandLine(info, name)
+    this.runNonce += 1
+    this.update({ terminalRun: { command, label: command, nonce: this.runNonce } })
+  }
+
+  /** The terminal panel took the pending run request; forget it. */
+  clearTerminalRun(): void {
+    if (this.state.terminalRun !== null) this.update({ terminalRun: null })
   }
 
   /** Loads one page of history into state (used by refresh and paging). */
@@ -2434,9 +2561,10 @@ export class AppStore {
     try {
       const output = await call(op, repo.path)
       // Any sync that lands proves the remote picture again — retire the
-      // rejected-push flag; a still-diverged branch re-arms the verb from
-      // git truth on the refresh below.
+      // rejected-push flag (and its prompt); a still-diverged branch re-arms
+      // the verb from git truth on the refresh below.
       this.update({ busy: null, pushNeedsPull: false })
+      this.clearAttentionIf('push-rejected')
       const lines = output
         .split('\n')
         .map(l => l.trim())
@@ -2453,35 +2581,53 @@ export class AppStore {
       if (this.state.view === 'history') void this.loadLog(false)
       return true
     } catch (err) {
-      // A failed pull retires the compound-verb flag: the conflicts banner (or
-      // the raw error toast) owns the recovery from here, and a later
+      // A failed pull retires the compound-verb flag: the conflicts dialog
+      // (or the raw error toast) owns the recovery from here, and a later
       // divergence re-arms the verb from the next status read.
       this.update({
         busy: null,
         ...(op === 'pull' ? { pushNeedsPull: false } : {})
       })
       const message = err instanceof Error ? err.message : String(err)
+      let conflictedNow = false
       if (op === 'push' && isNeedsPullRejectionMessage(message)) {
         // The push was rejected only because the remote moved ahead — the
-        // recovery is exactly one click, so the button carries it instead of
-        // an error toast: the sync verbs convert into Pull & Push (see
-        // progressive.ts). A rejected `(fetch first)` push leaves the
+        // sync verbs convert into Pull & Push (see progressive.ts) AND the
+        // centered prompt names the recovery outright, replacing the old
+        // info toast. A rejected `(fetch first)` push leaves the
         // remote-tracking refs stale, so fetch once first, best-effort, to
         // make the ahead/behind counts honest before the refresh paints.
         if (this.state.selectedRepo?.path === repo.path) {
           void call('fetch', repo.path).catch(() => undefined)
           this.update({ pushNeedsPull: true })
-          this.toast(
-            'info',
-            'Remote has new commits — the button will pull before it pushes.'
+          this.raiseAttention(
+            pushRejectedAttention(() => {
+              void this.pullThenPush()
+            })
           )
+          await this.refresh()
         }
       } else {
-        this.toast('error', message)
+        // A pull that stopped on conflicts leaves the repo mid-merge: refresh
+        // first and caption the conflicts prompt that observes the new state,
+        // so the dialog — not a raw CONFLICT dump — owns the explanation.
+        if (op === 'pull') {
+          const branch = this.state.status?.branch ?? ''
+          this.attentionCause =
+            branch.length > 0 ? pullAttentionCause(branch) : null
+        }
+        await this.refresh()
+        conflictedNow = (this.state.status?.conflictCount ?? 0) > 0
+        if (op !== 'pull' || !conflictedNow) {
+          this.toast('error', message)
+          this.attentionCause = null
+        }
       }
-      // A pull that stopped on conflicts leaves the repo mid-merge: make the
-      // banner show up instead of only reporting the raw failure.
-      await this.refresh()
+      if (conflictedNow && this.state.status !== null) {
+        // The operation the visitor just ran always re-asks, even a set they
+        // deferred earlier.
+        this.maybeRaiseConflicts(this.state.status, true)
+      }
       return false
     }
   }
@@ -2543,10 +2689,11 @@ export class AppStore {
 
   /**
    * Runs the merge. A conflicted merge is not a dead end: git leaves the
-   * repo paused mid-merge, refresh() moves the desk to the conflicts view,
-   * and the sidebar's banner offers Continue/Abort — so git's raw CONFLICT
-   * error is replaced by that explanation. Modelled on doSync: the refresh
-   * must happen on the error path too, which runGit deliberately skips.
+   * repo paused mid-merge, the refresh below moves the desk to the conflicts
+   * view and raises the centered prompt naming the files, and the banner
+   * offers Continue/Abort — so git's raw CONFLICT error is replaced by that
+   * explanation. Modelled on doSync: the refresh must happen on the error
+   * path too, which runGit deliberately skips.
    */
   async mergeBranch(name: string, fromRemote?: string): Promise<void> {
     const repo = this.state.selectedRepo
@@ -2577,12 +2724,17 @@ export class AppStore {
       this.update({ busy: null })
       const message = err instanceof Error ? err.message : String(err)
       if (/CONFLICT/i.test(message)) {
-        this.toast('info', 'Merge conflicts — resolve them to finish the merge.')
+        // Caption the prompt the refresh below raises — no toast: the dialog
+        // that names the files is the whole explanation.
+        this.attentionCause = mergeAttentionCause(source, target)
       } else {
         this.toast('error', message)
       }
     }
     await this.refresh()
+    if ((this.state.status?.conflictCount ?? 0) > 0 && this.state.status !== null) {
+      this.maybeRaiseConflicts(this.state.status, true)
+    }
     void this.refreshBranches()
     void this.refreshStashes()
     if (this.state.view === 'history') void this.loadLog(false)
@@ -3097,14 +3249,13 @@ export class AppStore {
       if (state.canInstall) {
         this.promptAvailableUpdate(state)
       } else {
-        this.toast('info', `Aspen ${state.version ?? 'a newer version'} is available.`, [
-          {
-            label: 'Open releases',
-            onClick: () => {
-              void call('openExternal', state.releaseUrl)
-            }
-          }
-        ])
+        // The page-only tier prompts too — it's the same "an update waits
+        // on you" state, only without a self-update button.
+        this.raiseAttention(
+          updateAvailableAttention(state.version ?? null, () => {
+            void call('openExternal', state.releaseUrl)
+          })
+        )
       }
     }
   }
@@ -3229,6 +3380,79 @@ export class AppStore {
     this.update({ confirm: null })
   }
 
+  // ------------------------------------------------------------- attention
+
+  /**
+   * Raise the centered needs-attention prompt. A notice never stomps an
+   * open conflicts dialog — a paused repo blocks the desk, and its notice
+   * still reads in the corner — while a conflicts prompt does replace a
+   * standing notice (it is the louder truth) and refreshes its own file
+   * list.
+   */
+  raiseAttention(request: AttentionRequest): void {
+    const current = this.state.attention
+    if (
+      request.kind === 'notice' &&
+      current !== null &&
+      current.kind === 'conflicts'
+    ) {
+      this.toast('info', request.message)
+      return
+    }
+    this.update({ attention: request })
+  }
+
+  /**
+   * Defer the prompt. The state behind it does not go away — the desk,
+   * banner and status bar keep showing it — so this only records that the
+   * current conflicted set must not re-ask until it changes.
+   */
+  dismissAttention(): void {
+    const current = this.state.attention
+    if (current !== null && current.kind === 'conflicts' && this.state.status !== null) {
+      this.attentionDismissedSig = conflictSignature(conflictedPaths(this.state.status))
+    }
+    this.attentionCause = null
+    this.update({ attention: null })
+  }
+
+  /** Retire exactly one notice kind when its state resolves (a landing
+   *  push clears the rejected-push prompt); anything else on screen stays. */
+  clearAttentionIf(id: AttentionNoticeId): void {
+    const current = this.state.attention
+    if (current !== null && current.kind === 'notice' && current.id === id) {
+      this.update({ attention: null })
+    }
+  }
+
+  /**
+   * The conflicts prompt's single funnel: every path that discovers a newly
+   * conflicted worktree ends here. A prompt already on screen keeps its
+   * caption — a second pass must not overwrite the cause line with a bare
+   * workflow title — while a standing notice yields to it. `force` re-asks
+   * even a set the visitor dismissed with Later: the Pull or Merge they just
+   * ran, and the conflicts it produced, is news however the last episode
+   * ended.
+   */
+  private maybeRaiseConflicts(status: RepositoryStatus, force: boolean): void {
+    if (status.conflictCount === 0) {
+      this.attentionCause = null
+      return
+    }
+    if (this.state.attention?.kind === 'conflicts') {
+      this.attentionCause = null
+      return
+    }
+    const sig = conflictSignature(conflictedPaths(status))
+    if (!force && sig === this.attentionDismissedSig) {
+      return
+    }
+    const cause = this.attentionCause
+    this.attentionCause = null
+    this.attentionDismissedSig = null
+    this.update({ attention: conflictsAttention(status, cause ?? undefined) })
+  }
+
   async saveSettings(patch: SettingsPatch): Promise<PublicSettings | null> {
     try {
       const settings = await call('saveSettings', patch)
@@ -3283,7 +3507,24 @@ export class AppStore {
       return true
     } catch (err) {
       this.update({ busy: null })
-      this.toast('error', err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      // A failure that paused the worktree on conflicts — a revert or
+      // cherry-pick stopping mid-way, a rebase continue hitting the next
+      // commit — reports through the conflicts dialog instead of the raw
+      // git text. Unlike the happy path, this refresh is deliberate: a
+      // failed operation may well have changed the repository state, which
+      // is exactly the case being judged here.
+      await this.refresh()
+      const status = this.state.status
+      if (
+        status !== null &&
+        status.conflictCount > 0 &&
+        /conflict/i.test(message)
+      ) {
+        this.maybeRaiseConflicts(status, true)
+      } else {
+        this.toast('error', message)
+      }
       return false
     }
   }

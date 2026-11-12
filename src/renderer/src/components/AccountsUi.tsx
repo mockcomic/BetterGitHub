@@ -131,7 +131,13 @@ export function AccountList(): JSX.Element {
                 Profile
               </button>
             )}
-            <span className="account-chip">{account.authKind === 'pat' ? 'Token' : 'Browser'}</span>
+            <span className="account-chip">
+              {account.authKind === 'pat'
+                ? 'Token'
+                : account.provider === 'github'
+                  ? 'Device code'
+                  : 'Browser'}
+            </span>
             <button
               className="mini danger"
               onClick={() => void store.signOut(account.id)}
@@ -148,11 +154,11 @@ export function AccountList(): JSX.Element {
 
 /**
  * Sign-in panel: the two browser buttons — always clickable, running the real
- * OAuth flow when an application id is configured and opening the one-step
- * setup in place when it is not — plus the token form that works everywhere
- * (self-hosted included). Pending browser sign-ins render their waiting state
- * here; polling lives in the store so closing the dialog never strands the
- * flow.
+ * sign-in (GitHub's one-time code, GitLab's browser OAuth) when an application
+ * id is configured and opening the one-step setup in place when it is not —
+ * plus the token form that works everywhere (self-hosted included). Pending
+ * sign-ins render their waiting state here; polling lives in the store so
+ * closing the dialog never strands the flow.
  */
 export function SignInPanel({
   onSuccess
@@ -230,8 +236,8 @@ export function SignInPanel({
                 onClick={() => startBrowser('github')}
                 title={
                   support && !support.hasGitHubClientId
-                    ? 'Signs you in in your browser (GitHub authorization, one-time-code fallback) — needs a free OAuth App id first, which the next step asks for.'
-                    : 'Sign in in your browser (GitHub authorization); falls back to the one-time code if the local port is busy.'
+                    ? 'Shows a one-time code to paste at github.com/login/device — needs an OAuth App id first (Device Flow enabled), which the next step asks for.'
+                    : 'Shows a one-time code to paste at github.com/login/device — no local port, no redirect. Uses GitHub’s own device-flow app until you paste your own id.'
                 }
               >
                 Sign in with GitHub
@@ -267,6 +273,12 @@ export function SignInPanel({
           onCopy={async (text: string): Promise<void> => {
             await call('writeClipboard', text)
             setNotice('Code copied.')
+          }}
+          onUseOwnApp={(): void => {
+            // Cancel the code riding on the built-in id, then ask for the
+            // user's own; saving restarts the sign-in with it.
+            store.cancelBrowserSignIn()
+            setSetupFor('github')
           }}
         />
       )}
@@ -328,12 +340,15 @@ export function SignInPanel({
 }
 
 /**
- * The one-step OAuth-app setup a browser sign-in needs the first time: the
- * registration page for the server being signed into, the callback URL to
- * type in (copyable, since a single wrong character silently breaks the
- * redirect), the two traps, and one paste box. Saving is the same settings
- * write the Browser-sign-in-apps drawer does, so the id shows up there
- * afterwards; the caller then starts the browser flow immediately.
+ * The one-step OAuth-app setup screen: the registration page for the server
+ * being signed into, the callback URL to type in (GitLab only — copyable,
+ * since a single wrong character silently breaks the redirect; GitHub's device
+ * flow never uses one), the traps, and one paste box. GitLab needs it the first
+ * time; GitHub only offers it as an override of the id baked into
+ * providers/config.ts — and requires it on a GitHub Enterprise server, where
+ * that id names no application. Saving is the same settings write the
+ * Browser-sign-in-apps drawer does, so the id shows up there afterwards; the
+ * caller then starts the sign-in immediately.
  */
 function SignInAppSetup({
   provider,
@@ -378,32 +393,63 @@ function SignInAppSetup({
   return (
     <div className="signin-setup">
       <p className="signin-setup-lede">
-        {provider === 'github' ? 'GitHub' : 'GitLab'} sign-in needs one free OAuth
-        application on <strong>{oauthInstanceLabel(provider, instance)}</strong> —
-        about a minute, once, and Aspen never needs the secret.
+        {provider === 'github' ? (
+          <>
+            Aspen’s code sign-in already works — it rides on GitHub’s own
+            device-flow application. Register one free OAuth application on{' '}
+            <strong>{oauthInstanceLabel(provider, instance)}</strong> to have
+            GitHub name Aspen instead (and to sign in to a GitHub Enterprise
+            server, which has no built-in id). About a minute, once, and Aspen
+            never needs the secret.
+          </>
+        ) : (
+          <>
+            GitLab sign-in needs one free OAuth application on{' '}
+            <strong>{oauthInstanceLabel(provider, instance)}</strong> — about a
+            minute, once, and Aspen never needs the secret.
+          </>
+        )}
       </p>
-      <div className="signin-setup-callback">
-        <code>{OAUTH_CALLBACK_URL}</code>
-        <button
-          className="mini"
-          title="Copy the callback/redirect URL to type into the registration form"
-          onClick={() =>
-            void call('writeClipboard', OAUTH_CALLBACK_URL).then(() =>
-              setNotice('Callback URL copied.')
-            )
-          }
-        >
-          Copy
-        </button>
-        <button
-          className="mini link"
-          onClick={() =>
-            void call('openExternal', appRegistrationUrl(provider, instance))
-          }
-        >
-          Open the registration page
-        </button>
-      </div>
+      {provider === 'gitlab' && (
+        <div className="signin-setup-callback">
+          <code>{OAUTH_CALLBACK_URL}</code>
+          <button
+            className="mini"
+            title="Copy the callback/redirect URL to type into the registration form"
+            onClick={() =>
+              void call('writeClipboard', OAUTH_CALLBACK_URL).then(() =>
+                setNotice('Callback URL copied.')
+              )
+            }
+          >
+            Copy
+          </button>
+          <button
+            className="mini link"
+            onClick={() =>
+              void call('openExternal', appRegistrationUrl(provider, instance))
+            }
+          >
+            Open the registration page
+          </button>
+        </div>
+      )}
+      {provider === 'github' && (
+        <div className="signin-setup-callback">
+          <span className="field-hint">
+            GitHub's form asks for a callback URL — any URL works, because the
+            code sign-in never redirects back to Aspen.
+          </span>
+          <button
+            className="mini link"
+            onClick={() =>
+              void call('openExternal', appRegistrationUrl(provider, instance))
+            }
+          >
+            Open the registration page
+          </button>
+        </div>
+      )}
       <ol className="signin-setup-steps">
         {appSetupSteps(provider, instance).map(step => (
           <li key={step}>{step}</li>
@@ -447,10 +493,18 @@ function SignInAppSetup({
   )
 }
 
+/**
+ * The waiting state of a live sign-in: GitHub's code screen (the code, a copy
+ * button, and the link that opens github.com/login/device) or GitLab's
+ * redirect hand-off. Polling lives in the store, so this component only
+ * renders what the challenge already carries.
+ */
 function BrowserSignInProgress({
-  onCopy
+  onCopy,
+  onUseOwnApp
 }: {
   onCopy: (text: string) => Promise<void>
+  onUseOwnApp: () => void
 }): JSX.Element {
   const state = useStoreState()
   const store = useStore()
@@ -478,7 +532,14 @@ function BrowserSignInProgress({
         <p className="signin-waiting">
           <span className="spinner" /> Waiting for you to approve the request…
         </p>
-        <p>
+        <p className="signin-progress-alt">
+          <button
+            className="mini"
+            title={'Register an OAuth application for Aspen and sign in through that instead — GitHub then names your app, and your approvals stop landing on the built-in one.'}
+            onClick={onUseOwnApp}
+          >
+            Use your own OAuth App
+          </button>{' '}
           <button className="mini" onClick={() => store.cancelBrowserSignIn()}>
             Cancel sign-in
           </button>
@@ -495,21 +556,12 @@ function BrowserSignInProgress({
         >
           Continue in your browser
         </button>{' '}
-        — Aspen is listening on 127.0.0.1 for the redirect.
+        — Aspen is listening on 127.0.0.1 for the GitLab redirect.
       </p>
       <p className="signin-waiting">
         <span className="spinner" /> Waiting for you to approve the request…
       </p>
       <p className="signin-progress-alt">
-        {challenge.kind === 'github-browser' && (
-          <button
-            className="mini"
-            title="Use GitHub's device-code flow instead (no local callback port needed)"
-            onClick={() => void store.startBrowserSignIn('github', undefined, 'device')}
-          >
-            Use the one-time code instead
-          </button>
-        )}{' '}
         <button className="mini" onClick={() => store.cancelBrowserSignIn()}>
           Cancel sign-in
         </button>

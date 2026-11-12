@@ -38,6 +38,23 @@ describe('openTab', () => {
     expect(opened.id).toBe(4)
     expect(opened.strip.tabs).toEqual([{ id: 1 }, { id: 3 }, { id: 4 }])
   })
+
+  it('carries a script run tab through the strip like a plain tab', () => {
+    const shell = openTab(emptyStrip)
+    const script = openTab(shell.strip, { command: 'npm run dev', label: 'npm run dev' })
+    expect(script.strip.tabs[1]).toEqual({
+      id: 2,
+      command: 'npm run dev',
+      label: 'npm run dev'
+    })
+    // Closing the shell beside it must not disturb the script tab or the
+    // active selection.
+    const closed = closeTab(script.strip, 1)
+    expect(closed.strip.tabs).toEqual([
+      { id: 2, command: 'npm run dev', label: 'npm run dev' }
+    ])
+    expect(closed.strip.activeId).toBe(2)
+  })
 })
 
 describe('closeTab', () => {

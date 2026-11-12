@@ -1,41 +1,60 @@
 /**
- * Compiled defaults for browser sign-in. Both GitHub flows (web OAuth with
- * PKCE and the device-code fallback) and GitLab's PKCE flow need one
- * application the user registers once:
+ * Compiled defaults for browser sign-in.
  *
- * - GitHub: Settings → Developer settings → OAuth Apps → new app, homepage
- *   URL anything, **Authorization callback URL**
- *   `http://127.0.0.1:<OAUTH_REDIRECT_PORT>/callback`, and tick
- *   "Enable Device Flow"; one app serves both flows.
- * - GitLab: User settings → Applications, confidential **off** (Aspen is a
- *   public PKCE client), redirect URI exactly
+ * - GitHub (**device-code flow** — the only browser sign-in GitHub offers):
+ *   press **Sign in with GitHub**, Aspen shows a one-time code, you paste it at
+ *   github.com/login/device. No local port and no redirect to catch.
+ * - GitLab (**authorization code + PKCE**): User settings → Applications,
+ *   confidential **off** (Aspen is a public PKCE client), redirect URI exactly
  *   `http://127.0.0.1:<OAUTH_REDIRECT_PORT>/callback`, scope `api`.
  *
- * Only the id is ever used — no client secret exists in this app, which is
- * why the ids are safe to ship. Paste yours into either of two places:
+ * ## The GitHub id ships filled in
  *
- *   1. the constants below, then rebuild → every install signs in out of the
- *      box (this is the file to edit for that);
- *   2. Preferences → Accounts, either in the sign-in panel's one-step setup
- *      or in the Browser sign-in apps fields → no rebuild; a value entered
- *      there wins over the constant, and clearing it falls back here.
+ * A device-code exchange needs an OAuth App whose **Enable Device Flow** box is
+ * ticked, so GitHub ships with one baked in: the id of GitHub's own **GitHub
+ * CLI** app, the very same public constant `gh` embeds in
+ * `internal/authflow/flow.go` (its secret is likewise safe in version control,
+ * and a device flow needs neither anyway — Aspen never sends one). Verified
+ * against the live endpoint: `POST /login/device/code` with this id and
+ * `scope=repo` returns a `user_code` and `verification_uri`.
  *
- * Empty means "not configured": both buttons stay clickable and open that
- * one-step setup instead of a dead greyed click, and token sign-in (which
- * also covers self-hosted instances) remains. A GitHub Enterprise or
- * self-hosted GitLab server needs an application registered **there** —
- * one id per provider is stored, so switching servers means re-pasting.
+ * Two consequences worth knowing:
+ *
+ *   - GitHub's approval page names the app it was issued to, so a stock build
+ *     says **GitHub CLI**, and the resulting token is listed under that app in
+ *     the user's Settings → Applications. Register your own app and paste its
+ *     id to have the page name Aspen instead.
+ *   - The id is per-server. On **GitHub Enterprise** this app does not exist,
+ *     so sign-in there needs an OAuth App registered on that host (tick
+ *     *Enable Device Flow*; the callback URL may be anything) and its id
+ *     pasted into Preferences → Accounts.
+ *
+ * To register your own app: Settings → Developer settings → OAuth Apps → new
+ * app, homepage URL anything, Authorization callback URL anything too (the
+ * device flow never redirects back to it), and tick **Enable Device Flow**.
+ * Then either
+ *
+ *   1. put the id in the constant below and rebuild → every install gets it;
+ *   2. paste it under Preferences → Accounts → Browser sign-in apps (or into
+ *      the sign-in panel's **Use your own OAuth App** step) → no rebuild; a
+ *      value entered there wins over the constant, and clearing it falls back
+ *      to the baked-in id.
+ *
+ * Only the id is ever used — no client secret exists in this app, which is why
+ * the ids are safe to ship. `DEFAULT_GITLAB_CLIENT_ID` is still empty: GitLab
+ * has no equivalent shared app, so its first browser sign-in walks the user
+ * through registering one, and GitLab token sign-in (which also covers
+ * self-hosted instances) needs none of this.
  */
-export const DEFAULT_GITHUB_CLIENT_ID = ''
+export const DEFAULT_GITHUB_CLIENT_ID = '178c6fc778ccc68e1d6a'
 export const DEFAULT_GITLAB_CLIENT_ID = ''
 
 /**
- * Fixed loopback port for the browser sign-in redirect. It serves **both**
- * providers' authorization-code flows through one shared callback server
- * (dispatch on the `state` parameter), and it must match the redirect URI
- * registered on each application, so it is not ephemeral; a busy port
- * makes the web flow fail with an actionable message (GitHub then falls
- * back to the device flow, where a port is not needed).
+ * Fixed loopback port for the browser sign-in redirect. It serves the
+ * **GitLab** authorization-code flow only (GitHub's device flow needs no
+ * port), and it must match the redirect URI registered on the application, so
+ * it is not ephemeral; a busy port makes the GitLab web flow fail with an
+ * actionable message.
  */
 export const OAUTH_REDIRECT_PORT = 8765
 export const OAUTH_REDIRECT_URI = `http://127.0.0.1:${OAUTH_REDIRECT_PORT}/callback`

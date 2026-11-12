@@ -27,6 +27,7 @@ import { friendlyGitError, execGit } from './git/exec'
 import { safeJoin } from './git/repo-path'
 import { getDetectedApps, launchDetached, openRepoInApp } from './external-apps'
 import { terminalManager, terminalStart } from './terminal'
+import { getPackageScripts } from './package-scripts'
 import { getStatus } from './git/status'
 import { getCommitFileDiff, getCommitFileNames, getPathsDiffText, getPathDiff } from './git/diff'
 import { getPreview } from './git/preview'
@@ -549,12 +550,8 @@ const handlers: Handlers = {
       credential: { token: trimmed, refreshToken: null, expiresAt: null }
     })
   },
-  async beginSignIn(
-    provider: AccountProvider,
-    apiBase?: string,
-    prefer?: 'web' | 'device'
-  ) {
-    return beginSignIn(provider, apiBase, prefer)
+  async beginSignIn(provider: AccountProvider, apiBase?: string) {
+    return beginSignIn(provider, apiBase)
   },
   async pollSignIn(requestId: string) {
     return pollSignIn(requestId)
@@ -957,6 +954,10 @@ const handlers: Handlers = {
   },
   async openInExternalApp(repoPath: string, appId: string) {
     await openRepoInApp(repoPath, appId)
+  },
+
+  async getPackageScripts(repoPath: string) {
+    return getPackageScripts(repoPath)
   },
 
   async terminalStart(repoPath: string, cols: number, rows: number) {

@@ -12,12 +12,14 @@ import {
   StashDetail,
   StashQueue
 } from './components/ChangesSidebar'
+import { ScriptsDetail, ScriptsQueue } from './components/ScriptsSidebar'
 import { DiffView } from './components/DiffView'
 import { HistoryView } from './components/HistoryView'
 import { ResizeHandle } from './components/ResizeHandle'
 import type { WidthRange } from './components/ResizeHandle'
 import { TerminalPanel } from './components/TerminalPanel'
 import { Toasts } from './components/Toasts'
+import { AttentionDialog } from './components/AttentionDialog'
 import {
   AboutDialog,
   AiMergeDialog,
@@ -62,6 +64,11 @@ function visibleDeskTabs(state: AppState): ReadonlyArray<DeskTab> {
   }
   if (state.stashes.length > 0) {
     tabs.push({ id: 'stash', label: 'Stash' })
+  }
+  // A plain npm/pnpm/yarn/bun project earns its desk tab the same way a
+  // stash does by existing: only when there is something to run.
+  if ((state.packageScripts?.scripts.length ?? 0) > 0) {
+    tabs.push({ id: 'scripts', label: 'Scripts' })
   }
   return tabs
 }
@@ -157,7 +164,7 @@ export function App(): JSX.Element {
   // returns to Review instead of stranding them on a retired tab.
   const deskTabs = useMemo(
     () => visibleDeskTabs(state),
-    [state.status, state.stashes]
+    [state.status, state.stashes, state.packageScripts]
   )
   useEffect(() => {
     if (!deskTabs.some(t => t.id === state.view)) store.setView('review')
@@ -179,6 +186,7 @@ export function App(): JSX.Element {
         <RenameBranchDialog />
         <StashDialog />
         <AboutDialog />
+        <AttentionDialog />
         <ConfirmDialog />
         <AiMergeDialog />
       </div>
@@ -207,6 +215,7 @@ export function App(): JSX.Element {
           {view === 'history' && <HistoryQueue />}
           {view === 'conflicts' && <ConflictsQueue />}
           {view === 'stash' && <StashQueue />}
+          {view === 'scripts' && <ScriptsQueue />}
         </aside>
         <ResizeHandle
           side="prev"
@@ -269,6 +278,7 @@ export function App(): JSX.Element {
           )}
           {view === 'history' && <HistoryView />}
           {view === 'stash' && <StashDetail />}
+          {view === 'scripts' && <ScriptsDetail />}
         </main>
         {view === 'review' && (
           <>
@@ -321,6 +331,8 @@ export function App(): JSX.Element {
             key={state.selectedRepo.id}
             repoPath={state.selectedRepo.path}
             repoName={state.selectedRepo.name}
+            run={state.terminalRun}
+            onRunConsumed={() => store.clearTerminalRun()}
           />
         </>
       )}
@@ -335,6 +347,7 @@ export function App(): JSX.Element {
       <RenameBranchDialog />
       <StashDialog />
       <AboutDialog />
+      <AttentionDialog />
       <ConfirmDialog />
       <AiMergeDialog />
     </div>
@@ -353,6 +366,7 @@ function SegmentedSwitch(): JSX.Element {
   const conflicts = state.status?.conflictCount ?? 0
   const files = state.status?.files.length ?? 0
   const stashes = state.stashes.length
+  const scripts = state.packageScripts?.scripts.length ?? 0
 
   const measure = (): void => {
     const nav = tabsRef.current
@@ -368,7 +382,7 @@ function SegmentedSwitch(): JSX.Element {
   // or disappears, since that changes the label's width.
   useLayoutEffect(() => {
     measure()
-  }, [state.view, files, conflicts, stashes])
+  }, [state.view, files, conflicts, stashes, scripts])
 
   useEffect(() => {
     const nav = tabsRef.current
@@ -421,7 +435,9 @@ function SegmentedSwitch(): JSX.Element {
               ? conflicts
               : tab.id === 'stash'
                 ? stashes
-                : 0
+                : tab.id === 'scripts'
+                  ? scripts
+                  : 0
         return (
           <button
             key={tab.id}
@@ -443,7 +459,9 @@ function SegmentedSwitch(): JSX.Element {
                     ? conflicts > 0
                       ? `${conflicts} file${conflicts === 1 ? '' : 's'} waiting to be resolved`
                       : 'No conflicts right now'
-                    : 'Restore previously stashed changes'
+                    : tab.id === 'stash'
+                      ? 'Restore previously stashed changes'
+                      : 'Run this project\u2019s package.json scripts'
             }
           >
             {tab.label}

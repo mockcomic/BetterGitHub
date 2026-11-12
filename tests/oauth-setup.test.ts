@@ -6,7 +6,16 @@ import {
   oauthInstanceRoot,
   OAUTH_CALLBACK_URL
 } from '../src/shared/oauth-setup'
-import { OAUTH_REDIRECT_URI } from '../src/main/providers/config'
+import { OAUTH_REDIRECT_URI, DEFAULT_GITHUB_CLIENT_ID } from '../src/main/providers/config'
+
+describe('DEFAULT_GITHUB_CLIENT_ID', () => {
+  it('ships a device-flow id so the GitHub button shows a code with no setup', () => {
+    // The device-code flow cannot start without an OAuth App id, so an empty
+    // constant here means the button opens the registration step instead of
+    // generating a code — the whole point of GitHub sign-in in this app.
+    expect(DEFAULT_GITHUB_CLIENT_ID.trim().length).toBeGreaterThan(0)
+  })
+})
 
 describe('OAUTH_CALLBACK_URL', () => {
   it('is the exact redirect the loopback server listens for', () => {
@@ -89,10 +98,12 @@ describe('appRegistrationUrl', () => {
 })
 
 describe('appSetupSteps', () => {
-  it('gives GitHub the callback, the Device Flow tick box and the secret note', () => {
+  it('gives GitHub the Device Flow tick box, no callback requirement, and the secret note', () => {
     const steps = appSetupSteps('github')
     expect(steps).toHaveLength(4)
-    expect(steps.join('\n')).toContain('http://127.0.0.1:8765/callback')
+    // GitHub signs in with a device code, so the loopback callback the web
+    // flow needed is not something the user has to type anywhere.
+    expect(steps.join('\n')).not.toContain('http://127.0.0.1:8765/callback')
     expect(steps.some(s => s.includes('Enable Device Flow'))).toBe(true)
     expect(steps.some(s => s.includes('Client ID'))).toBe(true)
     expect(steps[0]).toContain('github.com')

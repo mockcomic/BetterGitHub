@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'events'
-import { join, posix as pathPosix, win32 as pathWin32 } from 'path'
+import { posix as pathPosix, win32 as pathWin32 } from 'path'
 import { spawn } from 'child_process'
 import {
   detectExternalApps,
@@ -9,9 +9,11 @@ import {
   LINUX_FILE_MANAGERS,
   openDetected,
   resetDetectedAppsCache,
+  shimTargetExe,
   type CommandRules,
   type DetectedApp,
-  type DetectDeps
+  type DetectDeps,
+  type LaunchSpec
 } from '../src/main/external-apps'
 
 vi.mock('child_process', () => ({ spawn: vi.fn() }))
@@ -26,11 +28,13 @@ vi.mock('child_process', () => ({ spawn: vi.fn() }))
 function stubDeps(options: {
   commands?: Readonly<Record<string, string>>
   existingPaths?: ReadonlyArray<string>
+  contents?: Readonly<Record<string, string>>
   env?: NodeJS.ProcessEnv
   home?: string
 }): DetectDeps {
   const commands = options.commands ?? {}
   const existing = new Set(options.existingPaths ?? [])
+  const contents = options.contents ?? {}
   return {
     env: options.env ?? {},
     home: options.home ?? '/home/tester',
@@ -38,12 +42,21 @@ function stubDeps(options: {
       const hit = commands[command]
       return hit !== undefined ? hit : null
     },
-    exists: async path => existing.has(path)
+    exists: async path => existing.has(path),
+    readText: async path => contents[path] ?? null
   }
 }
 
 function app(detected: DetectedApp): string {
   return detected.app.id
+}
+
+/** Where a launch spec actually points, for the real-machine log line. */
+function launchTarget(launch: LaunchSpec): string {
+  if (launch.kind === 'exec') return launch.command
+  if (launch.kind === 'cmdShim') return launch.shim
+  if (launch.kind === 'macOpen') return launch.appName
+  return launch.kind
 }
 
 describe('detectExternalApps — win32', () => {
@@ -96,9 +109,122 @@ describe('detectExternalApps — win32', () => {
   })
 })
 
+/**
+ * A fork's compatibility shim on PATH must not make a foreign row detected
+ * with a launcher that runs the fork: Cursor ships `codeBin\code.cmd`
+ * (invoking Cursor.exe) on PATH ahead of real VS Code's bin, and the
+ * "Visual Studio Code" row opened Cursor. The gate rejects the hit, so the
+ * row either falls through to VS Code's own install layout or disappears.
+ */
+describe('detectExternalApps — win32 PATH-shim attribution', () => {
+  const CURSOR_CODE_SHIM =
+    'C:\\Users\\t\\AppData\\Local\\Programs\\cursor\\resources\\app\\codeBin\\code.cmd'
+  const VSCODE_CMD =
+    'C:\\Users\\t\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code.cmd'
+  const CURSOR_CODE_SHIM_TEXT =
+    '@echo off\r\nsetlocal\r\nset VSCODE_DEV=\r\nset ELECTRON_RUN_AS_NODE=1\r\n' +
+    '"%~dp0..\\..\\..\\Cursor.exe" "%~dp0..\\out\\cli.js" %*\r\nendlocal\r\n'
+  const VSCODE_CMD_TEXT =
+    '@echo off\r\nsetlocal\r\n"%~dp0..\\Code.exe" "%~dp0..\\resources\\app\\out\\cli.js" %*\r\nendlocal\r\n'
+  const env = { LOCALAPPDATA: 'C:\\Users\\t\\AppData\\Local' }
+  const cursorCmd = 'C:\\x\\cursor.cmd'
+  const cursorCmdText = '"%~dp0..\\Cursor.exe" "%~dp0..\\out\\cli.js" %*\r\n'
+
+  it('a foreign code.cmd falls through to the real VS Code install layout', async () => {
+    const apps = await detectExternalApps(
+      stubDeps({
+        env,
+        home: 'C:\\Users\\t',
+        commands: { code: CURSOR_CODE_SHIM, cursor: cursorCmd },
+        existingPaths: [VSCODE_CMD],
+        contents: {
+          [CURSOR_CODE_SHIM]: CURSOR_CODE_SHIM_TEXT,
+          [cursorCmd]: cursorCmdText
+        }
+      }),
+      'win32'
+    )
+    expect(apps.find(a => a.app.id === 'code')?.launch).toEqual({ kind: 'cmdShim', shim: VSCODE_CMD })
+    // The cursor row keeps its own (correctly attributed) shim.
+    expect(apps.find(a => a.app.id === 'cursor')?.launch).toEqual({ kind: 'cmdShim', shim: cursorCmd })
+  })
+
+  it('a foreign code.cmd with no real VS Code install shows no VS Code row at all', async () => {
+    const apps = await detectExternalApps(
+      stubDeps({
+        env,
+        home: 'C:\\Users\\t',
+        commands: { code: CURSOR_CODE_SHIM, cursor: cursorCmd },
+        contents: { [CURSOR_CODE_SHIM]: CURSOR_CODE_SHIM_TEXT, [cursorCmd]: cursorCmdText }
+      }),
+      'win32'
+    )
+    expect(apps.map(a => a.app.id)).toEqual(['files', 'cursor'])
+  })
+
+  it("a row's own shim passes the gate", async () => {
+    const apps = await detectExternalApps(
+      stubDeps({ env, commands: { code: VSCODE_CMD }, contents: { [VSCODE_CMD]: VSCODE_CMD_TEXT } }),
+      'win32'
+    )
+    expect(apps.find(a => a.app.id === 'code')?.launch).toEqual({ kind: 'cmdShim', shim: VSCODE_CMD })
+  })
+
+  it('an unparsable shim is accepted — the gate rejects only on evidence', async () => {
+    const zedCmd = 'C:\\x\\zed.cmd'
+    const apps = await detectExternalApps(
+      stubDeps({ env, commands: { zed: zedCmd }, contents: { [zedCmd]: 'start "" "%ZED%\\zed.exe" %*\r\n' } }),
+      'win32'
+    )
+    expect(apps.find(a => a.app.id === 'zed')?.launch).toEqual({ kind: 'cmdShim', shim: zedCmd })
+  })
+
+  it('checks a direct .exe PATH hit by its own file name', async () => {
+    const foreign = await detectExternalApps(stubDeps({ env, commands: { code: 'C:\\x\\Cursor.exe' } }), 'win32')
+    expect(foreign.map(a => a.app.id)).toEqual(['files'])
+
+    const own = await detectExternalApps(stubDeps({ env, commands: { code: 'C:\\x\\Code.exe' } }), 'win32')
+    expect(own.find(a => a.app.id === 'code')?.launch).toEqual({ kind: 'exec', command: 'C:\\x\\Code.exe' })
+  })
+
+  it('does not gate POSIX hits, where no shim text format is promised', async () => {
+    const apps = await detectExternalApps(
+      stubDeps({ commands: { code: '/usr/bin/code' } }),
+      'linux'
+    )
+    expect(apps.find(a => a.app.id === 'code')?.launch).toEqual({ kind: 'exec', command: '/usr/bin/code' })
+  })
+})
+
+describe('shimTargetExe', () => {
+  it('resolves a %~dp0-relative invocation against the shim directory', () => {
+    const target = shimTargetExe(
+      'C:\\p\\cursor\\resources\\app\\codeBin\\code.cmd',
+      '"%~dp0..\\..\\..\\Cursor.exe" "%~dp0..\\out\\cli.js" %*'
+    )
+    expect(target).toBe('C:\\p\\cursor\\Cursor.exe')
+  })
+
+  it('skips quoted non-exe tokens and takes the first .exe', () => {
+    const target = shimTargetExe(
+      'C:\\p\\Microsoft VS Code\\bin\\code.cmd',
+      '"%~dp0..\\out\\cli.js" "%~dp0..\\Code.exe" %*'
+    )
+    expect(target).toBe('C:\\p\\Microsoft VS Code\\Code.exe')
+  })
+
+  it('returns null for unreadable text and for tokens it cannot expand', () => {
+    expect(shimTargetExe('C:\\x\\a.cmd', null)).toBeNull()
+    expect(shimTargetExe('C:\\x\\a.cmd', '@echo off\r\n')).toBeNull()
+    expect(shimTargetExe('C:\\x\\a.cmd', '"%TOOL%\\a.exe" %*')).toBeNull()
+  })
+})
+
 describe('detectExternalApps — darwin', () => {
   it('always offers the Finder and prefers a bundle over a CLI shim', async () => {
-    const bundle = join('/Applications', 'Zed.app')
+    // Bundle paths follow the *probed* platform (posix), never the host's —
+    // macAppBundle builds them with pathPosix, like the findCommand note.
+    const bundle = pathPosix.join('/Applications', 'Zed.app')
     const apps = await detectExternalApps(
       stubDeps({
         commands: { zed: '/usr/local/bin/zed' },
@@ -125,7 +251,7 @@ describe('detectExternalApps — darwin', () => {
   })
 
   it('honours a user-scope ~/Applications install', async () => {
-    const bundle = join('/Users/t', 'Applications', 'Cursor.app')
+    const bundle = pathPosix.join('/Users/t', 'Applications', 'Cursor.app')
     const apps = await detectExternalApps(
       stubDeps({
         home: '/Users/t',
@@ -329,7 +455,10 @@ describe('real-machine detection', () => {
   it('returns a well-formed list (and a file manager on win/mac)', async () => {
     resetDetectedAppsCache()
     const apps = await getDetectedApps(true)
-    console.log('detected open-in targets:', apps.map(a => `${a.app.id} (${a.app.label})`).join(', ') || 'none')
+    console.log(
+      'detected open-in targets:',
+      apps.map(a => `${a.app.id} (${a.app.label}) -> ${launchTarget(a.launch)}`).join('\n  ') || 'none'
+    )
     const ids = apps.map(a => a.app.id)
     expect(new Set(ids).size).toBe(ids.length)
     for (const a of apps) {

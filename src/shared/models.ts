@@ -328,10 +328,12 @@ export interface PublicSettings {
     readonly hasApiKey: boolean
   }
   /**
-   * Whether browser sign-in can start immediately per provider. Device flow
-   * and OAuth PKCE need an app client id (see providers/config.ts); without
-   * one the buttons still work — they open the sign-in panel's one-step
-   * setup that asks for the id — and token sign-in is always offered.
+   * Whether browser sign-in can start immediately per provider. GitHub ships a
+   * device-flow client id at build time (providers/config.ts), so its button
+   * shows a code on a fresh install; GitLab needs an application id the user
+   * registers. Without one the button still works — it opens the sign-in
+   * panel's one-step setup that asks for the id — and token sign-in is always
+   * offered.
    */
   readonly accounts: {
     readonly hasGitHubClientId: boolean
@@ -466,6 +468,7 @@ export interface RemoteRepoQuery {
 /** Kick-off data for a browser sign-in; the renderer decides when to open it. */
 export type SignInChallenge =
   | {
+      /** GitHub's device-code flow (the only browser sign-in GitHub offers). */
       readonly kind: 'github-device'
       readonly requestId: string
       /** The XXXX-XXXX code the user types at verificationUrl. */
@@ -474,12 +477,6 @@ export type SignInChallenge =
       /** Unix ms when the device code expires. */
       readonly expiresAt: number
       readonly intervalMs: number
-    }
-  | {
-      /** GitHub authorization-code + PKCE (public client, loopback redirect). */
-      readonly kind: 'github-browser'
-      readonly requestId: string
-      readonly authorizeUrl: string
     }
   | {
       readonly kind: 'gitlab-browser'

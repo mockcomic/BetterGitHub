@@ -2,7 +2,7 @@ import type { JSX, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useStore, useStoreState } from '../store'
 import type { DeskView } from '../store'
-import type { ExternalApp } from '../../../shared/models'
+import type { ExternalApp, ManagedRepository } from '../../../shared/models'
 import { ConfettiBurst, useCelebration } from './Celebration'
 import { BranchDivergence } from './BranchBadges'
 import { useJustArmed } from '../motion'
@@ -14,7 +14,8 @@ const FILTER_LABELS: Record<DeskView, string> = {
   review: 'Filter files by path',
   history: 'Search commit messages',
   conflicts: 'Filter conflicted files',
-  stash: 'Filter stashes'
+  stash: 'Filter stashes',
+  scripts: 'Filter scripts by name'
 }
 
 /**
@@ -530,11 +531,24 @@ function RepoButton({
   const state = useStoreState()
   const store = useStore()
   const wrapRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
   const [filter, setFilter] = useState('')
+  /**
+   * Keyboard cursor: an index into the filtered `matches`, held at -1 until an
+   * arrow moves it, so opening the picker paints no ring until the keys ask for
+   * one. Focus stays in the filter field the whole time (combobox pattern), so
+   * typing and arrowing never fight.
+   */
+  const [cursor, setCursor] = useState(-1)
+  /** Inline disclosure for the Add menu (add-local / clone / create) that
+   *  sits beside the filter — collapsed whenever the picker itself closes. */
+  const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => {
     if (!open) {
       setFilter('')
+      setCursor(-1)
+      setAddOpen(false)
       return
     }
     const handler = (e: MouseEvent) => {
@@ -556,9 +570,49 @@ function RepoButton({
             r.name.toLowerCase().includes(needle) || r.path.toLowerCase().includes(needle)
         )
 
+  /** Move the cursor one row; an unset cursor starts at the near end. The ends
+   *  clamp instead of wrapping, so overshooting a short list costs nothing. */
+  const moveCursor = (delta: number): void => {
+    if (matches.length === 0) return
+    setCursor(prev =>
+      prev === -1
+        ? delta > 0
+          ? 0
+          : matches.length - 1
+        : Math.min(matches.length - 1, Math.max(0, prev + delta))
+    )
+  }
+
+  const jumpCursor = (toLast: boolean): void => {
+    if (matches.length === 0) return
+    setCursor(toLast ? matches.length - 1 : 0)
+  }
+
+  const pick = (repo: ManagedRepository): void => {
+    onClose()
+    void store.selectRepo(repo)
+  }
+
+  const cursorRepo = matches[cursor]
+  const activeId = cursorRepo === undefined ? undefined : `repo-opt-${cursorRepo.id}`
+
+  // The list scrolls inside the popover, so a cursor arrowed off the bottom (or
+  // a filter that moves the row) has to be pulled back into view.
+  useEffect(() => {
+    if (!open || cursor < 0) return
+    popRef.current
+      ?.querySelector<HTMLElement>(`[data-row="${cursor}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [open, cursor])
+
   return (
     <div className="menu-wrap" ref={wrapRef}>
-      <button className="btn picker" onClick={onToggle}>
+      <button
+        className="btn picker"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
         <span className="picker-label">
           <small>Current repository</small>
           <strong>{state.selectedRepo?.name ?? 'Add repository'}</strong>
@@ -566,45 +620,12 @@ function RepoButton({
         <span className="caret">▾</span>
       </button>
       {open && (
-        <div className="popover">
-          <input
-            ref={filterRef}
-            className="popover-filter"
-            placeholder="Filter repositories"
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Escape') onClose()
-            }}
-          />
-          {visible.length === 0 ? (
-            <div className="popover-empty">No repositories yet</div>
-          ) : matches.length === 0 ? (
-            <div className="popover-empty">No matching repositories</div>
-          ) : (
-            matches.map(r => (
-              <button
-                key={r.id}
-                className={`popover-item${state.selectedRepo?.id === r.id ? ' active' : ''}`}
-                onClick={() => {
-                  onClose()
-                  void store.selectRepo(r)
-                }}
-              >
-                {r.name}
-                <small title={r.path} className="popover-path">
-                  {r.path}
-                </small>
-              </button>
-            ))
-          )}
-          {state.repositories.length > visible.length && (
-            <div className="popover-empty">
-              {state.repositories.length - visible.length} missing on disk —
-              clean up in Manage repositories
-            </div>
-          )}
-          <div className="popover-sep" />
+        <div className="popover" ref={popRef}>
+          {/* Action rail at the very top: the repository verbs that are not
+              part of the Add menu. Manage/Show/Remove sit above the filter so
+              the list below stays the picker's one scrollable concern, and
+              clone/create/add-local moved into the Add button beside it —
+              GitHub Desktop's shape. */}
           <button
             className="popover-item"
             onClick={() => {
@@ -614,45 +635,180 @@ function RepoButton({
           >
             Manage repositories…
           </button>
-          <button
-            className="popover-item"
-            onClick={() => {
-              onClose()
-              void store.addLocalRepository()
-            }}
-          >
-            Add local repository…
-          </button>
-          <button
-            className="popover-item"
-            onClick={() => {
-              onClose()
-              store.setCloneOpen(true)
-            }}
-          >
-            Clone repository…
-          </button>
           {state.selectedRepo !== null && (
-            <button
-              className="popover-item"
-              onClick={() => {
-                onClose()
-                void store.revealFile('.')
-              }}
-            >
-              Show in Explorer
-            </button>
+            <>
+              <div className="popover-sep" />
+              <button
+                className="popover-item"
+                onClick={() => {
+                  onClose()
+                  void store.revealFile('.')
+                }}
+              >
+                Show in Explorer
+              </button>
+              <button
+                className="popover-item danger"
+                onClick={() => {
+                  onClose()
+                  store.removeRepository()
+                }}
+              >
+                Remove this repository
+              </button>
+            </>
           )}
-          {state.selectedRepo !== null && (
+          <div className="popover-sep" />
+          <div className="popover-filter-row">
+            <input
+              ref={filterRef}
+              className="popover-filter"
+              placeholder="Filter repositories"
+              title="Type to filter · ↑↓ to move · Enter to open"
+              value={filter}
+              role="combobox"
+              aria-expanded
+              aria-controls="repo-picker-list"
+              aria-autocomplete="list"
+              aria-activedescendant={activeId}
+              onChange={e => {
+                setFilter(e.target.value)
+                // A new filter is a new list; an index kept from the old one would
+                // point at an unrelated repository.
+                setCursor(-1)
+              }}
+              onKeyDown={e => {
+                switch (e.key) {
+                  case 'ArrowDown':
+                    e.preventDefault()
+                    moveCursor(1)
+                    break
+                  case 'ArrowUp':
+                    e.preventDefault()
+                    moveCursor(-1)
+                    break
+                  case 'Home': {
+                    // Home belongs to the text while the caret still has somewhere
+                    // to go; once it is already home it takes the first row.
+                    const el = e.currentTarget
+                    if (el.selectionStart === 0 && el.selectionEnd === 0) {
+                      e.preventDefault()
+                      jumpCursor(false)
+                    }
+                    break
+                  }
+                  case 'End': {
+                    const el = e.currentTarget
+                    const at = el.value.length
+                    if (el.selectionStart === at && el.selectionEnd === at) {
+                      e.preventDefault()
+                      jumpCursor(true)
+                    }
+                    break
+                  }
+                  case 'Enter': {
+                    e.preventDefault()
+                    // With no cursor yet, Enter takes the top match — the row the
+                    // picker is already showing first.
+                    const target = cursor === -1 ? matches[0] : matches[cursor]
+                    if (target !== undefined) pick(target)
+                    break
+                  }
+                  case 'Escape':
+                    // The Add disclosure collapses before the picker closes, so
+                    // one Escape never hides an open menu behind the popover.
+                    if (addOpen) setAddOpen(false)
+                    else onClose()
+                    break
+                }
+              }}
+            />
             <button
-              className="popover-item danger"
-              onClick={() => {
-                onClose()
-                store.removeRepository()
+              className="btn popover-add"
+              aria-haspopup="menu"
+              aria-expanded={addOpen}
+              title="Add a repository — clone, create, or point at one already on disk"
+              onClick={() => setAddOpen(o => !o)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') setAddOpen(false)
               }}
             >
-              Remove this repository
+              Add <span className="caret">▾</span>
             </button>
+          </div>
+          {addOpen && (
+            <div className="repo-add-menu" role="menu" aria-label="Add a repository">
+              <button
+                className="popover-item"
+                role="menuitem"
+                title="Clone a repository from a URL"
+                onClick={() => {
+                  onClose()
+                  store.setCloneOpen(true)
+                }}
+              >
+                Clone repository…
+              </button>
+              <button
+                className="popover-item"
+                role="menuitem"
+                title="Create a new repository on disk, optionally on your account"
+                onClick={() => {
+                  onClose()
+                  store.setRepoDialog('new')
+                }}
+              >
+                Create repository…
+              </button>
+              <button
+                className="popover-item"
+                role="menuitem"
+                title="Point Aspen at a git folder that already exists on disk"
+                onClick={() => {
+                  onClose()
+                  void store.addLocalRepository()
+                }}
+              >
+                Add local repository…
+              </button>
+            </div>
+          )}
+          <div className="popover-sep" />
+          <div id="repo-picker-list" role="listbox" aria-label="Repositories">
+            {visible.length === 0 ? (
+              <div className="popover-empty" role="presentation">
+                No repositories yet
+              </div>
+            ) : matches.length === 0 ? (
+              <div className="popover-empty" role="presentation">
+                No matching repositories
+              </div>
+            ) : (
+              matches.map((r, i) => (
+                <button
+                  key={r.id}
+                  id={`repo-opt-${r.id}`}
+                  role="option"
+                  aria-selected={state.selectedRepo?.id === r.id}
+                  data-row={i}
+                  className={`popover-item${state.selectedRepo?.id === r.id ? ' active' : ''}${
+                    i === cursor ? ' cursor' : ''
+                  }`}
+                  onClick={() => pick(r)}
+                >
+                  {r.name}
+                  <small title={r.path} className="popover-path">
+                    {r.path}
+                  </small>
+                </button>
+              ))
+            )}
+          </div>
+          {state.repositories.length > visible.length && (
+            <div className="popover-empty">
+              {state.repositories.length - visible.length} missing on disk —
+              clean up in Manage repositories
+            </div>
           )}
         </div>
       )}

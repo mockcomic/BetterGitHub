@@ -15,7 +15,17 @@
 export interface TerminalTab {
   /** Stable renderer-local key; deliberately not the PTY session id. */
   readonly id: number
+  /**
+   * Set on a Scripts-desk tab: the one line (e.g. `npm run dev`) the view
+   * types into its freshly-spawned shell. A plain shell tab has none.
+   */
+  readonly command?: string
+  /** Strip label override for a command tab (defaults to the shell name). */
+  readonly label?: string
 }
+
+/** Optional extra identity for a newly opened tab (a script run). */
+export type NewTabSpec = Pick<TerminalTab, 'command' | 'label'>
 
 export interface TabStrip {
   readonly tabs: ReadonlyArray<TerminalTab>
@@ -27,10 +37,15 @@ export interface TabStrip {
 export const emptyStrip: TabStrip = { tabs: [], activeId: null, nextId: 1 }
 
 /** Append a tab and make it the active one (the way every terminal does). */
-export function openTab(strip: TabStrip): { readonly strip: TabStrip; readonly id: number } {
+export function openTab(
+  strip: TabStrip,
+  spec?: NewTabSpec
+): { readonly strip: TabStrip; readonly id: number } {
   const id = strip.nextId
+  const tab: TerminalTab =
+    spec === undefined ? { id } : { id, command: spec.command, label: spec.label }
   return {
-    strip: { tabs: [...strip.tabs, { id }], activeId: id, nextId: id + 1 },
+    strip: { tabs: [...strip.tabs, tab], activeId: id, nextId: id + 1 },
     id
   }
 }

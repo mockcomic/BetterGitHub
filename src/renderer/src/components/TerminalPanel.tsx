@@ -2,14 +2,15 @@ import type { JSX } from 'react'
 import type { ITerminalOptions, Terminal as XtermTerminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useStore } from '../store'
+import { useStore, type TerminalRunRequest } from '../store'
 import { call, onTerminalExit, onTerminalOutput } from '../api'
 import {
   closeTab,
   emptyStrip,
   openTab,
   selectTab,
-  type TabStrip
+  type TabStrip,
+  type TerminalTab
 } from '../terminal-tabs'
 
 /**
@@ -31,6 +32,14 @@ import {
 interface TerminalPanelProps {
   readonly repoPath: string
   readonly repoName: string
+  /**
+   * A Scripts-desk Run press waiting for a tab (store.terminalRun). One
+   * mounted on arrival: its command is typed into a freshly spawned shell
+   * in a new tab labelled with the command itself. Null when nothing is
+   * pending; the panel calls `onRunConsumed` once the request has a tab.
+   */
+  readonly run: TerminalRunRequest | null
+  readonly onRunConsumed: () => void
 }
 
 /**
@@ -123,10 +132,29 @@ interface TerminalViewApi {
   readonly restart: () => void
 }
 
-export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.Element {
+export function TerminalPanel({
+  repoPath,
+  repoName,
+  run,
+  onRunConsumed
+}: TerminalPanelProps): JSX.Element {
   const store = useStore()
-  /** One tab from the first render: the panel always opens with a shell. */
-  const [strip, setStrip] = useState<TabStrip>(() => openTab(emptyStrip).strip)
+  /** Current run request as the initialiser sees it (same render, hook
+   *  order); a request consumed at mount must not also open a second tab
+   *  through the effect below. */
+  const runRef = useRef(run)
+  const seenNonce = useRef<number | null>(null)
+  /** One tab from the first render: a pending script run *is* that first
+   *  tab (the way every terminal opens with its first session); otherwise
+   *  a plain shell. */
+  const [strip, setStrip] = useState<TabStrip>(() => {
+    const first = runRef.current
+    if (first !== null) {
+      seenNonce.current = first.nonce
+      return openTab(emptyStrip, { command: first.command, label: first.label }).strip
+    }
+    return openTab(emptyStrip).strip
+  })
   const [infos, setInfos] = useState<Readonly<Record<number, TabInfo>>>({})
   /** The views' handles, keyed by tab id; a ref so the buttons never go
    *  stale between the spawn and the next render. */
@@ -135,6 +163,19 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
   const reportInfo = useCallback((id: number, patch: Partial<TabInfo>): void => {
     setInfos(prev => ({ ...prev, [id]: { ...(prev[id] ?? initialInfo), ...patch } }))
   }, [])
+
+  // The run-request handoff. A request the initial strip already mounted on
+  // (seenNonce matches at mount) only needs to be handed back; a later one
+  // gets its tab first. Both branches consume, so a repeat of the same
+  // script still bumps the nonce on the next press.
+  useEffect(() => {
+    if (run === null) return
+    if (seenNonce.current !== run.nonce) {
+      seenNonce.current = run.nonce
+      setStrip(current => openTab(current, { command: run.command, label: run.label }).strip)
+    }
+    onRunConsumed()
+  }, [run, onRunConsumed])
 
   const active = strip.activeId === null ? null : strip.tabs.find(tab => tab.id === strip.activeId) ?? null
   const activeInfo = active === null ? null : (infos[active.id] ?? initialInfo)
@@ -150,7 +191,13 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
     if (strip.tabs.length === 0) store.toggleTerminal()
   }, [strip, store])
 
-  const tabTitle = (id: number): string => (infos[id] ?? initialInfo).label
+  // A command tab shows its command on the strip from the first pixel,
+  // before the view has reported anything; a plain tab keeps the reported
+  // (shell) label, defaulting to "Terminal" while the spawn is in flight.
+  const tabTitle = (tab: TerminalTab): string => {
+    const reported = (infos[tab.id] ?? initialInfo).label
+    return reported === initialInfo.label && tab.label !== undefined ? tab.label : reported
+  }
 
   return (
     <section
@@ -177,13 +224,13 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
                   title={repoPath}
                   onClick={() => setStrip(current => selectTab(current, tab.id))}
                 >
-                  {tabTitle(tab.id)}
+                  {tabTitle(tab)}
                   <span className="terminal-tab-index">{index + 1}</span>
                 </button>
                 <button
                   className="terminal-tab-close"
                   type="button"
-                  aria-label={`Close ${tabTitle(tab.id)} session`}
+                  aria-label={`Close ${tabTitle(tab)} session`}
                   title="Close this terminal"
                   onClick={() => setStrip(current => closeTab(current, tab.id).strip)}
                 >
@@ -243,6 +290,8 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
           <TerminalView
             key={tab.id}
             repoPath={repoPath}
+            command={tab.command}
+            label={tab.label}
             active={tab.id === strip.activeId}
             tabId={tab.id}
             onInfo={patch => reportInfo(tab.id, patch)}
@@ -259,6 +308,10 @@ export function TerminalPanel({ repoPath, repoName }: TerminalPanelProps): JSX.E
 
 interface TerminalViewProps {
   readonly repoPath: string
+  /** A Scripts-desk tab: the line to type once the shell is live. */
+  readonly command?: string
+  /** Strip label for a command tab. */
+  readonly label?: string
   readonly tabId: number
   readonly active: boolean
   readonly onInfo: (patch: Partial<TabInfo>) => void
@@ -273,6 +326,8 @@ interface TerminalViewProps {
  */
 function TerminalView({
   repoPath,
+  command,
+  label,
   tabId,
   active,
   onInfo,
@@ -387,7 +442,10 @@ function TerminalView({
           return
         }
         sessionId = info.id
-        infoRef.current({ label: info.shellLabel, sessionId: info.id })
+        infoRef.current({
+          label: label ?? info.shellLabel,
+          sessionId: info.id
+        })
         terminal.focus()
         // The input leg of the round trip: everything xterm encodes from a
         // keystroke (printables, Enter, arrows, paste, IME commits) leaves
@@ -405,6 +463,13 @@ function TerminalView({
             infoRef.current({ exitCode: code, sessionId: null })
           }
         })
+        // A Scripts-desk tab "types" its one line exactly the way the
+        // keyboard would: the same bytes, on the same channel, once output
+        // and exit are wired. The PTY line-buffers it until the shell reads
+        // — Restart (the spawnNonce bump below) re-types it with the respawn.
+        if (command !== undefined) {
+          void call('terminalWrite', sessionId, `${command}\r`)
+        }
       } catch (err) {
         infoRef.current({
           error: err instanceof Error ? err.message : String(err),
@@ -461,7 +526,7 @@ function TerminalView({
       if (sessionId !== null) void call('terminalKill', sessionId)
       sessionId = null
     }
-  }, [repoPath, spawnNonce])
+  }, [repoPath, command, label, spawnNonce])
 
   // Clicking a tab should put the caret in it, the way every terminal does.
   useEffect(() => {

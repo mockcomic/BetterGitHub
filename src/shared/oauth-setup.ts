@@ -88,8 +88,8 @@ export function appSetupSteps(
   if (provider === 'github') {
     return [
       `On ${host}, register a new OAuth application — any name, any homepage URL.`,
-      `Authorization callback URL: exactly ${OAUTH_CALLBACK_URL}.`,
-      'Tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback.',
+      'Authorization callback URL: any URL you like — the code sign-in never redirects back to Aspen.',
+      'Tick “Enable Device Flow”; without it GitHub refuses the code sign-in.',
       'Paste the Client ID below. It is public by design; Aspen never needs the secret.'
     ]
   }

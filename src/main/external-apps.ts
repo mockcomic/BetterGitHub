@@ -1,6 +1,6 @@
 import { spawn } from 'child_process'
 import { constants as fsConstants } from 'fs'
-import { access, stat } from 'fs/promises'
+import { access, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { posix as pathPosix, win32 as pathWin32 } from 'path'
 import type { ExternalApp } from '../shared/models'
@@ -57,6 +57,8 @@ export interface DetectDeps {
   ) => Promise<string | null>
   /** True when the absolute path exists (file *or* folder — .app bundles). */
   readonly exists: (path: string) => Promise<boolean>
+  /** UTF-8 text of a small file (a cmd shim), or null when unreadable. */
+  readonly readText: (path: string) => Promise<string | null>
   readonly env: NodeJS.ProcessEnv
   readonly home: string
 }
@@ -72,6 +74,14 @@ interface PlatformProbe {
   readonly paths?: (deps: DetectDeps) => ReadonlyArray<string>
   /** macOS only: `.app` bundle names checked under /Applications + ~/Applications. */
   readonly appNames?: ReadonlyArray<string>
+  /**
+   * win32: file names of this product's own executables. Gates PATH hits —
+   * see {@link pathHitIsOwnLauncher}. Forks of VS Code ship compatibility
+   * shims under foreign names (Cursor installs `codeBin\code.cmd`, which
+   * runs Cursor.exe, on PATH *ahead of* real VS Code's bin), so without this
+   * a row can launch a different product than the one it names.
+   */
+  readonly ownExes?: ReadonlyArray<string>
 }
 
 interface CatalogRow {
@@ -127,7 +137,8 @@ export const EDITOR_CATALOG: ReadonlyArray<CatalogRow> = [
     kind: 'editor',
     win32: {
       commands: ['code'],
-      paths: winInstallPaths('Microsoft VS Code', ['Code.exe', 'code.cmd'])
+      paths: winInstallPaths('Microsoft VS Code', ['Code.exe', 'code.cmd']),
+      ownExes: ['Code.exe']
     },
     darwin: { appNames: ['Visual Studio Code'], commands: ['code'], extraDirs: MAC_EDITOR_BINS },
     linux: { commands: ['code'], extraDirs: LINUX_EXTRA_BINS }
@@ -138,7 +149,8 @@ export const EDITOR_CATALOG: ReadonlyArray<CatalogRow> = [
     kind: 'editor',
     win32: {
       commands: ['code-insiders'],
-      paths: winInstallPaths('Microsoft VS Code Insiders', ['Code - Insiders.exe', 'code-insiders.cmd'])
+      paths: winInstallPaths('Microsoft VS Code Insiders', ['Code - Insiders.exe', 'code-insiders.cmd']),
+      ownExes: ['Code - Insiders.exe']
     },
     darwin: {
       appNames: ['Visual Studio Code - Insiders'],
@@ -151,7 +163,11 @@ export const EDITOR_CATALOG: ReadonlyArray<CatalogRow> = [
     id: 'cursor',
     label: 'Cursor',
     kind: 'editor',
-    win32: { commands: ['cursor'], paths: winInstallPaths('cursor', ['Cursor.exe', 'cursor.cmd']) },
+    win32: {
+      commands: ['cursor'],
+      paths: winInstallPaths('cursor', ['Cursor.exe', 'cursor.cmd']),
+      ownExes: ['Cursor.exe']
+    },
     darwin: { appNames: ['Cursor'], commands: ['cursor'], extraDirs: MAC_EDITOR_BINS },
     linux: { commands: ['cursor'], extraDirs: LINUX_EXTRA_BINS }
   },
@@ -159,7 +175,11 @@ export const EDITOR_CATALOG: ReadonlyArray<CatalogRow> = [
     id: 'codium',
     label: 'VSCodium',
     kind: 'editor',
-    win32: { commands: ['codium'], paths: winInstallPaths('VSCodium', ['Codium.exe', 'codium.cmd']) },
+    win32: {
+      commands: ['codium'],
+      paths: winInstallPaths('VSCodium', ['Codium.exe', 'codium.cmd']),
+      ownExes: ['Codium.exe']
+    },
     darwin: { appNames: ['VSCodium'], commands: ['codium'], extraDirs: MAC_EDITOR_BINS },
     linux: { commands: ['codium'], extraDirs: LINUX_EXTRA_BINS }
   },
@@ -169,7 +189,8 @@ export const EDITOR_CATALOG: ReadonlyArray<CatalogRow> = [
     kind: 'editor',
     win32: {
       commands: ['windsurf'],
-      paths: winInstallPaths('Windsurf', ['Windsurf.exe', 'windsurf.cmd'])
+      paths: winInstallPaths('Windsurf', ['Windsurf.exe', 'windsurf.cmd']),
+      ownExes: ['Windsurf.exe']
     },
     darwin: { appNames: ['Windsurf'], commands: ['windsurf'], extraDirs: MAC_EDITOR_BINS },
     linux: { commands: ['windsurf'], extraDirs: LINUX_EXTRA_BINS }
@@ -178,7 +199,7 @@ export const EDITOR_CATALOG: ReadonlyArray<CatalogRow> = [
     id: 'zed',
     label: 'Zed',
     kind: 'editor',
-    win32: { commands: ['zed'], paths: winInstallPaths('Zed', ['zed.exe']) },
+    win32: { commands: ['zed'], paths: winInstallPaths('Zed', ['zed.exe']), ownExes: ['zed.exe'] },
     darwin: { appNames: ['Zed'], commands: ['zed'], extraDirs: MAC_EDITOR_BINS },
     linux: { commands: ['zed'], extraDirs: LINUX_EXTRA_BINS }
   },
@@ -188,7 +209,8 @@ export const EDITOR_CATALOG: ReadonlyArray<CatalogRow> = [
     kind: 'editor',
     win32: {
       commands: ['subl', 'sublime_text'],
-      paths: winInstallPaths('Sublime Text', ['subl.exe', 'sublime_text.exe'])
+      paths: winInstallPaths('Sublime Text', ['subl.exe', 'sublime_text.exe']),
+      ownExes: ['subl.exe', 'sublime_text.exe']
     },
     darwin: { appNames: ['Sublime Text'], commands: ['subl'], extraDirs: MAC_EDITOR_BINS },
     linux: { commands: ['subl', 'subl3', 'sublime_text'], extraDirs: LINUX_EXTRA_BINS }
@@ -269,9 +291,12 @@ async function probeEditor(
 
   for (const command of probe.commands ?? []) {
     const resolved = await deps.resolveCommand(command, extraDirs)
-    if (resolved !== null) {
-      return { app, launch: winLaunch(platform, resolved) }
-    }
+    if (resolved === null) continue
+    // A PATH hit for another product's look-alike shim (Cursor's
+    // codeBin\code.cmd) does not make this row detected — fall through to
+    // the install-layout probe, which looks inside the product's own folder.
+    if (!(await pathHitIsOwnLauncher(platform, resolved, probe, deps))) continue
+    return { app, launch: winLaunch(platform, resolved) }
   }
 
   for (const path of probe.paths?.(deps) ?? []) {
@@ -280,6 +305,61 @@ async function probeEditor(
     }
   }
   return null
+}
+
+/**
+ * The exe a Windows CLI shim invokes, or null when the shim cannot be read,
+ * holds no quoted `.exe` token, or uses tokens this parser does not expand
+ * (`%VAR%`-relative). The VS Code family's shims all share the shape
+ * `"%~dp0..\..\..\Product.exe" "%~dp0..\out\cli.js" %*`, where `%~dp0` is the
+ * shim's own directory — enough to attribute the launcher to a product.
+ * Deliberately best-effort: a null result means "doubt", and doubt must not
+ * reject a working shim.
+ */
+export function shimTargetExe(shimPath: string, text: string | null): string | null {
+  if (text === null) return null
+  const shimDir = pathWin32.dirname(shimPath) + pathWin32.sep
+  for (const match of text.matchAll(/"([^"]+)"/g)) {
+    const token = match[1]
+    if (!token.toLowerCase().endsWith('.exe')) continue
+    if (token.toLowerCase().includes('%~dp0')) {
+      return pathWin32.resolve(shimDir + token.replace(/%~dp0/gi, ''))
+    }
+    if (pathWin32.isAbsolute(token)) return pathWin32.resolve(token)
+  }
+  return null
+}
+
+/**
+ * The attribution gate on win32 PATH hits. A fork of VS Code can install a
+ * compatibility command under a foreign product's name — Cursor ships
+ * `codeBin\code.cmd` (it runs Cursor.exe) on PATH ahead of real VS Code — so
+ * first-PATH-match cannot decide which product answered. A hit therefore only
+ * counts for a row that declares `ownExes` when the launcher provably runs
+ * one of that row's executables: a direct `.exe`/`.com` by its file name, a
+ * `.cmd`/`.bat` shim by the exe it invokes (see {@link shimTargetExe}).
+ * Unparsable shims are accepted; the gate rejects only on positive evidence
+ * of a foreign target, never on doubt. Rows without `ownExes`, and every
+ * hit that came from the row's own install-layout `paths` probe, need no
+ * gate — those paths already live inside the product's folder.
+ */
+async function pathHitIsOwnLauncher(
+  platform: ExternalPlatform,
+  resolved: string,
+  probe: PlatformProbe,
+  deps: DetectDeps
+): Promise<boolean> {
+  const own = probe.ownExes
+  if (platform !== 'win32' || own === undefined || own.length === 0) return true
+  const ext = pathWin32.extname(resolved).toLowerCase()
+  let target: string | null = null
+  if (ext === '.exe' || ext === '.com') target = resolved
+  else if (ext === '.cmd' || ext === '.bat') {
+    target = shimTargetExe(resolved, await deps.readText(resolved))
+  }
+  if (target === null) return true
+  const fileName = pathWin32.basename(target).toLowerCase()
+  return own.some(exe => exe.toLowerCase() === fileName)
 }
 
 /** Windows .cmd shims must go through cmd.exe; everything else execs directly. */
@@ -516,6 +596,13 @@ function nodeDeps(): DetectDeps {
         return true
       } catch {
         return false
+      }
+    },
+    readText: async path => {
+      try {
+        return await readFile(path, 'utf8')
+      } catch {
+        return null
       }
     },
     resolveCommand: (command, extraDirs) =>

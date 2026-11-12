@@ -1,0 +1,266 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/ScriptsSidebar.tsx");const _jsxDEV = __vite__cjsImport1_react_jsxDevRuntime["jsxDEV"]; const _Fragment = __vite__cjsImport1_react_jsxDevRuntime["Fragment"];import { useStore, useStoreState } from "/src/store.ts";
+var _jsxFileName = "C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/ScriptsSidebar.tsx";
+import __vite__cjsImport1_react_jsxDevRuntime from "/@fs/C:/Users/mockcomic/Documents/GitHub/BetterGitHub/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=a63a28e8";
+var _s = $RefreshSig$(), _s2 = $RefreshSig$(), _s3 = $RefreshSig$();
+/**
+* The Scripts desk: every entry of the repository root's package.json,
+* each with one ▶ Run button. Pressing it docks the integrated terminal,
+* opens a tab labelled with the command, and *types* the line into a fresh
+* shell (store.runScript → TerminalPanel) — so streaming output, colours,
+* Ctrl+C, and the live prompt after the script exits are the terminal's
+* existing behaviour, not new machinery.
+*
+* The tab itself only appears when the repository actually has scripts
+* (App.tsx's visibleDeskTabs), following the desk's "tabs that have
+* something to say" rule.
+*/
+function ScriptRow({ script, manager }) {
+	_s();
+	const store = useStore();
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: "script-row",
+		children: [/* @__PURE__ */ _jsxDEV("button", {
+			className: "mini run",
+			title: `Run “${script.name}” — types ${manager} run ${script.name} into a new terminal tab`,
+			onClick: () => store.runScript(script.name),
+			children: "▶"
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 22,
+			columnNumber: 7
+		}, this), /* @__PURE__ */ _jsxDEV("span", {
+			className: "script-info",
+			children: [/* @__PURE__ */ _jsxDEV("span", {
+				className: "script-name",
+				children: script.name
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 30,
+				columnNumber: 9
+			}, this), /* @__PURE__ */ _jsxDEV("span", {
+				className: "script-command",
+				title: script.command,
+				children: script.command
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 31,
+				columnNumber: 9
+			}, this)]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 29,
+			columnNumber: 7
+		}, this)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 21,
+		columnNumber: 5
+	}, this);
+}
+_s(ScriptRow, "lacCqcEtsbxX3PAG/fPlTuRiPg0=", false, function() {
+	return [useStore];
+});
+_c = ScriptRow;
+export function ScriptsQueue() {
+	_s2();
+	const state = useStoreState();
+	const store = useStore();
+	const info = state.packageScripts;
+	if (info === null) {
+		return /* @__PURE__ */ _jsxDEV("div", {
+			className: "sidebar-message",
+			children: "Loading…"
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 45,
+			columnNumber: 12
+		}, this);
+	}
+	if (info.error !== null) {
+		return /* @__PURE__ */ _jsxDEV("div", {
+			className: "sidebar-message error",
+			children: [
+				/* @__PURE__ */ _jsxDEV("strong", { children: "package.json can't be read." }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 50,
+					columnNumber: 9
+				}, this),
+				/* @__PURE__ */ _jsxDEV("p", { children: info.error }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 51,
+					columnNumber: 9
+				}, this),
+				/* @__PURE__ */ _jsxDEV("p", { children: /* @__PURE__ */ _jsxDEV("button", {
+					className: "mini",
+					onClick: () => void store.refreshPackageScripts(),
+					children: "Try again"
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 53,
+					columnNumber: 11
+				}, this) }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 52,
+					columnNumber: 9
+				}, this)
+			]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 49,
+			columnNumber: 7
+		}, this);
+	}
+	// The desk's own filter narrows the script list like it does the review
+	// queue — one habit for every column on the desk.
+	const needle = state.deskFilter.trim().toLowerCase();
+	const shown = needle.length === 0 ? info.scripts : info.scripts.filter((s) => s.name.toLowerCase().includes(needle) || s.command.toLowerCase().includes(needle));
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: "changes-list",
+		children: [
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "queue-label",
+				children: [
+					"Scripts ",
+					/* @__PURE__ */ _jsxDEV("b", { children: shown.length === info.scripts.length ? info.scripts.length : `${shown.length} of ${info.scripts.length}` }, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 73,
+						columnNumber: 17
+					}, this),
+					/* @__PURE__ */ _jsxDEV("span", {
+						className: "script-manager",
+						children: info.manager
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 74,
+						columnNumber: 9
+					}, this)
+				]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 72,
+				columnNumber: 7
+			}, this),
+			shown.length === 0 && /* @__PURE__ */ _jsxDEV("div", {
+				className: "sidebar-message",
+				children: [/* @__PURE__ */ _jsxDEV("strong", { children: "No scripts match" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 78,
+					columnNumber: 11
+				}, this), /* @__PURE__ */ _jsxDEV("p", { children: [
+					"Nothing matches \"",
+					state.deskFilter.trim(),
+					"\"."
+				] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 79,
+					columnNumber: 11
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 77,
+				columnNumber: 9
+			}, this),
+			shown.map((s) => /* @__PURE__ */ _jsxDEV(ScriptRow, {
+				script: s,
+				manager: info.manager
+			}, s.name, false, {
+				fileName: _jsxFileName,
+				lineNumber: 83,
+				columnNumber: 9
+			}, this)),
+			/* @__PURE__ */ _jsxDEV("p", {
+				className: "script-hint",
+				children: "▶ opens the script in the integrated terminal — output streams there, Ctrl+C stops it, and the prompt stays live after it exits."
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 85,
+				columnNumber: 7
+			}, this)
+		]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 71,
+		columnNumber: 5
+	}, this);
+}
+_s2(ScriptsQueue, "NjcQFOVvfzrp+SsRc/R6o5ARrGs=", false, function() {
+	return [useStoreState, useStore];
+});
+_c2 = ScriptsQueue;
+export function ScriptsDetail() {
+	_s3();
+	const state = useStoreState();
+	const info = state.packageScripts;
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: "diff-view empty-diff",
+		children: [/* @__PURE__ */ _jsxDEV("h2", { children: "Package scripts" }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 98,
+			columnNumber: 7
+		}, this), /* @__PURE__ */ _jsxDEV("p", { children: info !== null && info.scripts.length > 0 ? /* @__PURE__ */ _jsxDEV(_Fragment, { children: [
+			"Press ",
+			/* @__PURE__ */ _jsxDEV("b", { children: "▶" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 102,
+				columnNumber: 19
+			}, this),
+			" next to a script to run it in the integrated terminal — ",
+			/* @__PURE__ */ _jsxDEV("code", { children: [info.manager, " run <name>"] }, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 103,
+				columnNumber: 24
+			}, this),
+			" is typed into a fresh tab, exactly as if you had. Long-running scripts like a dev server keep their tab streaming until you stop them with Ctrl+C; the shell prompt is still there afterwards, so",
+			/* @__PURE__ */ _jsxDEV("b", { children: " ↑" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 107,
+				columnNumber: 13
+			}, this),
+			" + Enter starts the script again."
+		] }, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 101,
+			columnNumber: 11
+		}, this) : "This repository has no runnable package scripts." }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 99,
+			columnNumber: 7
+		}, this)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 97,
+		columnNumber: 5
+	}, this);
+}
+_s3(ScriptsDetail, "dkCDwcSzvxIE78tP2mkgtCvuO0U=", false, function() {
+	return [useStoreState];
+});
+_c3 = ScriptsDetail;
+var _c, _c2, _c3;
+$RefreshReg$(_c, "ScriptRow");
+$RefreshReg$(_c2, "ScriptsQueue");
+$RefreshReg$(_c3, "ScriptsDetail");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/components/ScriptsSidebar.tsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/ScriptsSidebar.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/ScriptsSidebar.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/ScriptsSidebar.tsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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dUI7Ozs7O0dBQUM7R0FJdkQsd0JBQUMsS0FBRCxZQUFHLEtBQUs7Ozs7O0dBQUM7RUFDVDs7OzthQUVGLG1EQUVEOzs7O1VBQ0E7Ozs7OztBQUVUIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIlNjcmlwdHNTaWRlYmFyLnRzeCJdLCJ2ZXJzaW9uIjozLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgdHlwZSB7IEpTWCB9IGZyb20gJ3JlYWN0J1xuaW1wb3J0IHR5cGUgeyBQYWNrYWdlU2NyaXB0IH0gZnJvbSAnLi4vLi4vLi4vc2hhcmVkL3NjcmlwdHMnXG5pbXBvcnQgeyB1c2VTdG9yZSwgdXNlU3RvcmVTdGF0ZSB9IGZyb20gJy4uL3N0b3JlJ1xuXG4vKipcbiAqIFRoZSBTY3JpcHRzIGRlc2s6IGV2ZXJ5IGVudHJ5IG9mIHRoZSByZXBvc2l0b3J5IHJvb3QncyBwYWNrYWdlLmpzb24sXG4gKiBlYWNoIHdpdGggb25lIOKWtiBSdW4gYnV0dG9uLiBQcmVzc2luZyBpdCBkb2NrcyB0aGUgaW50ZWdyYXRlZCB0ZXJtaW5hbCxcbiAqIG9wZW5zIGEgdGFiIGxhYmVsbGVkIHdpdGggdGhlIGNvbW1hbmQsIGFuZCAqdHlwZXMqIHRoZSBsaW5lIGludG8gYSBmcmVzaFxuICogc2hlbGwgKHN0b3JlLnJ1blNjcmlwdCDihpIgVGVybWluYWxQYW5lbCkg4oCUIHNvIHN0cmVhbWluZyBvdXRwdXQsIGNvbG91cnMsXG4gKiBDdHJsK0MsIGFuZCB0aGUgbGl2ZSBwcm9tcHQgYWZ0ZXIgdGhlIHNjcmlwdCBleGl0cyBhcmUgdGhlIHRlcm1pbmFsJ3NcbiAqIGV4aXN0aW5nIGJlaGF2aW91ciwgbm90IG5ldyBtYWNoaW5lcnkuXG4gKlxuICogVGhlIHRhYiBpdHNlbGYgb25seSBhcHBlYXJzIHdoZW4gdGhlIHJlcG9zaXRvcnkgYWN0dWFsbHkgaGFzIHNjcmlwdHNcbiAqIChBcHAudHN4J3MgdmlzaWJsZURlc2tUYWJzKSwgZm9sbG93aW5nIHRoZSBkZXNrJ3MgXCJ0YWJzIHRoYXQgaGF2ZVxuICogc29tZXRoaW5nIHRvIHNheVwiIHJ1bGUuXG4gKi9cblxuZnVuY3Rpb24gU2NyaXB0Um93KHsgc2NyaXB0LCBtYW5hZ2VyIH06IHsgc2NyaXB0OiBQYWNrYWdlU2NyaXB0OyBtYW5hZ2VyOiBzdHJpbmcgfSk6IEpTWC5FbGVtZW50IHtcbiAgY29uc3Qgc3RvcmUgPSB1c2VTdG9yZSgpXG4gIHJldHVybiAoXG4gICAgPGRpdiBjbGFzc05hbWU9XCJzY3JpcHQtcm93XCI+XG4gICAgICA8YnV0dG9uXG4gICAgICAgIGNsYXNzTmFtZT1cIm1pbmkgcnVuXCJcbiAgICAgICAgdGl0bGU9e2BSdW4g4oCcJHtzY3JpcHQubmFtZX3igJ0g4oCUIHR5cGVzICR7bWFuYWdlcn0gcnVuICR7c2NyaXB0Lm5hbWV9IGludG8gYSBuZXcgdGVybWluYWwgdGFiYH1cbiAgICAgICAgb25DbGljaz17KCkgPT4gc3RvcmUucnVuU2NyaXB0KHNjcmlwdC5uYW1lKX1cbiAgICAgID5cbiAgICAgICAg4pa2XG4gICAgICA8L2J1dHRvbj5cbiAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInNjcmlwdC1pbmZvXCI+XG4gICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInNjcmlwdC1uYW1lXCI+e3NjcmlwdC5uYW1lfTwvc3Bhbj5cbiAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwic2NyaXB0LWNvbW1hbmRcIiB0aXRsZT17c2NyaXB0LmNvbW1hbmR9PlxuICAgICAgICAgIHtzY3JpcHQuY29tbWFuZH1cbiAgICAgICAgPC9zcGFuPlxuICAgICAgPC9zcGFuPlxuICAgIDwvZGl2PlxuICApXG59XG5cbmV4cG9ydCBmdW5jdGlvbiBTY3JpcHRzUXVldWUoKTogSlNYLkVsZW1lbnQge1xuICBjb25zdCBzdGF0ZSA9IHVzZVN0b3JlU3RhdGUoKVxuICBjb25zdCBzdG9yZSA9IHVzZVN0b3JlKClcbiAgY29uc3QgaW5mbyA9IHN0YXRlLnBhY2thZ2VTY3JpcHRzXG5cbiAgaWYgKGluZm8gPT09IG51bGwpIHtcbiAgICByZXR1cm4gPGRpdiBjbGFzc05hbWU9XCJzaWRlYmFyLW1lc3NhZ2VcIj5Mb2FkaW5n4oCmPC9kaXY+XG4gIH1cbiAgaWYgKGluZm8uZXJyb3IgIT09IG51bGwpIHtcbiAgICByZXR1cm4gKFxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJzaWRlYmFyLW1lc3NhZ2UgZXJyb3JcIj5cbiAgICAgICAgPHN0cm9uZz5wYWNrYWdlLmpzb24gY2FuJ3QgYmUgcmVhZC48L3N0cm9uZz5cbiAgICAgICAgPHA+e2luZm8uZXJyb3J9PC9wPlxuICAgICAgICA8cD5cbiAgICAgICAgICA8YnV0dG9uIGNsYXNzTmFtZT1cIm1pbmlcIiBvbkNsaWNrPXsoKSA9PiB2b2lkIHN0b3JlLnJlZnJlc2hQYWNrYWdlU2NyaXB0cygpfT5cbiAgICAgICAgICAgIFRyeSBhZ2FpblxuICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICA8L3A+XG4gICAgICA8L2Rpdj5cbiAgICApXG4gIH1cbiAgLy8gVGhlIGRlc2sncyBvd24gZmlsdGVyIG5hcnJvd3MgdGhlIHNjcmlwdCBsaXN0IGxpa2UgaXQgZG9lcyB0aGUgcmV2aWV3XG4gIC8vIHF1ZXVlIOKAlCBvbmUgaGFiaXQgZm9yIGV2ZXJ5IGNvbHVtbiBvbiB0aGUgZGVzay5cbiAgY29uc3QgbmVlZGxlID0gc3RhdGUuZGVza0ZpbHRlci50cmltKCkudG9Mb3dlckNhc2UoKVxuICBjb25zdCBzaG93biA9XG4gICAgbmVlZGxlLmxlbmd0aCA9PT0gMFxuICAgICAgPyBpbmZvLnNjcmlwdHNcbiAgICAgIDogaW5mby5zY3JpcHRzLmZpbHRlcihcbiAgICAgICAgICBzID0+IHMubmFtZS50b0xvd2VyQ2FzZSgpLmluY2x1ZGVzKG5lZWRsZSkgfHwgcy5jb21tYW5kLnRvTG93ZXJDYXNlKCkuaW5jbHVkZXMobmVlZGxlKVxuICAgICAgICApXG5cbiAgcmV0dXJuIChcbiAgICA8ZGl2IGNsYXNzTmFtZT1cImNoYW5nZXMtbGlzdFwiPlxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJxdWV1ZS1sYWJlbFwiPlxuICAgICAgICBTY3JpcHRzIDxiPntzaG93bi5sZW5ndGggPT09IGluZm8uc2NyaXB0cy5sZW5ndGggPyBpbmZvLnNjcmlwdHMubGVuZ3RoIDogYCR7c2hvd24ubGVuZ3RofSBvZiAke2luZm8uc2NyaXB0cy5sZW5ndGh9YH08L2I+XG4gICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInNjcmlwdC1tYW5hZ2VyXCI+e2luZm8ubWFuYWdlcn08L3NwYW4+XG4gICAgICA8L2Rpdj5cbiAgICAgIHtzaG93bi5sZW5ndGggPT09IDAgJiYgKFxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cInNpZGViYXItbWVzc2FnZVwiPlxuICAgICAgICAgIDxzdHJvbmc+Tm8gc2NyaXB0cyBtYXRjaDwvc3Ryb25nPlxuICAgICAgICAgIDxwPk5vdGhpbmcgbWF0Y2hlcyBcIntzdGF0ZS5kZXNrRmlsdGVyLnRyaW0oKX1cIi48L3A+XG4gICAgICAgIDwvZGl2PlxuICAgICAgKX1cbiAgICAgIHtzaG93bi5tYXAocyA9PiAoXG4gICAgICAgIDxTY3JpcHRSb3cga2V5PXtzLm5hbWV9IHNjcmlwdD17c30gbWFuYWdlcj17aW5mby5tYW5hZ2VyfSAvPlxuICAgICAgKSl9XG4gICAgICA8cCBjbGFzc05hbWU9XCJzY3JpcHQtaGludFwiPlxuICAgICAgICDilrYgb3BlbnMgdGhlIHNjcmlwdCBpbiB0aGUgaW50ZWdyYXRlZCB0ZXJtaW5hbCDigJQgb3V0cHV0IHN0cmVhbXMgdGhlcmUsXG4gICAgICAgIEN0cmwrQyBzdG9wcyBpdCwgYW5kIHRoZSBwcm9tcHQgc3RheXMgbGl2ZSBhZnRlciBpdCBleGl0cy5cbiAgICAgIDwvcD5cbiAgICA8L2Rpdj5cbiAgKVxufVxuXG5leHBvcnQgZnVuY3Rpb24gU2NyaXB0c0RldGFpbCgpOiBKU1guRWxlbWVudCB7XG4gIGNvbnN0IHN0YXRlID0gdXNlU3RvcmVTdGF0ZSgpXG4gIGNvbnN0IGluZm8gPSBzdGF0ZS5wYWNrYWdlU2NyaXB0c1xuICByZXR1cm4gKFxuICAgIDxkaXYgY2xhc3NOYW1lPVwiZGlmZi12aWV3IGVtcHR5LWRpZmZcIj5cbiAgICAgIDxoMj5QYWNrYWdlIHNjcmlwdHM8L2gyPlxuICAgICAgPHA+XG4gICAgICAgIHtpbmZvICE9PSBudWxsICYmIGluZm8uc2NyaXB0cy5sZW5ndGggPiAwID8gKFxuICAgICAgICAgIDw+XG4gICAgICAgICAgICBQcmVzcyA8Yj7ilrY8L2I+IG5leHQgdG8gYSBzY3JpcHQgdG8gcnVuIGl0IGluIHRoZSBpbnRlZ3JhdGVkXG4gICAgICAgICAgICB0ZXJtaW5hbCDigJQgPGNvZGU+e2luZm8ubWFuYWdlcn0gcnVuICZsdDtuYW1lJmd0OzwvY29kZT4gaXMgdHlwZWRcbiAgICAgICAgICAgIGludG8gYSBmcmVzaCB0YWIsIGV4YWN0bHkgYXMgaWYgeW91IGhhZC4gTG9uZy1ydW5uaW5nIHNjcmlwdHMgbGlrZVxuICAgICAgICAgICAgYSBkZXYgc2VydmVyIGtlZXAgdGhlaXIgdGFiIHN0cmVhbWluZyB1bnRpbCB5b3Ugc3RvcCB0aGVtIHdpdGhcbiAgICAgICAgICAgIEN0cmwrQzsgdGhlIHNoZWxsIHByb21wdCBpcyBzdGlsbCB0aGVyZSBhZnRlcndhcmRzLCBzb1xuICAgICAgICAgICAgPGI+IOKGkTwvYj4gKyBFbnRlciBzdGFydHMgdGhlIHNjcmlwdCBhZ2Fpbi5cbiAgICAgICAgICA8Lz5cbiAgICAgICAgKSA6IChcbiAgICAgICAgICAnVGhpcyByZXBvc2l0b3J5IGhhcyBubyBydW5uYWJsZSBwYWNrYWdlIHNjcmlwdHMuJ1xuICAgICAgICApfVxuICAgICAgPC9wPlxuICAgIDwvZGl2PlxuICApXG59XG4iXX0=

@@ -1,0 +1,298 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/AttentionDialog.tsx");const _jsxDEV = __vite__cjsImport3_react_jsxDevRuntime["jsxDEV"]; const _Fragment = __vite__cjsImport3_react_jsxDevRuntime["Fragment"];import { useStore, useStoreState } from "/src/store.ts";
+import { conflictedPaths, workflowKindOf, workflowNoun } from "/src/attention.ts";
+import { Dialog } from "/src/components/Dialog.tsx";
+var _jsxFileName = "C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/AttentionDialog.tsx";
+import __vite__cjsImport3_react_jsxDevRuntime from "/@fs/C:/Users/mockcomic/Documents/GitHub/BetterGitHub/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=a63a28e8";
+var _s = $RefreshSig$();
+/**
+* The needs-attention modal — centered above the desk, so a merge that
+* stopped on conflicts or a push the remote refused cannot be missed the
+* way an expiring corner toast can. The conflicts phase renders the live
+* conflicted list: the quick `ours` / `theirs` / ✨ AI resolves act in
+* place, a click walks the visitor to that file in the desk, and the
+* moment the last conflict clears the dialog answers the question the
+* operation actually has — finish it, or abandon it. A notice is the
+* quieter sibling: the story, the one verb that fixes it, and a Later that
+* stays honest because the desk keeps showing the state either way.
+*/
+export function AttentionDialog() {
+	_s();
+	const state = useStoreState();
+	const store = useStore();
+	const request = state.attention;
+	if (request === null) return null;
+	const dismiss = () => {
+		store.dismissAttention();
+	};
+	if (request.kind === "notice") {
+		return /* @__PURE__ */ _jsxDEV(Dialog, {
+			title: request.title,
+			onClose: dismiss,
+			footer: /* @__PURE__ */ _jsxDEV(_Fragment, { children: [/* @__PURE__ */ _jsxDEV("button", {
+				className: "btn",
+				onClick: dismiss,
+				children: request.dismissLabel
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 34,
+				columnNumber: 13
+			}, this), request.actions.map((action) => /* @__PURE__ */ _jsxDEV("button", {
+				className: `btn${action.primary === true ? " primary" : ""}${action.danger === true ? " destructive" : ""}`,
+				onClick: () => {
+					dismiss();
+					action.onClick();
+				},
+				children: action.label
+			}, action.label, false, {
+				fileName: _jsxFileName,
+				lineNumber: 38,
+				columnNumber: 15
+			}, this))] }, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 33,
+				columnNumber: 11
+			}, this),
+			children: /* @__PURE__ */ _jsxDEV("p", {
+				className: "confirm-message",
+				children: request.message
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 54,
+				columnNumber: 9
+			}, this)
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 29,
+			columnNumber: 7
+		}, this);
+	}
+	// Conflicts: derive everything from the live status — never a snapshot,
+	// so the dialog and the desk cannot disagree mid-resolution.
+	const status = state.status;
+	if (status === null) return null;
+	const conflicted = conflictedPaths(status);
+	const kind = workflowKindOf(status.inProgress);
+	// The episode is over and nothing is paused; refresh retires the request,
+	// but the paint must not briefly lie.
+	if (conflicted.length === 0 && kind === null) return null;
+	const busy = state.busy !== null;
+	const abort = () => {
+		if (kind === null) return;
+		dismiss();
+		store.abortWorkflow(kind);
+	};
+	const footer = /* @__PURE__ */ _jsxDEV(_Fragment, { children: [/* @__PURE__ */ _jsxDEV("button", {
+		className: "btn",
+		onClick: dismiss,
+		children: "Later"
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 78,
+		columnNumber: 7
+	}, this), conflicted.length === 0 ? /* @__PURE__ */ _jsxDEV(_Fragment, { children: [kind !== null && /* @__PURE__ */ _jsxDEV("button", {
+		className: "btn",
+		disabled: busy,
+		onClick: abort,
+		children: ["Abort ", workflowNoun(kind)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 84,
+		columnNumber: 13
+	}, this), kind !== null && /* @__PURE__ */ _jsxDEV("button", {
+		className: "btn primary",
+		disabled: busy,
+		onClick: () => {
+			if (kind === null) return;
+			dismiss();
+			store.continueWorkflow(kind);
+		},
+		children: ["Continue ", workflowNoun(kind)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 89,
+		columnNumber: 13
+	}, this)] }, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 82,
+		columnNumber: 9
+	}, this) : /* @__PURE__ */ _jsxDEV(_Fragment, { children: [kind !== null && /* @__PURE__ */ _jsxDEV("button", {
+		className: "btn",
+		disabled: busy,
+		onClick: abort,
+		children: ["Abort ", workflowNoun(kind)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 105,
+		columnNumber: 13
+	}, this), /* @__PURE__ */ _jsxDEV("button", {
+		className: "btn primary",
+		onClick: () => {
+			dismiss();
+			store.setView("conflicts");
+		},
+		children: "Review in the desk"
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 109,
+		columnNumber: 11
+	}, this)] }, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 103,
+		columnNumber: 9
+	}, this)] }, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 77,
+		columnNumber: 5
+	}, this);
+	return /* @__PURE__ */ _jsxDEV(Dialog, {
+		title: request.title,
+		width: 560,
+		onClose: dismiss,
+		footer,
+		children: conflicted.length === 0 ? /* @__PURE__ */ _jsxDEV("p", {
+			className: "confirm-message",
+			children: [
+				"Every conflict is resolved. ",
+				/* @__PURE__ */ _jsxDEV("b", { children: "Continue" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 127,
+					columnNumber: 39
+				}, this),
+				" finishes the",
+				" ",
+				kind !== null ? workflowNoun(kind) : "operation",
+				"; ",
+				/* @__PURE__ */ _jsxDEV("b", { children: "Abort" }, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 128,
+					columnNumber: 63
+				}, this),
+				" ",
+				"restores the state from before it started."
+			]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 126,
+			columnNumber: 9
+		}, this) : /* @__PURE__ */ _jsxDEV(_Fragment, { children: [/* @__PURE__ */ _jsxDEV("p", {
+			className: "confirm-message",
+			children: [
+				conflicted.length === 1 ? "One file is conflicted." : `${conflicted.length} files are conflicted.`,
+				" ",
+				"Keep your side, take the incoming one, or let ✨ AI combine both — then finish or abandon the operation."
+			]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 133,
+			columnNumber: 11
+		}, this), /* @__PURE__ */ _jsxDEV("ul", {
+			className: "attention-files",
+			"aria-label": "Conflicted files",
+			children: conflicted.map((path) => /* @__PURE__ */ _jsxDEV("li", {
+				className: "attention-file",
+				children: [/* @__PURE__ */ _jsxDEV("button", {
+					type: "button",
+					className: "attention-file-path",
+					title: "Open this file in the Conflicts desk",
+					onClick: () => {
+						dismiss();
+						store.setView("conflicts");
+						void store.selectFile(path);
+					},
+					children: path
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 143,
+					columnNumber: 17
+				}, this), /* @__PURE__ */ _jsxDEV("span", {
+					className: "conflict-actions",
+					children: [
+						/* @__PURE__ */ _jsxDEV("button", {
+							className: "mini ai",
+							title: "Ask the AI merge agent to combine both sides — it asks you when unsure",
+							disabled: state.aiMerge !== null,
+							onClick: () => store.startAiMerge(path),
+							children: "✨ AI"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 156,
+							columnNumber: 19
+						}, this),
+						/* @__PURE__ */ _jsxDEV("button", {
+							className: "mini",
+							title: "Keep the version from your branch",
+							disabled: busy,
+							onClick: () => store.resolveConflict(path, "ours"),
+							children: "ours"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 164,
+							columnNumber: 19
+						}, this),
+						/* @__PURE__ */ _jsxDEV("button", {
+							className: "mini",
+							title: "Take the incoming version",
+							disabled: busy,
+							onClick: () => store.resolveConflict(path, "theirs"),
+							children: "theirs"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 172,
+							columnNumber: 19
+						}, this)
+					]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 155,
+					columnNumber: 17
+				}, this)]
+			}, path, true, {
+				fileName: _jsxFileName,
+				lineNumber: 142,
+				columnNumber: 15
+			}, this))
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 140,
+			columnNumber: 11
+		}, this)] }, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 132,
+			columnNumber: 9
+		}, this)
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 124,
+		columnNumber: 5
+	}, this);
+}
+_s(AttentionDialog, "NjcQFOVvfzrp+SsRc/R6o5ARrGs=", false, function() {
+	return [useStoreState, useStore];
+});
+_c = AttentionDialog;
+var _c;
+$RefreshReg$(_c, "AttentionDialog");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/components/AttentionDialog.tsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/AttentionDialog.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/AttentionDialog.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/AttentionDialog.tsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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O0dBQWtCLGNBQVc7YUFDeEMsV0FBVyxLQUFJLFNBQ2Qsd0JBQUMsTUFBRDtJQUFlLFdBQVU7Y0FBekIsQ0FDRSx3QkFBQyxVQUFEO0tBQ0UsTUFBSztLQUNMLFdBQVU7S0FDVixPQUFNO0tBQ04sZUFBZTtNQUNiLFFBQVE7TUFDUixNQUFNLFFBQVEsV0FBVztNQUN6QixLQUFLLE1BQU0sV0FBVyxJQUFJO0tBQzVCO2VBRUM7SUFDSzs7OztjQUNSLHdCQUFDLFFBQUQ7S0FBTSxXQUFVO2VBQWhCO01BQ0Usd0JBQUMsVUFBRDtPQUNFLFdBQVU7T0FDVixPQUFNO09BQ04sVUFBVSxNQUFNLFlBQVk7T0FDNUIsZUFBZSxNQUFNLGFBQWEsSUFBSTtpQkFDdkM7TUFFTzs7Ozs7TUFDUix3QkFBQyxVQUFEO09BQ0UsV0FBVTtPQUNWLE9BQU07T0FDTixVQUFVO09BQ1YsZUFBZSxNQUFNLGdCQUFnQixNQUFNLE1BQU07aUJBQ2xEO01BRU87Ozs7O01BQ1Isd0JBQUMsVUFBRDtPQUNFLFdBQVU7T0FDVixPQUFNO09BQ04sVUFBVTtPQUNWLGVBQWUsTUFBTSxnQkFBZ0IsTUFBTSxRQUFRO2lCQUNwRDtNQUVPOzs7OztLQUNKOzs7OztZQUNKO01BdkNLOzs7O1VBdUNMLENBQ0w7RUFDQzs7OztVQUNKOzs7OztDQUVFOzs7OztBQUVaIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIkF0dGVudGlvbkRpYWxvZy50c3giXSwidmVyc2lvbiI6Mywic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHR5cGUgeyBKU1ggfSBmcm9tICdyZWFjdCdcbmltcG9ydCB7IHVzZVN0b3JlLCB1c2VTdG9yZVN0YXRlIH0gZnJvbSAnLi4vc3RvcmUnXG5pbXBvcnQgeyBjb25mbGljdGVkUGF0aHMsIHdvcmtmbG93S2luZE9mLCB3b3JrZmxvd05vdW4gfSBmcm9tICcuLi9hdHRlbnRpb24nXG5pbXBvcnQgeyBEaWFsb2cgfSBmcm9tICcuL0RpYWxvZydcblxuLyoqXG4gKiBUaGUgbmVlZHMtYXR0ZW50aW9uIG1vZGFsIOKAlCBjZW50ZXJlZCBhYm92ZSB0aGUgZGVzaywgc28gYSBtZXJnZSB0aGF0XG4gKiBzdG9wcGVkIG9uIGNvbmZsaWN0cyBvciBhIHB1c2ggdGhlIHJlbW90ZSByZWZ1c2VkIGNhbm5vdCBiZSBtaXNzZWQgdGhlXG4gKiB3YXkgYW4gZXhwaXJpbmcgY29ybmVyIHRvYXN0IGNhbi4gVGhlIGNvbmZsaWN0cyBwaGFzZSByZW5kZXJzIHRoZSBsaXZlXG4gKiBjb25mbGljdGVkIGxpc3Q6IHRoZSBxdWljayBgb3Vyc2AgLyBgdGhlaXJzYCAvIOKcqCBBSSByZXNvbHZlcyBhY3QgaW5cbiAqIHBsYWNlLCBhIGNsaWNrIHdhbGtzIHRoZSB2aXNpdG9yIHRvIHRoYXQgZmlsZSBpbiB0aGUgZGVzaywgYW5kIHRoZVxuICogbW9tZW50IHRoZSBsYXN0IGNvbmZsaWN0IGNsZWFycyB0aGUgZGlhbG9nIGFuc3dlcnMgdGhlIHF1ZXN0aW9uIHRoZVxuICogb3BlcmF0aW9uIGFjdHVhbGx5IGhhcyDigJQgZmluaXNoIGl0LCBvciBhYmFuZG9uIGl0LiBBIG5vdGljZSBpcyB0aGVcbiAqIHF1aWV0ZXIgc2libGluZzogdGhlIHN0b3J5LCB0aGUgb25lIHZlcmIgdGhhdCBmaXhlcyBpdCwgYW5kIGEgTGF0ZXIgdGhhdFxuICogc3RheXMgaG9uZXN0IGJlY2F1c2UgdGhlIGRlc2sga2VlcHMgc2hvd2luZyB0aGUgc3RhdGUgZWl0aGVyIHdheS5cbiAqL1xuZXhwb3J0IGZ1bmN0aW9uIEF0dGVudGlvbkRpYWxvZygpOiBKU1guRWxlbWVudCB8IG51bGwge1xuICBjb25zdCBzdGF0ZSA9IHVzZVN0b3JlU3RhdGUoKVxuICBjb25zdCBzdG9yZSA9IHVzZVN0b3JlKClcbiAgY29uc3QgcmVxdWVzdCA9IHN0YXRlLmF0dGVudGlvblxuICBpZiAocmVxdWVzdCA9PT0gbnVsbCkgcmV0dXJuIG51bGxcblxuICBjb25zdCBkaXNtaXNzID0gKCk6IHZvaWQgPT4ge1xuICAgIHN0b3JlLmRpc21pc3NBdHRlbnRpb24oKVxuICB9XG5cbiAgaWYgKHJlcXVlc3Qua2luZCA9PT0gJ25vdGljZScpIHtcbiAgICByZXR1cm4gKFxuICAgICAgPERpYWxvZ1xuICAgICAgICB0aXRsZT17cmVxdWVzdC50aXRsZX1cbiAgICAgICAgb25DbG9zZT17ZGlzbWlzc31cbiAgICAgICAgZm9vdGVyPXtcbiAgICAgICAgICA8PlxuICAgICAgICAgICAgPGJ1dHRvbiBjbGFzc05hbWU9XCJidG5cIiBvbkNsaWNrPXtkaXNtaXNzfT5cbiAgICAgICAgICAgICAge3JlcXVlc3QuZGlzbWlzc0xhYmVsfVxuICAgICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICAgICB7cmVxdWVzdC5hY3Rpb25zLm1hcChhY3Rpb24gPT4gKFxuICAgICAgICAgICAgICA8YnV0dG9uXG4gICAgICAgICAgICAgICAga2V5PXthY3Rpb24ubGFiZWx9XG4gICAgICAgICAgICAgICAgY2xhc3NOYW1lPXtgYnRuJHthY3Rpb24ucHJpbWFyeSA9PT0gdHJ1ZSA/ICcgcHJpbWFyeScgOiAnJ30ke1xuICAgICAgICAgICAgICAgICAgYWN0aW9uLmRhbmdlciA9PT0gdHJ1ZSA/ICcgZGVzdHJ1Y3RpdmUnIDogJydcbiAgICAgICAgICAgICAgICB9YH1cbiAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiB7XG4gICAgICAgICAgICAgICAgICBkaXNtaXNzKClcbiAgICAgICAgICAgICAgICAgIGFjdGlvbi5vbkNsaWNrKClcbiAgICAgICAgICAgICAgICB9fVxuICAgICAgICAgICAgICA+XG4gICAgICAgICAgICAgICAge2FjdGlvbi5sYWJlbH1cbiAgICAgICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICAgICApKX1cbiAgICAgICAgICA8Lz5cbiAgICAgICAgfVxuICAgICAgPlxuICAgICAgICA8cCBjbGFzc05hbWU9XCJjb25maXJtLW1lc3NhZ2VcIj57cmVxdWVzdC5tZXNzYWdlfTwvcD5cbiAgICAgIDwvRGlhbG9nPlxuICAgIClcbiAgfVxuXG4gIC8vIENvbmZsaWN0czogZGVyaXZlIGV2ZXJ5dGhpbmcgZnJvbSB0aGUgbGl2ZSBzdGF0dXMg4oCUIG5ldmVyIGEgc25hcHNob3QsXG4gIC8vIHNvIHRoZSBkaWFsb2cgYW5kIHRoZSBkZXNrIGNhbm5vdCBkaXNhZ3JlZSBtaWQtcmVzb2x1dGlvbi5cbiAgY29uc3Qgc3RhdHVzID0gc3RhdGUuc3RhdHVzXG4gIGlmIChzdGF0dXMgPT09IG51bGwpIHJldHVybiBudWxsXG4gIGNvbnN0IGNvbmZsaWN0ZWQgPSBjb25mbGljdGVkUGF0aHMoc3RhdHVzKVxuICBjb25zdCBraW5kID0gd29ya2Zsb3dLaW5kT2Yoc3RhdHVzLmluUHJvZ3Jlc3MpXG4gIC8vIFRoZSBlcGlzb2RlIGlzIG92ZXIgYW5kIG5vdGhpbmcgaXMgcGF1c2VkOyByZWZyZXNoIHJldGlyZXMgdGhlIHJlcXVlc3QsXG4gIC8vIGJ1dCB0aGUgcGFpbnQgbXVzdCBub3QgYnJpZWZseSBsaWUuXG4gIGlmIChjb25mbGljdGVkLmxlbmd0aCA9PT0gMCAmJiBraW5kID09PSBudWxsKSByZXR1cm4gbnVsbFxuICBjb25zdCBidXN5ID0gc3RhdGUuYnVzeSAhPT0gbnVsbFxuXG4gIGNvbnN0IGFib3J0ID0gKCk6IHZvaWQgPT4ge1xuICAgIGlmIChraW5kID09PSBudWxsKSByZXR1cm5cbiAgICBkaXNtaXNzKClcbiAgICBzdG9yZS5hYm9ydFdvcmtmbG93KGtpbmQpXG4gIH1cblxuICBjb25zdCBmb290ZXIgPSAoXG4gICAgPD5cbiAgICAgIDxidXR0b24gY2xhc3NOYW1lPVwiYnRuXCIgb25DbGljaz17ZGlzbWlzc30+XG4gICAgICAgIExhdGVyXG4gICAgICA8L2J1dHRvbj5cbiAgICAgIHtjb25mbGljdGVkLmxlbmd0aCA9PT0gMCA/IChcbiAgICAgICAgPD5cbiAgICAgICAgICB7a2luZCAhPT0gbnVsbCAmJiAoXG4gICAgICAgICAgICA8YnV0dG9uIGNsYXNzTmFtZT1cImJ0blwiIGRpc2FibGVkPXtidXN5fSBvbkNsaWNrPXthYm9ydH0+XG4gICAgICAgICAgICAgIEFib3J0IHt3b3JrZmxvd05vdW4oa2luZCl9XG4gICAgICAgICAgICA8L2J1dHRvbj5cbiAgICAgICAgICApfVxuICAgICAgICAgIHtraW5kICE9PSBudWxsICYmIChcbiAgICAgICAgICAgIDxidXR0b25cbiAgICAgICAgICAgICAgY2xhc3NOYW1lPVwiYnRuIHByaW1hcnlcIlxuICAgICAgICAgICAgICBkaXNhYmxlZD17YnVzeX1cbiAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4ge1xuICAgICAgICAgICAgICAgIGlmIChraW5kID09PSBudWxsKSByZXR1cm5cbiAgICAgICAgICAgICAgICBkaXNtaXNzKClcbiAgICAgICAgICAgICAgICBzdG9yZS5jb250aW51ZVdvcmtmbG93KGtpbmQpXG4gICAgICAgICAgICAgIH19XG4gICAgICAgICAgICA+XG4gICAgICAgICAgICAgIENvbnRpbnVlIHt3b3JrZmxvd05vdW4oa2luZCl9XG4gICAgICAgICAgICA8L2J1dHRvbj5cbiAgICAgICAgICApfVxuICAgICAgICA8Lz5cbiAgICAgICkgOiAoXG4gICAgICAgIDw+XG4gICAgICAgICAge2tpbmQgIT09IG51bGwgJiYgKFxuICAgICAgICAgICAgPGJ1dHRvbiBjbGFzc05hbWU9XCJidG5cIiBkaXNhYmxlZD17YnVzeX0gb25DbGljaz17YWJvcnR9PlxuICAgICAgICAgICAgICBBYm9ydCB7d29ya2Zsb3dOb3VuKGtpbmQpfVxuICAgICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICAgKX1cbiAgICAgICAgICA8YnV0dG9uXG4gICAgICAgICAgICBjbGFzc05hbWU9XCJidG4gcHJpbWFyeVwiXG4gICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiB7XG4gICAgICAgICAgICAgIGRpc21pc3MoKVxuICAgICAgICAgICAgICBzdG9yZS5zZXRWaWV3KCdjb25mbGljdHMnKVxuICAgICAgICAgICAgfX1cbiAgICAgICAgICA+XG4gICAgICAgICAgICBSZXZpZXcgaW4gdGhlIGRlc2tcbiAgICAgICAgICA8L2J1dHRvbj5cbiAgICAgICAgPC8+XG4gICAgICApfVxuICAgIDwvPlxuICApXG5cbiAgcmV0dXJuIChcbiAgICA8RGlhbG9nIHRpdGxlPXtyZXF1ZXN0LnRpdGxlfSB3aWR0aD17NTYwfSBvbkNsb3NlPXtkaXNtaXNzfSBmb290ZXI9e2Zvb3Rlcn0+XG4gICAgICB7Y29uZmxpY3RlZC5sZW5ndGggPT09IDAgPyAoXG4gICAgICAgIDxwIGNsYXNzTmFtZT1cImNvbmZpcm0tbWVzc2FnZVwiPlxuICAgICAgICAgIEV2ZXJ5IGNvbmZsaWN0IGlzIHJlc29sdmVkLiA8Yj5Db250aW51ZTwvYj4gZmluaXNoZXMgdGhleycgJ31cbiAgICAgICAgICB7a2luZCAhPT0gbnVsbCA/IHdvcmtmbG93Tm91bihraW5kKSA6ICdvcGVyYXRpb24nfTsgPGI+QWJvcnQ8L2I+eycgJ31cbiAgICAgICAgICByZXN0b3JlcyB0aGUgc3RhdGUgZnJvbSBiZWZvcmUgaXQgc3RhcnRlZC5cbiAgICAgICAgPC9wPlxuICAgICAgKSA6IChcbiAgICAgICAgPD5cbiAgICAgICAgICA8cCBjbGFzc05hbWU9XCJjb25maXJtLW1lc3NhZ2VcIj5cbiAgICAgICAgICAgIHtjb25mbGljdGVkLmxlbmd0aCA9PT0gMVxuICAgICAgICAgICAgICA/ICdPbmUgZmlsZSBpcyBjb25mbGljdGVkLidcbiAgICAgICAgICAgICAgOiBgJHtjb25mbGljdGVkLmxlbmd0aH0gZmlsZXMgYXJlIGNvbmZsaWN0ZWQuYH17JyAnfVxuICAgICAgICAgICAgS2VlcCB5b3VyIHNpZGUsIHRha2UgdGhlIGluY29taW5nIG9uZSwgb3IgbGV0IOKcqCBBSSBjb21iaW5lIGJvdGgg4oCUXG4gICAgICAgICAgICB0aGVuIGZpbmlzaCBvciBhYmFuZG9uIHRoZSBvcGVyYXRpb24uXG4gICAgICAgICAgPC9wPlxuICAgICAgICAgIDx1bCBjbGFzc05hbWU9XCJhdHRlbnRpb24tZmlsZXNcIiBhcmlhLWxhYmVsPVwiQ29uZmxpY3RlZCBmaWxlc1wiPlxuICAgICAgICAgICAge2NvbmZsaWN0ZWQubWFwKHBhdGggPT4gKFxuICAgICAgICAgICAgICA8bGkga2V5PXtwYXRofSBjbGFzc05hbWU9XCJhdHRlbnRpb24tZmlsZVwiPlxuICAgICAgICAgICAgICAgIDxidXR0b25cbiAgICAgICAgICAgICAgICAgIHR5cGU9XCJidXR0b25cIlxuICAgICAgICAgICAgICAgICAgY2xhc3NOYW1lPVwiYXR0ZW50aW9uLWZpbGUtcGF0aFwiXG4gICAgICAgICAgICAgICAgICB0aXRsZT1cIk9wZW4gdGhpcyBmaWxlIGluIHRoZSBDb25mbGljdHMgZGVza1wiXG4gICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiB7XG4gICAgICAgICAgICAgICAgICAgIGRpc21pc3MoKVxuICAgICAgICAgICAgICAgICAgICBzdG9yZS5zZXRWaWV3KCdjb25mbGljdHMnKVxuICAgICAgICAgICAgICAgICAgICB2b2lkIHN0b3JlLnNlbGVjdEZpbGUocGF0aClcbiAgICAgICAgICAgICAgICAgIH19XG4gICAgICAgICAgICAgICAgPlxuICAgICAgICAgICAgICAgICAge3BhdGh9XG4gICAgICAgICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwiY29uZmxpY3QtYWN0aW9uc1wiPlxuICAgICAgICAgICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgICAgICAgICBjbGFzc05hbWU9XCJtaW5pIGFpXCJcbiAgICAgICAgICAgICAgICAgICAgdGl0bGU9XCJBc2sgdGhlIEFJIG1lcmdlIGFnZW50IHRvIGNvbWJpbmUgYm90aCBzaWRlcyDigJQgaXQgYXNrcyB5b3Ugd2hlbiB1bnN1cmVcIlxuICAgICAgICAgICAgICAgICAgICBkaXNhYmxlZD17c3RhdGUuYWlNZXJnZSAhPT0gbnVsbH1cbiAgICAgICAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gc3RvcmUuc3RhcnRBaU1lcmdlKHBhdGgpfVxuICAgICAgICAgICAgICAgICAgPlxuICAgICAgICAgICAgICAgICAgICDinKggQUlcbiAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICAgICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgICAgICAgICBjbGFzc05hbWU9XCJtaW5pXCJcbiAgICAgICAgICAgICAgICAgICAgdGl0bGU9XCJLZWVwIHRoZSB2ZXJzaW9uIGZyb20geW91ciBicmFuY2hcIlxuICAgICAgICAgICAgICAgICAgICBkaXNhYmxlZD17YnVzeX1cbiAgICAgICAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gc3RvcmUucmVzb2x2ZUNvbmZsaWN0KHBhdGgsICdvdXJzJyl9XG4gICAgICAgICAgICAgICAgICA+XG4gICAgICAgICAgICAgICAgICAgIG91cnNcbiAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICAgICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgICAgICAgICBjbGFzc05hbWU9XCJtaW5pXCJcbiAgICAgICAgICAgICAgICAgICAgdGl0bGU9XCJUYWtlIHRoZSBpbmNvbWluZyB2ZXJzaW9uXCJcbiAgICAgICAgICAgICAgICAgICAgZGlzYWJsZWQ9e2J1c3l9XG4gICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHN0b3JlLnJlc29sdmVDb25mbGljdChwYXRoLCAndGhlaXJzJyl9XG4gICAgICAgICAgICAgICAgICA+XG4gICAgICAgICAgICAgICAgICAgIHRoZWlyc1xuICAgICAgICAgICAgICAgICAgPC9idXR0b24+XG4gICAgICAgICAgICAgICAgPC9zcGFuPlxuICAgICAgICAgICAgICA8L2xpPlxuICAgICAgICAgICAgKSl9XG4gICAgICAgICAgPC91bD5cbiAgICAgICAgPC8+XG4gICAgICApfVxuICAgIDwvRGlhbG9nPlxuICApXG59XG4iXX0=

@@ -17,19 +17,28 @@ const autoEntries = THEME_ENTRIES.filter(e => e.group === 'auto')
 const lightEntries = THEME_ENTRIES.filter(e => e.group === 'light')
 const darkEntries = THEME_ENTRIES.filter(e => e.group === 'dark')
 
-/** The preferences rail, in panel order. Accounts leads: it is the first
- *  thing a fresh install needs; the AI pointer note overrides on open. */
-type SettingsSection = 'accounts' | 'ai' | 'appearance' | 'behavior'
+/** The preferences rail, in panel order. General leads: it is where the
+ *  app-level switches live, and the conventional first item of a settings
+ *  window — and the selected item has to be the first one, or the rail reads
+ *  as broken. Accounts, the first thing a fresh install needs, is a click or
+ *  an arrow key away; the AI pointer note still overrides on open. */
+type SettingsSection =
+  | 'general'
+  | 'accounts'
+  | 'ai'
+  | 'appearance'
+  | 'behavior'
 
 const SECTION_ENTRIES: ReadonlyArray<{
   readonly id: SettingsSection
   readonly label: string
   readonly sub: string
 }> = [
+  { id: 'general', label: 'General', sub: 'Updates, tips, watch folder' },
   { id: 'accounts', label: 'Accounts', sub: 'Providers, tokens, OAuth apps' },
   { id: 'ai', label: 'AI agent', sub: 'The endpoint behind ✨ Generate' },
   { id: 'appearance', label: 'Appearance', sub: 'Theme and palettes' },
-  { id: 'behavior', label: 'Behavior', sub: 'Refresh, tips, updates' }
+  { id: 'behavior', label: 'Behavior', sub: 'Commit prompts, auto-refresh' }
 ]
 
 export function SettingsDialog(): JSX.Element | null {
@@ -48,9 +57,11 @@ export function SettingsDialog(): JSX.Element | null {
   const [hintsEnabled, setHintsEnabled] = useState(true)
   const [autoUpdateChecks, setAutoUpdateChecks] = useState(true)
   const [theme, setTheme] = useState<ThemeId>('system')
+  const [scanFolder, setScanFolder] = useState('')
+  const [appVersion, setAppVersion] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
-  const [section, setSection] = useState<SettingsSection>('accounts')
+  const [section, setSection] = useState<SettingsSection>('general')
   const [appsOpen, setAppsOpen] = useState(false)
   const navRefs = useRef<Partial<Record<SettingsSection, HTMLButtonElement | null>>>({})
 
@@ -64,19 +75,39 @@ export function SettingsDialog(): JSX.Element | null {
       setHintsEnabled(settings.hintsEnabled)
       setAutoUpdateChecks(settings.autoUpdateChecks)
       setTheme(settings.theme)
+      setScanFolder(settings.scanFolder)
       setApiKey('')
       setGitHubClientId('')
       setGitLabClientId('')
       setTestResult(null)
       // Land where the visitor came for: the AI pointer note opens the AI
-      // rail item. The sign-in-apps drawer stays closed by default — an
+      // rail item, otherwise General — the first item, where the app-level
+      // switches live. The sign-in-apps drawer stays closed by default — an
       // unconfigured browser button now explains itself by opening the
       // one-step setup right in the sign-in panel, so nothing here has to
       // pre-emptively apologise for a greyed button.
-      setSection(state.settingsAiNote ? 'ai' : 'accounts')
+      setSection(state.settingsAiNote ? 'ai' : 'general')
       setAppsOpen(false)
     }
   }, [settings, state.showSettings, state.settingsAiNote])
+
+  // The packaged version, so the update line can name the release it just
+  // checked against instead of trailing off. Asked once per open, exactly as
+  // the About card asks it.
+  useEffect(() => {
+    if (!state.showSettings) return
+    let alive = true
+    void call('getAppVersion')
+      .then(v => {
+        if (alive) setAppVersion(v)
+      })
+      .catch(() => {
+        /* the update line keeps its version-free wording */
+      })
+    return () => {
+      alive = false
+    }
+  }, [state.showSettings])
 
   if (!state.showSettings || settings === null) return null
 
@@ -138,7 +169,10 @@ export function SettingsDialog(): JSX.Element | null {
                   autoRefresh,
                   hintsEnabled,
                   autoUpdateChecks,
-                  theme
+                  theme,
+                  // Only when it actually moved: an untouched box must not
+                  // trigger main's folder resync on every Save.
+                  ...(scanFolder !== settings.scanFolder ? { scanFolder } : {})
                 })
                 .then(s => {
                   if (s !== null) store.setSettingsOpen(false)
@@ -185,6 +219,70 @@ export function SettingsDialog(): JSX.Element | null {
           aria-labelledby={`settings-tab-${section}`}
           tabIndex={0}
         >
+      {section === 'general' && (
+      <section className="settings-section">
+        <h3>General</h3>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={autoUpdateChecks}
+            onChange={e => setAutoUpdateChecks(e.target.checked)}
+          />
+          <span>Check GitHub releases for updates at startup</span>
+          <InfoTip text={'Aspen asks the public releases page of this app’s GitHub repository whether a newer version exists. Nothing identifies you, and nothing downloads or installs itself.'} />
+        </label>
+        <p className="field-hint">
+          Switches the automatic pass only, in installed builds, and takes
+          effect at the next launch. Checking by hand below always works.
+        </p>
+        <UpdateRow currentVersion={appVersion} />
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={hintsEnabled}
+            onChange={e => setHintsEnabled(e.target.checked)}
+          />
+          <span>Show tips for getting started</span>
+          <InfoTip text={'Hides the one-time coach banner, the first-run captions, and the pointer notes in these pages. Git facts, counts and errors stay visible regardless.'} />
+        </label>
+        <Field
+          label="Watch folder for repositories"
+          hint="Its direct subfolders that are git repositories keep the list in step — new ones appear, folders that leave the disk are dropped. Applies when you press Save; Rescan stays in the repository manager."
+          tip={'Leave empty to keep the list exactly as you built it.\nOne level deep: the folder’s own subfolders, each recognised by its .git — a worktree or submodule folder counts, nested projects deeper down do not.'}
+        >
+          <div className="row">
+            <input
+              readOnly
+              placeholder="No folder watched"
+              value={scanFolder}
+              onClick={async () => {
+                const dir = await call('selectDirectory')
+                if (dir !== null) setScanFolder(dir)
+              }}
+            />
+            <button
+              className="btn"
+              onClick={async () => {
+                const dir = await call('selectDirectory')
+                if (dir !== null) setScanFolder(dir)
+              }}
+            >
+              Choose…
+            </button>
+            {scanFolder.length > 0 && (
+              <button
+                className="mini"
+                onClick={() => setScanFolder('')}
+                title="Keep the list as it is; stops watching on Save"
+              >
+                Stop watching
+              </button>
+            )}
+          </div>
+        </Field>
+      </section>
+      )}
+
       {section === 'ai' && (
       <section className="settings-section">
         <h3>AI agent</h3>
@@ -287,7 +385,7 @@ export function SettingsDialog(): JSX.Element | null {
         >
           <summary>
             Browser sign-in apps
-            <InfoTip text={'Both browser buttons are always clickable. With an id here they go straight to your browser for authorization; without one the button first asks for the id, in place. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
+            <InfoTip text={'Both buttons are always clickable. With an id here GitHub shows its one-time code straight away and GitLab goes to your browser for authorization; without one the button first asks for the id, in place. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
           </summary>
           <p className="field-hint">
             The browser buttons sign you in through an OAuth application you register
@@ -298,8 +396,8 @@ export function SettingsDialog(): JSX.Element | null {
           </p>
           <Field
             label="GitHub OAuth App client id"
-            hint="github.com/settings/developers → new OAuth App → Authorization callback URL http://127.0.0.1:8765/callback and tick “Enable Device Flow” — one app serves the browser sign-in and the one-time-code fallback. Public by design; leave empty to fall back to the id baked in at build time."
-            tip={'GitHub → Settings → Developer settings → OAuth Apps → New OAuth App.\nHomepage URL: anything. Authorization callback URL: exactly http://127.0.0.1:8765/callback.\nTick “Enable Device Flow” — the one app covers both the browser sign-in and the code fallback.\nOnly the Client ID is used; Aspen never needs the secret.'}
+            hint="Already filled in: Aspen ships GitHub’s own device-flow app id, so the button shows a code on a fresh install. Paste your own app’s id to have GitHub name it instead (tick “Enable Device Flow”; any callback URL); required on GitHub Enterprise. Clear the box to go back to the built-in id."
+            tip={'A device-code sign-in needs an OAuth App with “Enable Device Flow” ticked.\nOut of the box Aspen uses the public id GitHub’s own CLI embeds, so the approval page says “GitHub CLI” and the token is listed under that app.\nTo change that: Settings → Developer settings → OAuth Apps → New OAuth App. Homepage URL and callback URL: anything.\nTick “Enable Device Flow”, then paste the Client ID here — Aspen never needs the secret.\nOn GitHub Enterprise the built-in id names no app, so registering one there is required.'}
           >
             <input
               placeholder={
@@ -350,24 +448,6 @@ export function SettingsDialog(): JSX.Element | null {
           />
           <span>Refresh the changes list automatically when files change on disk</span>
           <InfoTip text={'When off, the changes list refreshes after git actions and when you press Refresh — handy if watching a very large working tree feels heavy.'} />
-        </label>
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={hintsEnabled}
-            onChange={e => setHintsEnabled(e.target.checked)}
-          />
-          <span>Show tips for getting started</span>
-          <InfoTip text={'Hides the one-time coach banner, the first-run captions, and the pointer notes in these pages. Git facts, counts and errors stay visible regardless.'} />
-        </label>
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={autoUpdateChecks}
-            onChange={e => setAutoUpdateChecks(e.target.checked)}
-          />
-          <span>Check GitHub releases for updates at startup</span>
-          <InfoTip text={'Aspen asks the public releases page of this app’s GitHub repository whether a newer version exists. Nothing identifies you, and nothing downloads or installs itself.'} />
         </label>
       </section>
       )}
@@ -1445,7 +1525,7 @@ export function StashDialog(): JSX.Element | null {
  *  live progress. Never claims an update Aspen hasn't seen. */
 function updateSummary(update: UpdateState | null, currentVersion: string | null): string {
   if (update === null) {
-    return 'Aspen checks GitHub releases a few seconds after launch; you can check any time from here.'
+    return 'Aspen checks GitHub releases a few seconds after launch when that pass is switched on; you can check any time from here.'
   }
   switch (update.phase) {
     case 'checking':
@@ -1463,6 +1543,78 @@ function updateSummary(update: UpdateState | null, currentVersion: string | null
     case 'error':
       return update.error ?? 'The update check failed.'
   }
+}
+
+/** Where the update flow stands and what you can do about it, as one unit:
+ *  the honest status sentence, a live download bar, and the verb that fits
+ *  the current phase. Shared by Preferences ▸ General and the About card, so
+ *  the two can never offer different update buttons. */
+function UpdateRow({
+  currentVersion
+}: {
+  readonly currentVersion: string | null
+}): JSX.Element {
+  const state = useStoreState()
+  const store = useStore()
+  const update = state.update
+
+  return (
+    <>
+      <p className="confirm-message">{updateSummary(update, currentVersion)}</p>
+      {update?.phase === 'downloading' && (
+        <div
+          className="update-progress"
+          role="progressbar"
+          aria-label="Update download progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={update.percent ?? 0}
+        >
+          <div
+            className="update-progress-fill"
+            style={{ width: `${update.percent ?? 0}%` }}
+          />
+        </div>
+      )}
+      <div className="donate-row">
+        {update?.phase === 'ready' ? (
+          <button
+            className="btn primary"
+            onClick={() => void store.checkForUpdatesNow()}
+          >
+            Restart to update
+          </button>
+        ) : update?.phase === 'available' && update.canInstall ? (
+          <button
+            className="btn primary"
+            onClick={() => void store.downloadAvailableUpdate()}
+          >
+            Download update
+          </button>
+        ) : (
+          <button
+            className="btn"
+            disabled={update?.phase === 'checking' || update?.phase === 'downloading'}
+            onClick={() => void store.checkForUpdatesNow()}
+          >
+            Check for updates
+          </button>
+        )}
+        {(update === null ||
+          update.phase === 'available' ||
+          update.phase === 'error') && (
+          <button
+            className="btn"
+            onClick={() =>
+              void call('openExternal', update?.releaseUrl ?? RELEASES_URL)
+            }
+          >
+            View releases
+          </button>
+        )}
+      </div>
+    </>
+  )
 }
 
 export function AboutDialog(): JSX.Element | null {
@@ -1489,8 +1641,6 @@ export function AboutDialog(): JSX.Element | null {
   }, [state.showAbout])
 
   if (!state.showAbout) return null
-
-  const update = state.update
 
   return (
     <Dialog
@@ -1540,59 +1690,7 @@ export function AboutDialog(): JSX.Element | null {
       </div>
       <div className="settings-section">
         <h3>Updates</h3>
-        <p className="confirm-message">{updateSummary(update, appVersion)}</p>
-        {update?.phase === 'downloading' && (
-          <div
-            className="update-progress"
-            role="progressbar"
-            aria-label="Update download progress"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={update.percent ?? 0}
-          >
-            <div
-              className="update-progress-fill"
-              style={{ width: `${update.percent ?? 0}%` }}
-            />
-          </div>
-        )}
-        <div className="donate-row">
-          {update?.phase === 'ready' ? (
-            <button
-              className="btn primary"
-              onClick={() => void store.checkForUpdatesNow()}
-            >
-              Restart to update
-            </button>
-          ) : update?.phase === 'available' && update.canInstall ? (
-            <button
-              className="btn primary"
-              onClick={() => void store.downloadAvailableUpdate()}
-            >
-              Download update
-            </button>
-          ) : (
-            <button
-              className="btn"
-              disabled={update?.phase === 'checking' || update?.phase === 'downloading'}
-              onClick={() => void store.checkForUpdatesNow()}
-            >
-              Check for updates
-            </button>
-          )}
-          {(update === null ||
-            update.phase === 'available' ||
-            update.phase === 'error') && (
-            <button
-              className="btn"
-              onClick={() =>
-                void call('openExternal', update?.releaseUrl ?? RELEASES_URL)
-              }
-            >
-              View releases
-            </button>
-          )}
-        </div>
+        <UpdateRow currentVersion={appVersion} />
       </div>
       <div className="settings-section">
         <h3>Support the development</h3>

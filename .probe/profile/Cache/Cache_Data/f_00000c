@@ -1,0 +1,370 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/HistoryView.tsx");const useState = __vite__cjsImport0_react["useState"];const _jsxDEV = __vite__cjsImport4_react_jsxDevRuntime["jsxDEV"];import __vite__cjsImport0_react from "/@fs/C:/Users/mockcomic/Documents/GitHub/BetterGitHub/node_modules/.vite/deps/react.js?v=a63a28e8";
+import { DiffView } from "/src/components/DiffView.tsx";
+import { ContextMenu, menuStateFromEvent } from "/src/components/ContextMenu.tsx";
+import { useStore, useStoreState } from "/src/store.ts";
+var _jsxFileName = "C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/HistoryView.tsx";
+import __vite__cjsImport4_react_jsxDevRuntime from "/@fs/C:/Users/mockcomic/Documents/GitHub/BetterGitHub/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=a63a28e8";
+var _s = $RefreshSig$();
+/**
+* Main pane for the History tab: selected commit details + its changed
+* files + the per-file diff (GHD shows commit files in the sidebar; we show
+* them in the middle since the sidebar keeps the commit list).
+*/
+export function HistoryView() {
+	_s();
+	const state = useStoreState();
+	const store = useStore();
+	const [menu, setMenu] = useState(null);
+	const commit = state.selectedCommit;
+	if (commit === null) {
+		return /* @__PURE__ */ _jsxDEV("div", {
+			className: "diff-view empty-diff",
+			children: [/* @__PURE__ */ _jsxDEV("h2", { children: "Select a commit" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 25,
+				columnNumber: 9
+			}, this), /* @__PURE__ */ _jsxDEV("p", { children: "Pick a commit from the history list to see the changes it introduced." }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 26,
+				columnNumber: 9
+			}, this)]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 24,
+			columnNumber: 7
+		}, this);
+	}
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: "history-view",
+		children: [
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "commit-detail",
+				children: [
+					/* @__PURE__ */ _jsxDEV("div", {
+						className: "commit-detail-head",
+						children: [
+							/* @__PURE__ */ _jsxDEV("strong", { children: commit.summary }, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 35,
+								columnNumber: 11
+							}, this),
+							commit.isMerge && /* @__PURE__ */ _jsxDEV("span", {
+								className: "badge",
+								children: "merge"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 36,
+								columnNumber: 30
+							}, this),
+							/* @__PURE__ */ _jsxDEV("div", {
+								className: "commit-actions-inline",
+								children: [
+									/* @__PURE__ */ _jsxDEV("button", {
+										className: "mini",
+										title: "Copy the full SHA",
+										onClick: () => void store.copyText(commit.sha, "Commit SHA"),
+										children: "Copy SHA"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 38,
+										columnNumber: 13
+									}, this),
+									state.commits[0]?.sha === commit.sha && /* @__PURE__ */ _jsxDEV("button", {
+										className: "mini",
+										title: "Load this commit's message into the commit box for rewriting",
+										disabled: state.busy !== null,
+										onClick: () => void store.editLastCommit(),
+										children: "Edit latest"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 46,
+										columnNumber: 15
+									}, this),
+									state.commits[0]?.sha === commit.sha && !commit.isMerge && /* @__PURE__ */ _jsxDEV("button", {
+										className: "mini",
+										title: "Drop this commit and move its changes back to the commit box",
+										disabled: state.busy !== null,
+										onClick: () => store.uncommitSelectedCommit(),
+										children: "Uncommit"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 56,
+										columnNumber: 15
+									}, this),
+									/* @__PURE__ */ _jsxDEV("button", {
+										className: "mini",
+										title: "Create a branch starting at this commit",
+										onClick: () => store.createBranchFromSelectedCommit(),
+										children: "Branch from here"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 65,
+										columnNumber: 13
+									}, this),
+									/* @__PURE__ */ _jsxDEV("button", {
+										className: "mini",
+										title: "Apply this commit onto the current branch",
+										disabled: state.busy !== null,
+										onClick: () => store.cherryPickSelectedCommit(),
+										children: "Cherry-pick"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 72,
+										columnNumber: 13
+									}, this),
+									/* @__PURE__ */ _jsxDEV("button", {
+										className: "mini danger",
+										title: "Create a commit that undoes this one",
+										disabled: state.busy !== null,
+										onClick: () => store.revertSelectedCommit(),
+										children: "Revert"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 80,
+										columnNumber: 13
+									}, this),
+									state.remoteUrl !== null && /* @__PURE__ */ _jsxDEV("button", {
+										className: "mini",
+										title: "Open this commit in the browser",
+										onClick: () => void store.viewOnGitHub({
+											kind: "commit",
+											sha: commit.sha
+										}),
+										children: "View on GitHub"
+									}, void 0, false, {
+										fileName: _jsxFileName,
+										lineNumber: 89,
+										columnNumber: 15
+									}, this)
+								]
+							}, void 0, true, {
+								fileName: _jsxFileName,
+								lineNumber: 37,
+								columnNumber: 11
+							}, this)
+						]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 34,
+						columnNumber: 9
+					}, this),
+					/* @__PURE__ */ _jsxDEV("div", {
+						className: "commit-detail-meta",
+						children: [
+							commit.authorName,
+							" <",
+							commit.authorEmail,
+							"> ·",
+							" ",
+							new Date(commit.date).toLocaleString(),
+							" · ",
+							commit.sha.slice(0, 10),
+							commit.parents.length > 1 && ` · ${commit.parents.length} parents`
+						]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 99,
+						columnNumber: 9
+					}, this),
+					commit.body.length > 0 && /* @__PURE__ */ _jsxDEV("pre", {
+						className: "commit-detail-body",
+						children: commit.body
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 105,
+						columnNumber: 11
+					}, this)
+				]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 33,
+				columnNumber: 7
+			}, this),
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "history-body",
+				children: [/* @__PURE__ */ _jsxDEV("div", {
+					className: "commit-files",
+					children: [
+						/* @__PURE__ */ _jsxDEV("div", {
+							className: "commit-files-head",
+							children: [
+								"Changed files (",
+								state.commitFiles.length,
+								")"
+							]
+						}, void 0, true, {
+							fileName: _jsxFileName,
+							lineNumber: 111,
+							columnNumber: 11
+						}, this),
+						state.commitFilesLoading && /* @__PURE__ */ _jsxDEV("div", {
+							className: "sidebar-message",
+							children: "Loading files…"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 115,
+							columnNumber: 13
+						}, this),
+						state.commitFilesError !== null && /* @__PURE__ */ _jsxDEV("div", {
+							className: "sidebar-message error",
+							children: [
+								/* @__PURE__ */ _jsxDEV("strong", { children: "Can't list this commit's files." }, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 119,
+									columnNumber: 15
+								}, this),
+								/* @__PURE__ */ _jsxDEV("p", { children: state.commitFilesError }, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 120,
+									columnNumber: 15
+								}, this),
+								/* @__PURE__ */ _jsxDEV("p", { children: /* @__PURE__ */ _jsxDEV("button", {
+									className: "mini",
+									onClick: () => void store.selectCommit(commit),
+									children: "Try again"
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 122,
+									columnNumber: 17
+								}, this) }, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 121,
+									columnNumber: 15
+								}, this)
+							]
+						}, void 0, true, {
+							fileName: _jsxFileName,
+							lineNumber: 118,
+							columnNumber: 13
+						}, this),
+						!state.commitFilesLoading && state.commitFilesError === null && state.commitFiles.length === 0 && /* @__PURE__ */ _jsxDEV("div", {
+							className: "sidebar-message",
+							children: [/* @__PURE__ */ _jsxDEV("strong", { children: "No files" }, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 135,
+								columnNumber: 17
+							}, this), /* @__PURE__ */ _jsxDEV("p", { children: "This commit has no changes to show." }, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 136,
+								columnNumber: 17
+							}, this)]
+						}, void 0, true, {
+							fileName: _jsxFileName,
+							lineNumber: 134,
+							columnNumber: 15
+						}, this),
+						state.commitFiles.map((f) => /* @__PURE__ */ _jsxDEV("div", {
+							className: `file-row compact${state.selectedCommitFilePath === f.path ? " selected" : ""}`,
+							onClick: () => void store.selectCommitFile(f.path),
+							onContextMenu: (e) => {
+								e.preventDefault();
+								setMenu(menuStateFromEvent(e, [{
+									label: "Copy path",
+									onSelect: () => void store.copyText(f.path, "Path")
+								}, {
+									label: "Show in Explorer",
+									onSelect: () => void store.revealFile(f.path)
+								}]));
+							},
+							children: [/* @__PURE__ */ _jsxDEV("span", {
+								className: `status-glyph ${f.kind}`,
+								children: f.kind === "new" ? "＋" : f.kind === "deleted" ? "－" : f.kind === "renamed" || f.kind === "copied" ? "⇄" : "●"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 162,
+								columnNumber: 15
+							}, this), /* @__PURE__ */ _jsxDEV("span", {
+								className: "file-path",
+								children: /* @__PURE__ */ _jsxDEV("span", {
+									className: "file-name",
+									children: f.path
+								}, void 0, false, {
+									fileName: _jsxFileName,
+									lineNumber: 172,
+									columnNumber: 17
+								}, this)
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 171,
+								columnNumber: 15
+							}, this)]
+						}, f.path, true, {
+							fileName: _jsxFileName,
+							lineNumber: 140,
+							columnNumber: 13
+						}, this))
+					]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 110,
+					columnNumber: 9
+				}, this), /* @__PURE__ */ _jsxDEV("div", {
+					className: "history-diff",
+					children: /* @__PURE__ */ _jsxDEV(DiffView, {
+						diff: state.selectedCommitFileDiff,
+						title: state.selectedCommitFilePath,
+						error: state.selectedCommitFileError,
+						preview: state.selectedCommitFilePreview,
+						onRetry: state.selectedCommitFilePath !== null ? () => void store.selectCommitFile(state.selectedCommitFilePath) : undefined,
+						emptyTitle: "Select a file",
+						emptyHint: "Choose one of the changed files to see its diff."
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 178,
+						columnNumber: 11
+					}, this)
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 177,
+					columnNumber: 9
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 109,
+				columnNumber: 7
+			}, this),
+			menu !== null && /* @__PURE__ */ _jsxDEV(ContextMenu, {
+				menu,
+				onClose: () => setMenu(null)
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 193,
+				columnNumber: 25
+			}, this)
+		]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 32,
+		columnNumber: 5
+	}, this);
+}
+_s(HistoryView, "NjEZn1RTmSHyStfAtouMepm9nH8=", false, function() {
+	return [useStoreState, useStore];
+});
+_c = HistoryView;
+var _c;
+$RefreshReg$(_c, "HistoryView");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/components/HistoryView.tsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/HistoryView.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/HistoryView.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Users/mockcomic/Documents/GitHub/BetterGitHub/src/renderer/src/components/HistoryView.tsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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QkFDZCx3QkFBQyxRQUFEO1NBQU0sV0FBVTttQkFBYSxFQUFFO1FBQVc7Ozs7O09BQ3RDOzs7O2VBQ0g7U0FqQ0UsRUFBRTs7OzthQWlDSixDQUNOO0tBQ0U7Ozs7O2NBQ0wsd0JBQUMsT0FBRDtLQUFLLFdBQVU7ZUFDYix3QkFBQyxVQUFEO01BQ0UsTUFBTSxNQUFNO01BQ1osT0FBTyxNQUFNO01BQ2IsT0FBTyxNQUFNO01BQ2IsU0FBUyxNQUFNO01BQ2YsU0FDRSxNQUFNLDJCQUEyQixhQUN2QixLQUFLLE1BQU0saUJBQWlCLE1BQU0sc0JBQXVCLElBQy9EO01BRU4sWUFBVztNQUNYLFdBQVU7S0FDWDs7Ozs7SUFDRTs7OztZQUNGOzs7Ozs7R0FDSixTQUFTLFFBQVEsd0JBQUMsYUFBRDtJQUFtQjtJQUFNLGVBQWUsUUFBUSxJQUFJO0dBQUk7Ozs7O0VBQ3ZFOzs7Ozs7QUFFVCIsIm5hbWVzIjpbXSwic291cmNlcyI6WyJIaXN0b3J5Vmlldy50c3giXSwidmVyc2lvbiI6Mywic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHR5cGUgeyBKU1ggfSBmcm9tICdyZWFjdCdcclxuaW1wb3J0IHsgdXNlU3RhdGUgfSBmcm9tICdyZWFjdCdcclxuaW1wb3J0IHsgRGlmZlZpZXcgfSBmcm9tICcuL0RpZmZWaWV3J1xyXG5pbXBvcnQge1xyXG4gIENvbnRleHRNZW51LFxyXG4gIG1lbnVTdGF0ZUZyb21FdmVudCxcclxuICB0eXBlIENvbnRleHRNZW51U3RhdGVcclxufSBmcm9tICcuL0NvbnRleHRNZW51J1xyXG5pbXBvcnQgeyB1c2VTdG9yZSwgdXNlU3RvcmVTdGF0ZSB9IGZyb20gJy4uL3N0b3JlJ1xyXG5cclxuLyoqXHJcbiAqIE1haW4gcGFuZSBmb3IgdGhlIEhpc3RvcnkgdGFiOiBzZWxlY3RlZCBjb21taXQgZGV0YWlscyArIGl0cyBjaGFuZ2VkXHJcbiAqIGZpbGVzICsgdGhlIHBlci1maWxlIGRpZmYgKEdIRCBzaG93cyBjb21taXQgZmlsZXMgaW4gdGhlIHNpZGViYXI7IHdlIHNob3dcclxuICogdGhlbSBpbiB0aGUgbWlkZGxlIHNpbmNlIHRoZSBzaWRlYmFyIGtlZXBzIHRoZSBjb21taXQgbGlzdCkuXHJcbiAqL1xyXG5leHBvcnQgZnVuY3Rpb24gSGlzdG9yeVZpZXcoKTogSlNYLkVsZW1lbnQge1xyXG4gIGNvbnN0IHN0YXRlID0gdXNlU3RvcmVTdGF0ZSgpXHJcbiAgY29uc3Qgc3RvcmUgPSB1c2VTdG9yZSgpXHJcbiAgY29uc3QgW21lbnUsIHNldE1lbnVdID0gdXNlU3RhdGU8Q29udGV4dE1lbnVTdGF0ZSB8IG51bGw+KG51bGwpXHJcbiAgY29uc3QgY29tbWl0ID0gc3RhdGUuc2VsZWN0ZWRDb21taXRcclxuXHJcbiAgaWYgKGNvbW1pdCA9PT0gbnVsbCkge1xyXG4gICAgcmV0dXJuIChcclxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJkaWZmLXZpZXcgZW1wdHktZGlmZlwiPlxyXG4gICAgICAgIDxoMj5TZWxlY3QgYSBjb21taXQ8L2gyPlxyXG4gICAgICAgIDxwPlBpY2sgYSBjb21taXQgZnJvbSB0aGUgaGlzdG9yeSBsaXN0IHRvIHNlZSB0aGUgY2hhbmdlcyBpdCBpbnRyb2R1Y2VkLjwvcD5cclxuICAgICAgPC9kaXY+XHJcbiAgICApXHJcbiAgfVxyXG5cclxuICByZXR1cm4gKFxyXG4gICAgPGRpdiBjbGFzc05hbWU9XCJoaXN0b3J5LXZpZXdcIj5cclxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJjb21taXQtZGV0YWlsXCI+XHJcbiAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJjb21taXQtZGV0YWlsLWhlYWRcIj5cclxuICAgICAgICAgIDxzdHJvbmc+e2NvbW1pdC5zdW1tYXJ5fTwvc3Ryb25nPlxyXG4gICAgICAgICAge2NvbW1pdC5pc01lcmdlICYmIDxzcGFuIGNsYXNzTmFtZT1cImJhZGdlXCI+bWVyZ2U8L3NwYW4+fVxyXG4gICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJjb21taXQtYWN0aW9ucy1pbmxpbmVcIj5cclxuICAgICAgICAgICAgPGJ1dHRvblxyXG4gICAgICAgICAgICAgIGNsYXNzTmFtZT1cIm1pbmlcIlxyXG4gICAgICAgICAgICAgIHRpdGxlPVwiQ29weSB0aGUgZnVsbCBTSEFcIlxyXG4gICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHZvaWQgc3RvcmUuY29weVRleHQoY29tbWl0LnNoYSwgJ0NvbW1pdCBTSEEnKX1cclxuICAgICAgICAgICAgPlxyXG4gICAgICAgICAgICAgIENvcHkgU0hBXHJcbiAgICAgICAgICAgIDwvYnV0dG9uPlxyXG4gICAgICAgICAgICB7c3RhdGUuY29tbWl0c1swXT8uc2hhID09PSBjb21taXQuc2hhICYmIChcclxuICAgICAgICAgICAgICA8YnV0dG9uXHJcbiAgICAgICAgICAgICAgICBjbGFzc05hbWU9XCJtaW5pXCJcclxuICAgICAgICAgICAgICAgIHRpdGxlPVwiTG9hZCB0aGlzIGNvbW1pdCdzIG1lc3NhZ2UgaW50byB0aGUgY29tbWl0IGJveCBmb3IgcmV3cml0aW5nXCJcclxuICAgICAgICAgICAgICAgIGRpc2FibGVkPXtzdGF0ZS5idXN5ICE9PSBudWxsfVxyXG4gICAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gdm9pZCBzdG9yZS5lZGl0TGFzdENvbW1pdCgpfVxyXG4gICAgICAgICAgICAgID5cclxuICAgICAgICAgICAgICAgIEVkaXQgbGF0ZXN0XHJcbiAgICAgICAgICAgICAgPC9idXR0b24+XHJcbiAgICAgICAgICAgICl9XHJcbiAgICAgICAgICAgIHtzdGF0ZS5jb21taXRzWzBdPy5zaGEgPT09IGNvbW1pdC5zaGEgJiYgIWNvbW1pdC5pc01lcmdlICYmIChcclxuICAgICAgICAgICAgICA8YnV0dG9uXHJcbiAgICAgICAgICAgICAgICBjbGFzc05hbWU9XCJtaW5pXCJcclxuICAgICAgICAgICAgICAgIHRpdGxlPVwiRHJvcCB0aGlzIGNvbW1pdCBhbmQgbW92ZSBpdHMgY2hhbmdlcyBiYWNrIHRvIHRoZSBjb21taXQgYm94XCJcclxuICAgICAgICAgICAgICAgIGRpc2FibGVkPXtzdGF0ZS5idXN5ICE9PSBudWxsfVxyXG4gICAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gc3RvcmUudW5jb21taXRTZWxlY3RlZENvbW1pdCgpfVxyXG4gICAgICAgICAgICAgID5cclxuICAgICAgICAgICAgICAgIFVuY29tbWl0XHJcbiAgICAgICAgICAgICAgPC9idXR0b24+XHJcbiAgICAgICAgICAgICl9XHJcbiAgICAgICAgICAgIDxidXR0b25cclxuICAgICAgICAgICAgICBjbGFzc05hbWU9XCJtaW5pXCJcclxuICAgICAgICAgICAgICB0aXRsZT1cIkNyZWF0ZSBhIGJyYW5jaCBzdGFydGluZyBhdCB0aGlzIGNvbW1pdFwiXHJcbiAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gc3RvcmUuY3JlYXRlQnJhbmNoRnJvbVNlbGVjdGVkQ29tbWl0KCl9XHJcbiAgICAgICAgICAgID5cclxuICAgICAgICAgICAgICBCcmFuY2ggZnJvbSBoZXJlXHJcbiAgICAgICAgICAgIDwvYnV0dG9uPlxyXG4gICAgICAgICAgICA8YnV0dG9uXHJcbiAgICAgICAgICAgICAgY2xhc3NOYW1lPVwibWluaVwiXHJcbiAgICAgICAgICAgICAgdGl0bGU9XCJBcHBseSB0aGlzIGNvbW1pdCBvbnRvIHRoZSBjdXJyZW50IGJyYW5jaFwiXHJcbiAgICAgICAgICAgICAgZGlzYWJsZWQ9e3N0YXRlLmJ1c3kgIT09IG51bGx9XHJcbiAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gc3RvcmUuY2hlcnJ5UGlja1NlbGVjdGVkQ29tbWl0KCl9XHJcbiAgICAgICAgICAgID5cclxuICAgICAgICAgICAgICBDaGVycnktcGlja1xyXG4gICAgICAgICAgICA8L2J1dHRvbj5cclxuICAgICAgICAgICAgPGJ1dHRvblxyXG4gICAgICAgICAgICAgIGNsYXNzTmFtZT1cIm1pbmkgZGFuZ2VyXCJcclxuICAgICAgICAgICAgICB0aXRsZT1cIkNyZWF0ZSBhIGNvbW1pdCB0aGF0IHVuZG9lcyB0aGlzIG9uZVwiXHJcbiAgICAgICAgICAgICAgZGlzYWJsZWQ9e3N0YXRlLmJ1c3kgIT09IG51bGx9XHJcbiAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gc3RvcmUucmV2ZXJ0U2VsZWN0ZWRDb21taXQoKX1cclxuICAgICAgICAgICAgPlxyXG4gICAgICAgICAgICAgIFJldmVydFxyXG4gICAgICAgICAgICA8L2J1dHRvbj5cclxuICAgICAgICAgICAge3N0YXRlLnJlbW90ZVVybCAhPT0gbnVsbCAmJiAoXHJcbiAgICAgICAgICAgICAgPGJ1dHRvblxyXG4gICAgICAgICAgICAgICAgY2xhc3NOYW1lPVwibWluaVwiXHJcbiAgICAgICAgICAgICAgICB0aXRsZT1cIk9wZW4gdGhpcyBjb21taXQgaW4gdGhlIGJyb3dzZXJcIlxyXG4gICAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gdm9pZCBzdG9yZS52aWV3T25HaXRIdWIoeyBraW5kOiAnY29tbWl0Jywgc2hhOiBjb21taXQuc2hhIH0pfVxyXG4gICAgICAgICAgICAgID5cclxuICAgICAgICAgICAgICAgIFZpZXcgb24gR2l0SHViXHJcbiAgICAgICAgICAgICAgPC9idXR0b24+XHJcbiAgICAgICAgICAgICl9XHJcbiAgICAgICAgICA8L2Rpdj5cclxuICAgICAgICA8L2Rpdj5cclxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImNvbW1pdC1kZXRhaWwtbWV0YVwiPlxyXG4gICAgICAgICAge2NvbW1pdC5hdXRob3JOYW1lfSAmbHQ7e2NvbW1pdC5hdXRob3JFbWFpbH0mZ3Q7IMK3eycgJ31cclxuICAgICAgICAgIHtuZXcgRGF0ZShjb21taXQuZGF0ZSkudG9Mb2NhbGVTdHJpbmcoKX0gwrcge2NvbW1pdC5zaGEuc2xpY2UoMCwgMTApfVxyXG4gICAgICAgICAge2NvbW1pdC5wYXJlbnRzLmxlbmd0aCA+IDEgJiYgYCDCtyAke2NvbW1pdC5wYXJlbnRzLmxlbmd0aH0gcGFyZW50c2B9XHJcbiAgICAgICAgPC9kaXY+XHJcbiAgICAgICAge2NvbW1pdC5ib2R5Lmxlbmd0aCA+IDAgJiYgKFxyXG4gICAgICAgICAgPHByZSBjbGFzc05hbWU9XCJjb21taXQtZGV0YWlsLWJvZHlcIj57Y29tbWl0LmJvZHl9PC9wcmU+XHJcbiAgICAgICAgKX1cclxuICAgICAgPC9kaXY+XHJcblxyXG4gICAgICA8ZGl2IGNsYXNzTmFtZT1cImhpc3RvcnktYm9keVwiPlxyXG4gICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiY29tbWl0LWZpbGVzXCI+XHJcbiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImNvbW1pdC1maWxlcy1oZWFkXCI+XHJcbiAgICAgICAgICAgIENoYW5nZWQgZmlsZXMgKHtzdGF0ZS5jb21taXRGaWxlcy5sZW5ndGh9KVxyXG4gICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICB7c3RhdGUuY29tbWl0RmlsZXNMb2FkaW5nICYmIChcclxuICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJzaWRlYmFyLW1lc3NhZ2VcIj5Mb2FkaW5nIGZpbGVz4oCmPC9kaXY+XHJcbiAgICAgICAgICApfVxyXG4gICAgICAgICAge3N0YXRlLmNvbW1pdEZpbGVzRXJyb3IgIT09IG51bGwgJiYgKFxyXG4gICAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cInNpZGViYXItbWVzc2FnZSBlcnJvclwiPlxyXG4gICAgICAgICAgICAgIDxzdHJvbmc+Q2FuJ3QgbGlzdCB0aGlzIGNvbW1pdCdzIGZpbGVzLjwvc3Ryb25nPlxyXG4gICAgICAgICAgICAgIDxwPntzdGF0ZS5jb21taXRGaWxlc0Vycm9yfTwvcD5cclxuICAgICAgICAgICAgICA8cD5cclxuICAgICAgICAgICAgICAgIDxidXR0b25cclxuICAgICAgICAgICAgICAgICAgY2xhc3NOYW1lPVwibWluaVwiXHJcbiAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHZvaWQgc3RvcmUuc2VsZWN0Q29tbWl0KGNvbW1pdCl9XHJcbiAgICAgICAgICAgICAgICA+XHJcbiAgICAgICAgICAgICAgICAgIFRyeSBhZ2FpblxyXG4gICAgICAgICAgICAgICAgPC9idXR0b24+XHJcbiAgICAgICAgICAgICAgPC9wPlxyXG4gICAgICAgICAgICA8L2Rpdj5cclxuICAgICAgICAgICl9XHJcbiAgICAgICAgICB7IXN0YXRlLmNvbW1pdEZpbGVzTG9hZGluZyAmJlxyXG4gICAgICAgICAgICBzdGF0ZS5jb21taXRGaWxlc0Vycm9yID09PSBudWxsICYmXHJcbiAgICAgICAgICAgIHN0YXRlLmNvbW1pdEZpbGVzLmxlbmd0aCA9PT0gMCAmJiAoXHJcbiAgICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJzaWRlYmFyLW1lc3NhZ2VcIj5cclxuICAgICAgICAgICAgICAgIDxzdHJvbmc+Tm8gZmlsZXM8L3N0cm9uZz5cclxuICAgICAgICAgICAgICAgIDxwPlRoaXMgY29tbWl0IGhhcyBubyBjaGFuZ2VzIHRvIHNob3cuPC9wPlxyXG4gICAgICAgICAgICAgIDwvZGl2PlxyXG4gICAgICAgICAgICApfVxyXG4gICAgICAgICAge3N0YXRlLmNvbW1pdEZpbGVzLm1hcChmID0+IChcclxuICAgICAgICAgICAgPGRpdlxyXG4gICAgICAgICAgICAgIGtleT17Zi5wYXRofVxyXG4gICAgICAgICAgICAgIGNsYXNzTmFtZT17YGZpbGUtcm93IGNvbXBhY3Qke1xyXG4gICAgICAgICAgICAgICAgc3RhdGUuc2VsZWN0ZWRDb21taXRGaWxlUGF0aCA9PT0gZi5wYXRoID8gJyBzZWxlY3RlZCcgOiAnJ1xyXG4gICAgICAgICAgICAgIH1gfVxyXG4gICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHZvaWQgc3RvcmUuc2VsZWN0Q29tbWl0RmlsZShmLnBhdGgpfVxyXG4gICAgICAgICAgICAgIG9uQ29udGV4dE1lbnU9e2UgPT4ge1xyXG4gICAgICAgICAgICAgICAgZS5wcmV2ZW50RGVmYXVsdCgpXHJcbiAgICAgICAgICAgICAgICBzZXRNZW51KFxyXG4gICAgICAgICAgICAgICAgICBtZW51U3RhdGVGcm9tRXZlbnQoZSwgW1xyXG4gICAgICAgICAgICAgICAgICAgIHtcclxuICAgICAgICAgICAgICAgICAgICAgIGxhYmVsOiAnQ29weSBwYXRoJyxcclxuICAgICAgICAgICAgICAgICAgICAgIG9uU2VsZWN0OiAoKSA9PiB2b2lkIHN0b3JlLmNvcHlUZXh0KGYucGF0aCwgJ1BhdGgnKVxyXG4gICAgICAgICAgICAgICAgICAgIH0sXHJcbiAgICAgICAgICAgICAgICAgICAge1xyXG4gICAgICAgICAgICAgICAgICAgICAgbGFiZWw6ICdTaG93IGluIEV4cGxvcmVyJyxcclxuICAgICAgICAgICAgICAgICAgICAgIG9uU2VsZWN0OiAoKSA9PiB2b2lkIHN0b3JlLnJldmVhbEZpbGUoZi5wYXRoKVxyXG4gICAgICAgICAgICAgICAgICAgIH1cclxuICAgICAgICAgICAgICAgICAgXSlcclxuICAgICAgICAgICAgICAgIClcclxuICAgICAgICAgICAgICB9fVxyXG4gICAgICAgICAgICA+XHJcbiAgICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPXtgc3RhdHVzLWdseXBoICR7Zi5raW5kfWB9PlxyXG4gICAgICAgICAgICAgICAge2Yua2luZCA9PT0gJ25ldydcclxuICAgICAgICAgICAgICAgICAgPyAn77yLJ1xyXG4gICAgICAgICAgICAgICAgICA6IGYua2luZCA9PT0gJ2RlbGV0ZWQnXHJcbiAgICAgICAgICAgICAgICAgICAgPyAn77yNJ1xyXG4gICAgICAgICAgICAgICAgICAgIDogZi5raW5kID09PSAncmVuYW1lZCcgfHwgZi5raW5kID09PSAnY29waWVkJ1xyXG4gICAgICAgICAgICAgICAgICAgICAgPyAn4oeEJ1xyXG4gICAgICAgICAgICAgICAgICAgICAgOiAn4pePJ31cclxuICAgICAgICAgICAgICA8L3NwYW4+XHJcbiAgICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwiZmlsZS1wYXRoXCI+XHJcbiAgICAgICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJmaWxlLW5hbWVcIj57Zi5wYXRofTwvc3Bhbj5cclxuICAgICAgICAgICAgICA8L3NwYW4+XHJcbiAgICAgICAgICAgIDwvZGl2PlxyXG4gICAgICAgICAgKSl9XHJcbiAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJoaXN0b3J5LWRpZmZcIj5cclxuICAgICAgICAgIDxEaWZmVmlld1xyXG4gICAgICAgICAgICBkaWZmPXtzdGF0ZS5zZWxlY3RlZENvbW1pdEZpbGVEaWZmfVxyXG4gICAgICAgICAgICB0aXRsZT17c3RhdGUuc2VsZWN0ZWRDb21taXRGaWxlUGF0aH1cclxuICAgICAgICAgICAgZXJyb3I9e3N0YXRlLnNlbGVjdGVkQ29tbWl0RmlsZUVycm9yfVxyXG4gICAgICAgICAgICBwcmV2aWV3PXtzdGF0ZS5zZWxlY3RlZENvbW1pdEZpbGVQcmV2aWV3fVxyXG4gICAgICAgICAgICBvblJldHJ5PXtcclxuICAgICAgICAgICAgICBzdGF0ZS5zZWxlY3RlZENvbW1pdEZpbGVQYXRoICE9PSBudWxsXHJcbiAgICAgICAgICAgICAgICA/ICgpID0+IHZvaWQgc3RvcmUuc2VsZWN0Q29tbWl0RmlsZShzdGF0ZS5zZWxlY3RlZENvbW1pdEZpbGVQYXRoISlcclxuICAgICAgICAgICAgICAgIDogdW5kZWZpbmVkXHJcbiAgICAgICAgICAgIH1cclxuICAgICAgICAgICAgZW1wdHlUaXRsZT1cIlNlbGVjdCBhIGZpbGVcIlxyXG4gICAgICAgICAgICBlbXB0eUhpbnQ9XCJDaG9vc2Ugb25lIG9mIHRoZSBjaGFuZ2VkIGZpbGVzIHRvIHNlZSBpdHMgZGlmZi5cIlxyXG4gICAgICAgICAgLz5cclxuICAgICAgICA8L2Rpdj5cclxuICAgICAgPC9kaXY+XHJcbiAgICAgIHttZW51ICE9PSBudWxsICYmIDxDb250ZXh0TWVudSBtZW51PXttZW51fSBvbkNsb3NlPXsoKSA9PiBzZXRNZW51KG51bGwpfSAvPn1cclxuICAgIDwvZGl2PlxyXG4gIClcclxufVxyXG4iXX0=

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  githubAuthorizeUrl,
   gitlabAuthorizeUrl,
   parseCallbackParams,
   pkceMaterial
@@ -18,28 +17,6 @@ describe('pkceMaterial', () => {
     // Fresh material on every call (verifier, challenge and state all differ).
     expect(a.verifier).not.toBe(b.verifier)
     expect(a.state).not.toBe(b.state)
-  })
-})
-
-describe('githubAuthorizeUrl', () => {
-  it('builds the cloud authorization URL with PKCE and the loopback redirect', () => {
-    const url = new URL(
-      githubAuthorizeUrl('https://github.com', 'Iv1.demo', REDIRECT, 'st123', 'chal')
-    )
-    expect(url.origin + url.pathname).toBe('https://github.com/login/oauth/authorize')
-    expect(url.searchParams.get('response_type')).toBe('code')
-    expect(url.searchParams.get('client_id')).toBe('Iv1.demo')
-    expect(url.searchParams.get('redirect_uri')).toBe(REDIRECT)
-    expect(url.searchParams.get('scope')).toBe('repo')
-    expect(url.searchParams.get('state')).toBe('st123')
-    expect(url.searchParams.get('code_challenge')).toBe('chal')
-    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
-  })
-
-  it('sits under the instance path for GitHub Enterprise roots', () => {
-    expect(
-      githubAuthorizeUrl('https://ghe.corp.example/base', 'id', REDIRECT, 's', 'c')
-    ).toContain('https://ghe.corp.example/base/login/oauth/authorize')
   })
 })
 

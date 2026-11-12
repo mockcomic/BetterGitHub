@@ -1,6 +1,7 @@
 import type { JSX } from 'react'
 import { useState } from 'react'
 import type { FileStatus, IgnoreRequest } from '../../../shared/models'
+import { workflowKindOf } from '../attention'
 import { useStore, useStoreState, type AppState } from '../store'
 import { relativeTime } from '../time'
 import {
@@ -204,7 +205,7 @@ export function ChangesQueue(): JSX.Element {
     return <div className="sidebar-message">Loading…</div>
   }
 
-  const workflow = workflowKind(state.status.inProgress)
+  const workflow = workflowKindOf(state.status.inProgress)
   const files = state.status.files
   const shown = files.filter(f => fileMatches(f, state.deskFilter))
   const filtered = files.length > 0 && shown.length !== files.length
@@ -550,7 +551,9 @@ export function ResolveHelp(): JSX.Element {
   const conflicted = (state.status?.files ?? []).filter(
     f => f.kind === 'conflicted'
   ).length
-  const workflow = workflowKind(state.status?.inProgress ?? { merge: false, rebase: false, cherryPick: false, revert: false })
+  const workflow = workflowKindOf(
+    state.status?.inProgress ?? { merge: false, rebase: false, cherryPick: false, revert: false }
+  )
 
   return (
     <div className="resolve-help">
@@ -977,15 +980,9 @@ function pushTitle(state: AppState): string {
 
 // ----------------------------------------------------------------- shared
 
-function workflowKind(
-  inProgress: { merge: boolean; rebase: boolean; cherryPick: boolean; revert: boolean }
-): 'merge' | 'rebase' | 'cherryPick' | 'revert' | null {
-  if (inProgress.rebase) return 'rebase'
-  if (inProgress.merge) return 'merge'
-  if (inProgress.revert) return 'revert'
-  if (inProgress.cherryPick) return 'cherryPick'
-  return null
-}
+// The paused-workflow precedence lives in attention.ts, so the banner and
+// the attention dialog can never disagree about which operation owns the
+// worktree. workflowLabel stays here — it is banner copy, not dialog copy.
 
 function workflowLabel(
   kind: 'merge' | 'rebase' | 'cherryPick' | 'revert',

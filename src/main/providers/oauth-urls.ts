@@ -1,9 +1,11 @@
 import { createHash, randomBytes } from 'crypto'
 
 /**
- * Pure pieces of the browser sign-in flows: the PKCE material, the
- * authorize-URL shapes, and the loopback callback parsing. Kept free of
+ * Pure pieces of the GitLab browser sign-in: the PKCE material, the
+ * authorize-URL shape, and the loopback callback parsing. Kept free of
  * Electron imports so the URL contracts are unit-testable in isolation.
+ * (GitHub signs in through the device-code flow, which needs no authorize URL
+ * and no redirect — see providers/oauth.ts.)
  */
 
 function base64url(buf: Buffer): string {
@@ -23,25 +25,6 @@ export function pkceMaterial(): {
   const verifier = base64url(randomBytes(32))
   const challenge = base64url(createHash('sha256').update(verifier).digest())
   return { verifier, challenge, state: randomBytes(16).toString('hex') }
-}
-
-/** GitHub's authorization-code endpoint (web root; GHES mirrors per host). */
-export function githubAuthorizeUrl(
-  siteRoot: string,
-  clientId: string,
-  redirectUri: string,
-  state: string,
-  challenge: string
-): string {
-  return (
-    `${siteRoot}/login/oauth/authorize?response_type=code` +
-    `&client_id=${encodeURIComponent(clientId)}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&scope=repo` +
-    `&state=${state}` +
-    `&code_challenge=${challenge}` +
-    `&code_challenge_method=S256`
-  )
 }
 
 /** GitLab's authorization-code + PKCE endpoint (instance root). */

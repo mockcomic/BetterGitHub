@@ -26,9 +26,11 @@ parsing → cancellable request).
   anywhere else are left alone. Manual removals stick (the folder is
   remembered as dismissed until it leaves the disk); rescans run on startup,
   on folder changes, and on window focus.
-- **Hosted accounts** — sign in with **GitHub** (browser OAuth, the device
-  code, or a personal access token) and **GitLab** (OAuth PKCE for gitlab.com,
-  token for self-hosted instances too); the Clone dialog grows a tab per
+- **Hosted accounts** — press **Sign in with GitHub** for a one-time device code
+  to paste at github.com/login/device (no app registration and no local port
+  needed; a personal access token works too), and sign in to **GitLab** with
+  OAuth PKCE for gitlab.com or a token for self-hosted instances; the Clone
+  dialog grows a tab per
   account listing every repository you own, collaborate on, or see through an
   organization, with provider-side search (GitHub's Search API, GitLab's
   `?search=`), sorting and a public/private filter. Account rows show your
@@ -123,7 +125,7 @@ parsing → cancellable request).
   switch: one context-aware **Sync** verb whose caret always lists Fetch, Pull
   and Push; Conflicts and Stash tabs appear when there are conflicts or
   stashes; staged badges appear once anything is staged; a one-time three-step
-  coaching banner retires itself at your first commit (Preferences ▸ Behavior
+  coaching banner retires itself at your first commit (Preferences ▸ General
   ▸ *Show tips for getting started*); and copy that says "not on the remote
   yet" instead of "no upstream". Every shortcut, menu and tooltip power users
   rely on is unchanged.
@@ -132,8 +134,9 @@ parsing → cancellable request).
   **Help → Check for updates…**. On Windows NSIS installs the newer
   installer downloads in the background and a **Restart now** toast (or the
   About dialog) applies it; on every other build — and the portable exe —
-  Aspen points you at the release page instead. Toggle the automatic pass
-  in Preferences ▸ Behavior. See *Keeping Aspen up to date* below.
+  Aspen points you at the release page instead. Toggle the automatic pass —
+  and see what the last check found, with a **Check for updates** button — in
+  Preferences ▸ General. See *Keeping Aspen up to date* below.
 - Toasts with actions (e.g. **Undo** after a commit) and manual dismiss.
 - Light / dark / system theme.
 
@@ -230,19 +233,21 @@ is simply never consulted.
 
 Open **Clone a repository → Accounts** (or Preferences → Accounts).
 
-- **GitHub — browser sign-in (OAuth).** The browser opens GitHub's authorize
-  page and Aspen catches the redirect on a loopback server at
-  `http://127.0.0.1:8765/callback` (authorization code + PKCE — a public
-  client, so no secret travels and the token never expires until you sign
-  out). If something else holds that port, Aspen automatically falls back to
-  the **device flow** — the short code you type at github.com/login/device,
-  the same dance `gh` and GitHub Desktop do — and the sign-in panel always
-  offers "Use the one-time code instead" as the manual choice.
+- **GitHub — code sign-in (OAuth device flow).** Press **Sign in with GitHub**
+  and Aspen shows a one-time code, opening github.com/login/device for you to
+  paste it into — the same dance `gh` and GitHub Desktop do — while Aspen polls
+  until GitHub says yes. No authorize redirect and no local port to hold, so it
+  works behind strict NAT. A fresh install needs no setup: Aspen ships the
+  public client id of GitHub's own device-flow application (the same one `gh`
+  embeds), which is why GitHub's approval page reads **GitHub CLI** until you
+  paste your own OAuth App id — press **Use your own OAuth App** on the code
+  screen or fill the field under Preferences → Accounts. GitHub Enterprise needs
+  an app registered on that host, since the built-in id does not exist there.
+  (The account chip reads **Device code**.)
 - **GitLab — browser sign-in (OAuth + PKCE).** The browser opens your
-  instance's authorize page; Aspen catches the redirect on the same
-  loopback server (it dispatches purely on the unguessable `state`
-  parameter, so GitHub and GitLab sign-ins can even be pending at once).
-  PKCE means no client secret travels. Access tokens expire after GitLab's
+  instance's authorize page; Aspen catches the redirect on a loopback server at
+  `http://127.0.0.1:8765/callback` (authorization code + PKCE — a public
+  client, so no secret travels). Access tokens expire after GitLab's
   two hours — Aspen refreshes them silently.
 - **Token sign-in — works for everything.** A GitHub classic PAT with the
   `repo` scope (or a fine-grained token with repository contents: read —
@@ -254,20 +259,22 @@ Open **Clone a repository → Accounts** (or Preferences → Accounts).
   the app. The token is validated against `/user` before anything is stored,
   then kept encrypted next to the settings file.
 
-Browser sign-in needs an OAuth application you register once (or bake into
-`src/main/providers/config.ts` and rebuild): GitHub — an OAuth App whose
-Authorization callback URL is `http://127.0.0.1:8765/callback` with *Enable
-Device Flow* ticked, one app serving both GitHub flows; GitLab — an
-application, confidential **off**, redirect URI exactly
-`http://127.0.0.1:8765/callback`, scope `api`. The ids are public, so they
-ship empty — and both sign-in buttons are always clickable either way: with
-an id on file they go straight to your browser for authorization, and without
-one they first open a one-step setup **in the sign-in panel** (registration
-page, copyable callback URL, the steps, one paste box) and start the same
-authorization the moment you paste and press **Save & sign in**. The
-**Browser sign-in apps** fields in Preferences are the same two ids, for
-replacing them later; the token path needs none of this and covers servers
-whose application you cannot register.
+GitLab's browser sign-in is the one that needs an application you register
+once: an application, confidential **off**, redirect URI exactly
+`http://127.0.0.1:8765/callback`, scope `api` (that loopback port serves GitLab
+alone). GitHub's device flow needs an OAuth App with *Enable Device Flow* ticked
+too, but it ships one — see `src/main/providers/config.ts` — so registering your
+own is optional: do it to have the approval page name Aspen, to keep your
+approvals off the shared app, or to sign in to GitHub Enterprise. Any homepage
+URL and any callback URL work, since the device flow never redirects back. Ids
+are public by design; Aspen never needs the secret. A button with no id on file
+(GitLab's first run) opens a one-step setup **in the sign-in panel** —
+registration page, the steps, a copyable callback URL, one paste box — and
+starts the same sign-in the moment you paste and press **Save & sign in**. The
+**Browser sign-in apps** fields in Preferences hold the same two ids, for
+replacing them later, and clearing one falls back to the baked-in value; the
+token path needs none of this and covers servers whose application you cannot
+register.
 
 Once signed in, the Clone dialog gets one tab per account listing your
 repositories (owner, visibility, last push) with provider-side search,
@@ -306,9 +313,11 @@ Aspen updates itself from this repository's **GitHub Releases**
   running, a version is available, or why the check failed — including the
   friendly "no published releases yet" before the first release exists.
   The silent pass never nags on network errors, and
-  **Preferences ▸ Behavior → Check GitHub releases for updates at startup**
-  turns the automatic pass off. A signed-in GitHub account's token is used
-  opportunistically for the API pass (higher rate limit; ready-made for a
+  **Preferences ▸ General → Check GitHub releases for updates at startup**
+  turns the automatic pass off. Preferences ▸ General also carries the same
+  update status and **Check for updates** verb the About card shows, so the
+  answer is one click away either way. A signed-in GitHub account's token is
+  used opportunistically for the API pass (higher rate limit; ready-made for a
   private repo).
 
 ### Releasing an update

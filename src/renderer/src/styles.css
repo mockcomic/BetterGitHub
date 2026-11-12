@@ -1549,6 +1549,15 @@ html[data-wco] .titlebar {
   font-weight: 600;
 }
 
+/* Keyboard cursor in the popovers' pickers (the repository switcher): the same
+   inset accent border the repository hub uses, so the pointer's hover ground
+   and the keys' ring stay two separate answers — and the ring can sit on the
+   already-active row without hiding it. */
+.popover-item.cursor {
+  outline: 1px solid var(--accent);
+  outline-offset: -3px;
+}
+
 .popover-item.danger {
   color: var(--danger);
 }
@@ -1603,6 +1612,43 @@ html[data-wco] .titlebar {
 .popover-filter {
   margin: 4px;
   width: calc(100% - 8px);
+}
+
+/* The repository switcher's filter row: the field flexes beside the Add
+   disclosure. The override is scoped to the row, so every bare .popover-filter
+   (the branch picker, the add-remote form, the dialogs) keeps its full-width
+   face untouched. */
+.popover-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px;
+}
+
+.popover-filter-row .popover-filter {
+  flex: 1 1 auto;
+  width: auto;
+  margin: 0;
+  min-width: 0;
+}
+
+.popover-add {
+  flex: 0 0 auto;
+}
+
+/* The Add menu: an inline disclosure between the filter row and the list, so
+   the popover's own scroll box never clips a floating sub-menu. Same surface
+   language as .popover — border, shadow, item rows ride the base styles. */
+.repo-add-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 4px 4px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
 }
 
 /* ---------------------------------------------------------------- layout */
@@ -1945,6 +1991,72 @@ body.desk-resizing .main-pane {
 
 .file-name {
   font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- scripts */
+
+/* The Scripts desk's queue rows: one Run button, the script name, and the
+   command it runs — the same two-line idiom the file rows use, where the
+   muted line is context rather than state. */
+.script-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid transparent;
+}
+
+.script-row:hover {
+  background: var(--bg-hover);
+}
+
+.script-row .run {
+  flex: 0 0 auto;
+  min-width: 26px;
+}
+
+.script-info {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.script-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-command {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The lockfile-detected manager, shown once in the section head so every
+   row's typed command is honest about which verb ▶ presses. */
+.script-manager {
+  margin-left: 8px;
+  font-family: var(--mono);
+  text-transform: none;
+  color: var(--text);
+  background: var(--bg-header);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+.script-hint {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .badge {
@@ -4121,6 +4233,53 @@ img.account-avatar {
 
 .mini.danger {
   color: var(--danger);
+}
+
+/* -------------------------------------------------------- attention dialog */
+
+/* The conflicted-file list inside the attention dialog: repo paths in the
+   mono stack (verbatim text stays verbatim), each row carrying the same
+   quick resolves the file rows use. Hairline-separated 6px card, matching
+   the banner family rather than inventing a new one. */
+.attention-files {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.attention-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.attention-file + .attention-file {
+  border-top: 1px solid var(--border);
+}
+
+.attention-file-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.attention-file-path:hover {
+  color: var(--accent);
 }
 
 /* --------------------------------------------------------------- stash */
