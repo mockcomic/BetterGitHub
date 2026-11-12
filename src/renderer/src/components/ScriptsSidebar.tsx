@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import type { PackageScript } from '../../../shared/scripts'
+import { scriptCommandLine, type PackageScript, type PackageManager } from '../../../shared/scripts'
 import { useStore, useStoreState } from '../store'
 
 /**
@@ -15,17 +15,31 @@ import { useStore, useStoreState } from '../store'
  * something to say" rule.
  */
 
-function ScriptRow({ script, manager }: { script: PackageScript; manager: string }): JSX.Element {
+function ScriptRow({ script, manager }: { script: PackageScript; manager: PackageManager }): JSX.Element {
   const store = useStore()
+  // A name that cannot be quoted inertly (see quoteScriptName) gets no Run
+  // button: typing `manager run "<name>"` at a live shell would let $(),
+  // backticks, %VARS%, ! or quotes inside the name execute, and the name is
+  // data from a repository the user merely added.
+  const command = scriptCommandLine({ manager }, script.name)
   return (
     <div className="script-row">
-      <button
-        className="mini run"
-        title={`Run “${script.name}” — types ${manager} run ${script.name} into a new terminal tab`}
-        onClick={() => store.runScript(script.name)}
-      >
-        ▶
-      </button>
+      {command !== null ? (
+        <button
+          className="mini run"
+          title={`Run “${script.name}” — types ${command} into a new terminal tab`}
+          onClick={() => store.runScript(script.name)}
+        >
+          ▶
+        </button>
+      ) : (
+        <span
+          className="mini run"
+          title={`“${script.name}” carries characters that cannot be quoted safely into the terminal shell — run it by hand.`}
+        >
+          ·
+        </span>
+      )}
       <span className="script-info">
         <span className="script-name">{script.name}</span>
         <span className="script-command" title={script.command}>

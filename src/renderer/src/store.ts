@@ -845,9 +845,12 @@ export class AppStore {
     const drafts = new Map(this.state.drafts)
     drafts.set(repo.path, this.draftFor(repo.path))
     // A prompt about the old repository's state must not ride into the new
-    // one, and neither may a cause line or a dismissed set.
+    // one, and neither may a cause line or a dismissed set. A running AI
+    // pass either — the sequence bump is what makes its loop stop painting
+    // and stop writing into the repo the user walked away from.
     this.attentionCause = null
     this.attentionDismissedSig = null
+    this.supersedeAiWork()
     this.update({
       drafts,
       selectedRepo: repo,
@@ -1067,10 +1070,14 @@ export class AppStore {
           selected !== null &&
           outcome.removed.some(r => r.id === selected.id)
         ) {
+          this.supersedeAiWork()
           Object.assign(patch, {
             selectedRepo: null,
             status: null,
             statusError: null,
+            aiMerge: null,
+            aiBatch: null,
+            attention: null,
             commits: [],
             branches: [],
             remoteBranches: []
@@ -1622,7 +1629,11 @@ export class AppStore {
           if (this.state.view === 'history') await this.loadLog(false)
         } catch (err) {
           this.update({
-            status: null,
+            // A silent (watcher-driven) re-read must not blank a status the
+            // user is looking at — keep the stale truth over a transient
+            // blink, exactly like statusError does below. A mid-pass
+            // AttentionDialog would otherwise vanish on one hiccup.
+            status: options?.silent === true ? this.state.status : null,
             statusError: options?.silent === true ? this.state.statusError : err instanceof Error ? err.message : String(err)
           })
         }
@@ -1708,8 +1719,11 @@ export class AppStore {
   runScript(name: string): void {
     const info = this.state.packageScripts
     if (info === null) return
-    if (!this.state.terminalOpen) this.toggleTerminal()
     const command = scriptCommandLine(info, name)
+    // Unquotable names carry no ▶ (ScriptRow), so this is belt-and-braces:
+    // never type a command line we cannot vouch for.
+    if (command === null) return
+    if (!this.state.terminalOpen) this.toggleTerminal()
     this.runNonce += 1
     this.update({ terminalRun: { command, label: command, nonce: this.runNonce } })
   }
@@ -2176,6 +2190,23 @@ export class AppStore {
 
   private aiBatchSeq = 0
 
+  /**
+   * Invalidate every in-flight AI conversation (single-file merge and the
+   * Resolve-all pass). Sequence bumps make the loops' mine() guards false,
+   * so a superseded pass stops painting state and stops landing writes;
+   * cancel the current request too so main aborts the HTTP call and the
+   * file write, not just the loop. Callers clear the visible state.
+   */
+  private supersedeAiWork(): void {
+    const batch = this.state.aiBatch
+    const repo = this.state.selectedRepo
+    this.aiMergeSeq++
+    this.aiBatchSeq++
+    if (batch !== null && repo !== null) {
+      void call('cancelAiResolve', repo.path, batch.current).catch(() => undefined)
+    }
+  }
+
   private async runAiBatch(
     seq: number,
     repoPath: string,
@@ -2204,7 +2235,14 @@ export class AppStore {
         const message = err instanceof Error ? err.message : String(err)
         // Stopped mid-file: main aborted this path and the sequence moved on.
         if (message === 'cancelled' || !mine()) return
-        outcomes.push({ path, kind: 'failed', detail: message })
+        // The outcome detail lands inside a sentence in the summary toast;
+        // an endpoint rejection carries up to 300 chars of the provider's
+        // raw JSON body — keep the headline, drop the payload.
+        outcomes.push({
+          path,
+          kind: 'failed',
+          detail: message.replace(/:\s*\{[\s\S]*\}$/, '.').slice(0, 160)
+        })
       }
     }
     if (!mine()) return
@@ -2247,6 +2285,14 @@ export class AppStore {
         tone: 'danger',
         onConfirm: () => {
           this.update({ confirm: null })
+          // A running AI pass would otherwise land its in-flight merge on
+          // top of the freshly restored worktree (writeFile + git add after
+          // --abort), and every remaining file would misreport as failed.
+          // Tear the pass down first, exactly like Stop does.
+          if (this.state.aiBatch !== null || this.state.aiMerge !== null) {
+            this.supersedeAiWork()
+            this.update({ aiBatch: null, aiMerge: null })
+          }
           void this.runGit(async () => {
             await call('abortOperation', repo.path, kind)
           }, 'abort')
@@ -3075,6 +3121,11 @@ export class AppStore {
     await this.refresh()
     if ((this.state.status?.conflictCount ?? 0) > 0 && this.state.status !== null) {
       this.maybeRaiseConflicts(this.state.status, true)
+    } else {
+      // The raise never happened (no conflicts, or a refresh that failed and
+      // left status null) — retire the cause line so it can't caption some
+      // unrelated conflicts episode the watcher finds later.
+      this.attentionCause = null
     }
     void this.refreshBranches()
     void this.refreshStashes()

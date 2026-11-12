@@ -35,7 +35,8 @@ export async function gitlabRefreshToken(
     return {
       token,
       refreshToken: str(res.json.refresh_token) ?? credential.refreshToken,
-      expiresAt: Date.now() + expiresIn * 1000
+      expiresAt: Date.now() + expiresIn * 1000,
+      clientId: credential.clientId ?? null
     }
   } catch {
     return null
@@ -78,7 +79,8 @@ export async function githubRefreshToken(
     return {
       token,
       refreshToken: str(res.json.refresh_token) ?? credential.refreshToken,
-      expiresAt: expiresIn === null ? credential.expiresAt : Date.now() + expiresIn * 1000
+      expiresAt: expiresIn === null ? credential.expiresAt : Date.now() + expiresIn * 1000,
+      clientId: credential.clientId ?? null
     }
   } catch {
     return null

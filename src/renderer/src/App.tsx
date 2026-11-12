@@ -67,8 +67,13 @@ function visibleDeskTabs(state: AppState): ReadonlyArray<DeskTab> {
     tabs.push({ id: 'stash', label: 'Stash' })
   }
   // A plain npm/pnpm/yarn/bun project earns its desk tab the same way a
-  // stash does by existing: only when there is something to run.
-  if ((state.packageScripts?.scripts.length ?? 0) > 0) {
+  // stash does by existing: when there is something to run — or something
+  // to explain (a malformed/unreadable package.json must not make the
+  // desk silently vanish; ScriptsQueue renders the reason + retry).
+  if (
+    (state.packageScripts?.scripts.length ?? 0) > 0 ||
+    (state.packageScripts?.error ?? null) !== null
+  ) {
     tabs.push({ id: 'scripts', label: 'Scripts' })
   }
   return tabs
