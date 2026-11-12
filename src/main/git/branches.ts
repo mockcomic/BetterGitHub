@@ -163,6 +163,17 @@ export function parseUpstreamTrack(
   }
 }
 
+/**
+ * Pure: is this `%(upstream:track)` git's `[gone]` — the branch still names an
+ * upstream, but that ref no longer exists? Tracked separately from
+ * {@link parseUpstreamTrack}, which reports no counts for it: the absence of
+ * numbers is not the same fact as a deleted remote branch, and the second one
+ * is worth a word on the desk.
+ */
+export function isUpstreamGone(track: string): boolean {
+  return track.trim() === '[gone]'
+}
+
 /** Mutable builder shape for a parsed `refs/heads/` record. */
 interface ParsedLocalRef {
   name: string
@@ -171,6 +182,7 @@ interface ParsedLocalRef {
   upstream?: string
   upstreamAhead?: number
   upstreamBehind?: number
+  upstreamGone?: boolean
 }
 
 function parseLocalRefs(output: string): ParsedLocalRef[] {
@@ -189,6 +201,7 @@ function parseLocalRefs(output: string): ParsedLocalRef[] {
           ref.upstreamAhead = ab.ahead
           ref.upstreamBehind = ab.behind
         }
+        if (isUpstreamGone(track ?? '')) ref.upstreamGone = true
       }
       return ref
     })

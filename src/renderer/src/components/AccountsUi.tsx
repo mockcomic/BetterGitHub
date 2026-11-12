@@ -153,12 +153,13 @@ export function AccountList(): JSX.Element {
 }
 
 /**
- * Sign-in panel: the two browser buttons — always clickable, running the real
- * sign-in (GitHub's one-time code, GitLab's browser OAuth) when an application
- * id is configured and opening the one-step setup in place when it is not —
- * plus the token form that works everywhere (self-hosted included). Pending
- * sign-ins render their waiting state here; polling lives in the store so
- * closing the dialog never strands the flow.
+ * Sign-in panel: the two code/browser buttons — always clickable, running the
+ * real flow when an application id is configured and opening the one-step
+ * setup in place when it is not (GitHub: the device one-time code only;
+ * GitLab: browser OAuth) — plus the token form that works everywhere
+ * (self-hosted included). Pending sign-ins render their waiting state
+ * here; polling lives in the store so closing the dialog never strands the
+ * flow.
  */
 export function SignInPanel({
   onSuccess
@@ -236,8 +237,8 @@ export function SignInPanel({
                 onClick={() => startBrowser('github')}
                 title={
                   support && !support.hasGitHubClientId
-                    ? 'Shows a one-time code to paste at github.com/login/device — needs an OAuth App id first (Device Flow enabled), which the next step asks for.'
-                    : 'Shows a one-time code to paste at github.com/login/device — no local port, no redirect. Uses GitHub’s own device-flow app until you paste your own id.'
+                    ? 'GitHub one-time-code sign-in (the device flow) — needs a free OAuth App id first, which the next step asks for. Or use a personal access token below.'
+                    : 'GitHub one-time-code sign-in (the device flow): type a short code at github.com/login/device. Or use a personal access token below.'
                 }
               >
                 Sign in with GitHub
@@ -340,15 +341,13 @@ export function SignInPanel({
 }
 
 /**
- * The one-step OAuth-app setup screen: the registration page for the server
- * being signed into, the callback URL to type in (GitLab only — copyable,
- * since a single wrong character silently breaks the redirect; GitHub's device
- * flow never uses one), the traps, and one paste box. GitLab needs it the first
- * time; GitHub only offers it as an override of the id baked into
- * providers/config.ts — and requires it on a GitHub Enterprise server, where
- * that id names no application. Saving is the same settings write the
- * Browser-sign-in-apps drawer does, so the id shows up there afterwards; the
- * caller then starts the sign-in immediately.
+ * The one-step OAuth-app setup a code/browser sign-in needs the first time:
+ * the registration page for the server being signed into, the callback URL
+ * to type in (copyable, since a single wrong character silently breaks the
+ * redirect — GitLab only; GitHub's device flow registers no callback), the
+ * traps, and one paste box. Saving is the same settings
+ * write the Browser-sign-in-apps drawer does, so the id shows up there
+ * afterwards; the caller then starts the sign-in flow immediately.
  */
 function SignInAppSetup({
   provider,
@@ -395,12 +394,11 @@ function SignInAppSetup({
       <p className="signin-setup-lede">
         {provider === 'github' ? (
           <>
-            Aspen’s code sign-in already works — it rides on GitHub’s own
-            device-flow application. Register one free OAuth application on{' '}
-            <strong>{oauthInstanceLabel(provider, instance)}</strong> to have
-            GitHub name Aspen instead (and to sign in to a GitHub Enterprise
-            server, which has no built-in id). About a minute, once, and Aspen
-            never needs the secret.
+            GitHub sign-in needs one free OAuth application on{' '}
+            <strong>{oauthInstanceLabel(provider, instance)}</strong> — about a
+            minute, once. The app only needs "Enable Device Flow": Aspen signs
+            you in with the one-time code, never a browser redirect, and never
+            needs the secret.
           </>
         ) : (
           <>
@@ -415,7 +413,7 @@ function SignInAppSetup({
           <code>{OAUTH_CALLBACK_URL}</code>
           <button
             className="mini"
-            title="Copy the callback/redirect URL to type into the registration form"
+            title="Copy the redirect URL to type into the registration form"
             onClick={() =>
               void call('writeClipboard', OAUTH_CALLBACK_URL).then(() =>
                 setNotice('Callback URL copied.')
@@ -436,10 +434,6 @@ function SignInAppSetup({
       )}
       {provider === 'github' && (
         <div className="signin-setup-callback">
-          <span className="field-hint">
-            GitHub's form asks for a callback URL — any URL works, because the
-            code sign-in never redirects back to Aspen.
-          </span>
           <button
             className="mini link"
             onClick={() =>
@@ -682,7 +676,7 @@ export function RemoteRepoPane({
       {pane.items.length === 0 && !pane.loading && pane.error === null && (
         <p className="remote-empty">
           {needle.length > 0 ? (
-            <>No repositories matching “{search.trim()}” for @{account.login}.</>
+            <>No repositories matching "{search.trim()}" for @{account.login}.</>
           ) : (
             <>
               No repositories visible for @{account.login}. Fetch the first page with{' '}

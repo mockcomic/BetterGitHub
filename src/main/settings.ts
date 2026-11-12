@@ -5,6 +5,12 @@ import { basename, join } from 'path'
 import { app, safeStorage } from 'electron'
 import type { ThemeId } from '../shared/themes'
 import { isThemeId } from '../shared/themes'
+import type { AutoFetchMinutes } from '../shared/auto-fetch'
+import {
+  DEFAULT_AUTO_FETCH_MINUTES,
+  isAutoFetchMinutes,
+  sanitizeAutoFetchMinutes
+} from '../shared/auto-fetch'
 import { pathKey } from './repo-scan-plan'
 import type {
   ManagedRepository,
@@ -35,6 +41,12 @@ interface StoredSettings {
   accounts: { githubClientId: string; gitlabClientId: string }
   confirmOverrideWithGeneratedMessage: boolean
   autoRefresh: boolean
+  /**
+   * Cadence of the automatic fetch of the selected repository (minutes, 0 =
+   * manual only); the renderer owns the timer, this file only stores the
+   * choice. See src/shared/auto-fetch.ts.
+   */
+  autoFetchMinutes: AutoFetchMinutes
   theme: ThemeId
   /** Watch folder for the repository scan; '' = watching off. */
   scanFolder: string
@@ -62,6 +74,7 @@ const DEFAULTS: StoredSettings = {
   },
   confirmOverrideWithGeneratedMessage: true,
   autoRefresh: true,
+  autoFetchMinutes: DEFAULT_AUTO_FETCH_MINUTES,
   theme: 'light',
   hintsEnabled: true,
   autoUpdateChecks: true,
@@ -102,6 +115,12 @@ async function load(): Promise<StoredSettings> {
       // rather than selecting a palette with no CSS block (an unskinned
       // :root with only font tokens).
       if (!isThemeId(cached.theme)) cached.theme = DEFAULTS.theme
+      // Same defense as the theme id: the cadence is a closed set, and a file
+      // carrying anything else (a hand-typed 7, a null from a torn write) reads
+      // back as the default rather than as silence.
+      cached.autoFetchMinutes = sanitizeAutoFetchMinutes(
+        cached.autoFetchMinutes
+      )
       return cached
     }
   } catch (err) {
@@ -138,6 +157,7 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     },
     confirmOverrideWithGeneratedMessage: s.confirmOverrideWithGeneratedMessage,
     autoRefresh: s.autoRefresh,
+    autoFetchMinutes: s.autoFetchMinutes,
     theme: s.theme,
     hintsEnabled: s.hintsEnabled,
     autoUpdateChecks: s.autoUpdateChecks,
@@ -192,6 +212,9 @@ export async function saveSettings(patch: SettingsPatch): Promise<PublicSettings
       patch.confirmOverrideWithGeneratedMessage
   }
   if (patch.autoRefresh !== undefined) s.autoRefresh = patch.autoRefresh
+  if (isAutoFetchMinutes(patch.autoFetchMinutes)) {
+    s.autoFetchMinutes = patch.autoFetchMinutes
+  }
   if (patch.scanFolder !== undefined) {
     const trimmed = patch.scanFolder.trim()
     s.scanFolder = trimmed.length === 0 ? '' : join(trimmed)

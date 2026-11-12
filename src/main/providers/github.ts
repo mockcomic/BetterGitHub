@@ -235,6 +235,92 @@ export function buildGitHubCreateRepoBody(
   return body
 }
 
+/** The POST URL that forks `parentFullName` into the caller's namespace. */
+export function githubForkUrl(apiBase: string, parentFullName: string): string {
+  const encoded = parentFullName
+    .split('/')
+    .map(seg => encodeURIComponent(seg))
+    .join('/')
+  return `${apiBase}/repos/${encoded}/forks`
+}
+
+/** The GET URL of a repository's API record (fork readiness polling). */
+export function githubRepoUrl(apiBase: string, fullName: string): string {
+  const encoded = fullName
+    .split('/')
+    .map(seg => encodeURIComponent(seg))
+    .join('/')
+  return `${apiBase}/repos/${encoded}`
+}
+
+/**
+ * A personal fork always keeps the parent's repository name; that lets the
+ * fork flow know the fork's full name (and a good web URL for errors) even
+ * when GitHub's 202 body is sparse.
+ */
+export function expectedForkFullName(login: string, parentFullName: string): string {
+  const parentName = parentFullName.split('/').pop() ?? parentFullName
+  return `${login}/${parentName}`
+}
+
+/** Everything fork readiness polling takes from its environment. */
+export interface ForkPollingDeps {
+  readonly fetchJson: (url: string, init?: RequestInit) => Promise<ApiResponse>
+  readonly sleep: (ms: number) => Promise<void>
+  readonly deadlineMs: number
+  readonly intervalMs: number
+}
+
+/**
+ * Poll `GET /repos/{forkFullName}` until the fork's record reads back as a
+ * repository — GitHub answers the POST with 202 while the copy is still
+ * being made, and a push must not race that. The fresh record (with the
+ * fork's real default branch and URLs) is what the caller gets. A 404 keeps
+ * the loop waiting; any other failure surfaces as the provider's own
+ * message; the deadline ends with a message naming the fork's page, because
+ * the fork will exist — soon.
+ */
+export async function pollGitHubForkReady(
+  deps: ForkPollingDeps,
+  apiBase: string,
+  token: string,
+  accountId: string,
+  forkFullName: string,
+  fallbackWebUrl: string
+): Promise<RemoteRepository> {
+  const until = Date.now() + deps.deadlineMs
+  let lastStatus = 0
+  for (;;) {
+    const res = await deps.fetchJson(githubRepoUrl(apiBase, forkFullName), {
+      headers: authHeaders(token)
+    })
+    if (res.ok) {
+      const fork = mapGitHubRepo(res.json, accountId)
+      if (fork !== null) return fork
+    } else if (res.status !== 404) {
+      fail(res)
+    }
+    lastStatus = res.status
+    if (Date.now() + deps.intervalMs > until) {
+      throw new Error(
+        `GitHub is still creating ${forkFullName} (HTTP ${lastStatus}). ` +
+          `It will be ready at ${fallbackWebUrl} shortly — Push again once it is.`
+      )
+    }
+    await deps.sleep(deps.intervalMs)
+  }
+}
+
+const FORK_POLL_DEADLINE_MS = 60_000
+const FORK_POLL_INTERVAL_MS = 1_000
+
+const liveForkPollingDeps: ForkPollingDeps = {
+  fetchJson: apiFetch,
+  sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+  deadlineMs: FORK_POLL_DEADLINE_MS,
+  intervalMs: FORK_POLL_INTERVAL_MS
+}
+
 /** True when the request should land somewhere other than the user's own space. */
 function ownerIsDifferent(login: string, owner: string): boolean {
   // GitHub logins (users and orgs) are case-insensitive.
@@ -337,5 +423,55 @@ export const githubClient: ProviderClient = {
       throw new Error('GitHub created the repository but returned an unreadable record.')
     }
     return created
+  },
+
+  /**
+   * Fork the parent under the account's own login and wait for GitHub to
+   * finish making it (see pollGitHubForkReady). A fork that already exists
+   * from an earlier day answers the POST with a refusal — when the account's
+   * own record is verifiably that same fork, the flow converges on it
+   * instead of erroring, so re-running the verb never dead-ends.
+   */
+  async forkRepo(apiBase, account, token, _authKind, parentFullName) {
+    const segments = parentFullName.split('/').filter(s => s.length > 0)
+    if (segments.length < 2) {
+      throw new Error(`Not a repository path GitHub can fork: ${parentFullName}`)
+    }
+    const forkFullName = expectedForkFullName(account.login, parentFullName)
+    const forkWebUrl = `${githubSiteRoot(apiBase)}/${forkFullName}`
+    const res = await apiFetch(githubForkUrl(apiBase, parentFullName), {
+      method: 'POST',
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+      body: '{}'
+    })
+    if (res.ok) return pollGitHubForkReady(liveForkPollingDeps, apiBase, token, account.id, forkFullName, forkWebUrl)
+
+    // Refused — GitHub answers "you already forked this" with a 403/409/422
+    // on the POST. Accept only a record that really is this account's fork
+    // of exactly this parent; anything else keeps the refusal message.
+    const existingRes = await apiFetch(githubRepoUrl(apiBase, forkFullName), {
+      headers: authHeaders(token)
+    })
+    if (existingRes.ok && isForkOf(existingRes.json, parentFullName)) {
+      const existing = mapGitHubRepo(existingRes.json, account.id)
+      if (existing !== null) {
+        return pollGitHubForkReady(liveForkPollingDeps, apiBase, token, account.id, existing.fullName, existing.webUrl)
+      }
+    }
+    fail(res)
   }
+}
+
+/**
+ * True when a repository record is a fork whose parent is `parentFullName`
+ * (case-insensitive, like every GitHub path comparison).
+ */
+function isForkOf(json: Record<string, unknown>, parentFullName: string): boolean {
+  const parent = json.parent
+  if (parent === null || typeof parent !== 'object') return false
+  const parentRepo = str((parent as Record<string, unknown>).full_name)
+  return (
+    parentRepo !== null &&
+    parentRepo.toLowerCase() === parentFullName.toLowerCase()
+  )
 }

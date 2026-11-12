@@ -25,19 +25,23 @@ import {
  * Browser sign-in flows, kept entirely in main so tokens never touch the
  * renderer:
  *
- * - **GitHub (the only browser flow GitHub offers)**: the `gh` / GitHub
- *   Desktop **device-code** dance — main fetches a device code, the user
- *   pastes the short code at github.com/login/device, main polls until
- *   GitHub says yes. No local port to hold and no redirect to catch, so it
- *   works behind strict NAT and on GitHub Enterprise roots alike (the
- *   endpoints mirror per host).
+ * - **GitHub (the only browser flow offered)**: the device-code one-time
+ *   code — the `gh` / GitHub Desktop dance. Main fetches a device code, the
+ *   user types the short code at github.com/login/device (or the enterprise
+ *   root's equivalent), main polls until GitHub says yes. No local port to
+ *   hold and no redirect to catch, so it works behind strict NAT and on
+ *   GitHub Enterprise roots alike (the endpoints mirror per host). GitHub's
+ *   authorization-code + PKCE web redirect is deliberately not offered:
+ *   GitHub sign-in is the one-time code or a personal access token, nothing
+ *   else.
  * - **GitLab**: OAuth **authorization code + PKCE** (public client — no
  *   client secret) against the instance the user signs into; main opens the
  *   authorize URL and catches the redirect on the loopback server.
  *
- * The 127.0.0.1 callback server (fixed port, see config.ts) therefore serves
- * GitLab alone, and the handler dispatches purely on the unguessable `state`
- * parameter so two GitLab sign-ins can never cross wires.
+ * The web flow uses a single 127.0.0.1 callback server (fixed port, see
+ * config.ts); the handler dispatches purely on the unguessable `state`
+ * parameter so two GitLab sign-ins can never cross wires, and the GitHub
+ * device flow needs no port at all.
  *
  * GitHub's other path — a personal access token pasted in the panel — needs
  * no application at all and is always offered.
@@ -148,8 +152,8 @@ function ensureCallbackServer(): Promise<void> {
       callbackStarting = null
       reject(
         new Error(
-          `Could not listen on 127.0.0.1:${OAUTH_REDIRECT_PORT} for the GitLab browser sign-in redirect (${err.message}). ` +
-          `Close whatever holds the port, or sign in with a personal access token instead.`
+          `Could not listen on 127.0.0.1:${OAUTH_REDIRECT_PORT} for the browser sign-in redirect (${err.message}). ` +
+          `Close whatever holds the port and retry, sign in with a token, or use GitHub's one-time code sign-in.`
         )
       )
     })
@@ -188,8 +192,8 @@ async function beginGitHubDevice(
     // baked-in id simply does not exist on a GitHub Enterprise host.
     const hint =
       root.toLowerCase() === 'https://github.com'
-        ? 'Check the OAuth App’s client id under Preferences → Accounts — it must have “Enable Device Flow” ticked.'
-        : `${root} has no OAuth App with that id. Register one on that server — tick “Enable Device Flow”, the callback URL may be anything — and paste its id under Preferences → Accounts, or sign in with a personal access token.`
+        ? 'Check the OAuth App\u2019s client id under Preferences \u2192 Accounts \u2014 it must have \u201cEnable Device Flow\u201d ticked.'
+        : `${root} has no OAuth App with that id. Register one on that server \u2014 tick \u201cEnable Device Flow\u201d, the callback URL may be anything \u2014 and paste its id under Preferences \u2192 Accounts, or sign in with a personal access token.`
     throw new Error(`GitHub refused the device sign-in start (HTTP ${res.status}). ${hint}`)
   }
   const deviceCode = str(res.json.device_code)
@@ -258,8 +262,9 @@ async function beginGitLabBrowser(
 
 /**
  * Start a browser sign-in for a provider; returns what the UI must show.
- * GitHub always uses the device-code flow — no local port, no redirect. GitLab
- * uses authorization-code + PKCE against its own instance.
+ * GitHub always runs the device-code one-time-code flow (the only code
+ * sign-in offered besides a personal access token); GitLab runs its
+ * authorization-code + PKCE browser flow.
  */
 export async function beginSignIn(
   provider: AccountProvider,
@@ -278,8 +283,8 @@ export async function beginSignIn(
     // asks for the id before a sign-in ever starts here.
     throw new Error(
       provider === 'github'
-        ? 'GitHub code sign-in needs an OAuth App client id with “Enable Device Flow” ticked (its callback URL is never used) — press “Sign in with GitHub” again and paste it in the setup step, add one under Preferences → Accounts → Browser sign-in apps, or sign in with a personal access token.'
-        : 'GitLab browser sign-in needs an application id (redirect URI http://127.0.0.1:8765/callback) — press “Sign in with GitLab” again and paste it in the setup step, add one under Preferences → Accounts → Browser sign-in apps, or sign in with a personal access token.'
+        ? 'GitHub one-time-code sign-in needs an OAuth App client id with \u201cEnable Device Flow\u201d ticked (its callback URL is never used) \u2014 press \u201cSign in with GitHub\u201d again and paste it in the setup step, add one under Preferences \u2192 Accounts \u2192 Browser sign-in apps, or sign in with a personal access token.'
+        : 'GitLab browser sign-in needs an application id (redirect URI http://127.0.0.1:8765/callback) \u2014 press \u201cSign in with GitLab\u201d again and paste it in the setup step, add one under Preferences \u2192 Accounts \u2192 Browser sign-in apps, or sign in with a personal access token.'
     )
   }
   // The stored apiBase follows each provider's token sign-in convention
@@ -312,7 +317,7 @@ function instanceRoot(apiBase: string | undefined, fallback: string): string {
 
 async function pollGitHubDevice(entry: PendingSignIn): Promise<SignInStatus> {
   if (entry.deviceCode === undefined) {
-    return { status: 'failed', message: 'This sign-in is no longer pending — start it again.' }
+    return { status: 'failed', message: 'This sign-in is no longer pending \u2014 start it again.' }
   }
   const res = await formPost(
     `${githubSiteRoot(entry.apiBase)}/login/oauth/access_token`,
@@ -352,7 +357,7 @@ async function pollGitHubDevice(entry: PendingSignIn): Promise<SignInStatus> {
     return { status: 'failed', message: 'GitHub returned no access token.' }
   }
   // GitHub OAuth tokens do not expire unless the app opted into expiring
-  // authorizations — then a refresh token rides along and is stored, so the
+  // authorizations \u2014 then a refresh token rides along and is stored, so the
   // account keeps working through providers/refresh.ts.
   const expiresAt =
     typeof res.json.expires_in === 'number' && res.json.expires_in > 0
@@ -429,7 +434,7 @@ export async function pollSignIn(requestId: string): Promise<SignInStatus> {
   const entry = pending.get(requestId)
   if (entry === undefined) {
     sweepExpired()
-    return { status: 'failed', message: 'This sign-in is no longer pending — start it again.' }
+    return { status: 'failed', message: 'This sign-in is no longer pending \u2014 start it again.' }
   }
   if (entry.expiresAt <= Date.now()) {
     closeEntry(entry)

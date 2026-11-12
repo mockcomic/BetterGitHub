@@ -3,6 +3,7 @@ import {
   branchUrl,
   commitUrl,
   compareUrl,
+  pullRequestUrl,
   toWebRepository
 } from '../src/main/git/github-url'
 
@@ -62,5 +63,44 @@ describe('web URLs', () => {
     expect(compareUrl(repo, 'main', 'feature/x')).toBe(
       'https://github.com/owner/repo/compare/main...feature/x'
     )
+  })
+})
+
+describe('pullRequestUrl', () => {
+  const parent = toWebRepository('git@github.com:parent/repo.git')!
+
+  it('opens the same-repo compare with the form expanded', () => {
+    expect(pullRequestUrl(parent, 'main', { branch: 'feature/x' })).toBe(
+      'https://github.com/parent/repo/compare/main...feature/x?expand=1'
+    )
+  })
+
+  it('spells a fork head as user:repo:branch with literal colons', () => {
+    expect(
+      pullRequestUrl(parent, 'main', {
+        branch: 'feature',
+        forkOwner: 'octo',
+        forkName: 'repo'
+      })
+    ).toBe('https://github.com/parent/repo/compare/main...octo:repo:feature?expand=1')
+  })
+
+  it('keeps fork branch slashes path-like and still encodes URL-awkward refs', () => {
+    expect(
+      pullRequestUrl(parent, 'main', {
+        branch: 'fix/bug#1',
+        forkOwner: 'octo',
+        forkName: 'repo'
+      })
+    ).toBe('https://github.com/parent/repo/compare/main...octo:repo:fix/bug%231?expand=1')
+  })
+
+  it('targets the base repository — the parent, not the fork', () => {
+    const fork = toWebRepository('https://github.com/octo/repo.git')!
+    expect(
+      pullRequestUrl(fork, 'main', { branch: 'feature' }).startsWith(
+        'https://github.com/octo/repo/compare/'
+      )
+    ).toBe(true)
   })
 })

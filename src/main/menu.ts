@@ -126,6 +126,12 @@ const MENUS: ReadonlyArray<TopMenu> = [
       { label: 'Delete branch…', action: 'delete-branch' },
       { separator: true },
       { label: 'Publish repository…', action: 'publish-repository' },
+      { label: 'Fork this repository…', action: 'create-fork' },
+      {
+        label: 'Create Pull Request',
+        accelerator: 'CmdOrCtrl+Shift+R',
+        action: 'create-pull-request'
+      },
       { separator: true },
       {
         label: 'Fetch',

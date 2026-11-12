@@ -1,6 +1,6 @@
-import { existsSync, readdirSync } from 'fs'
 import { basename } from 'path'
-import { gitRetryCredential } from '../accounts'
+import { gitRetryCredential, githubAccountCoversHost } from '../accounts'
+import { prepareRepositoryFolder } from './init'
 import { buildTokenAuthEnv, httpsHostOf, isGitAuthFailure } from './auth'
 import type { GitTokenCredential } from './auth'
 import {
@@ -10,18 +10,22 @@ import {
   type GitExecResult
 } from './exec'
 import {
+  PUSH_NEEDS_FORK_MESSAGE,
   PUSH_NEEDS_PULL_MESSAGE,
+  isPushPermissionDenied,
   isRemoteMovedAhead
 } from '../../shared/push-rejection'
 import { getStatus } from './status'
+import { toWebRepository } from './github-url'
 
 /**
  * Run a hosted-remote git command, and when it fails specifically because
  * git could not authenticate, rerun it once with the signed-in account's
  * token scoped to that URL's origin (see git/auth.ts). Any other failure —
- * and the retry's own failure — surface unchanged.
+ * and the retry's own failure — surface unchanged. Exported for the fork
+ * flow (git/fork.ts), whose pinned push needs the identical fallback.
  */
-async function execGitWithTokenRetry(
+export async function execGitWithTokenRetry(
   args: ReadonlyArray<string>,
   options: GitExecOptions,
   remoteUrl: string | null
@@ -83,6 +87,23 @@ export async function push(repoPath: string): Promise<string> {
     // branches, hooks) stay raw errors.
     if (err instanceof GitExecError && isRemoteMovedAhead(err.result.stderr)) {
       throw new Error(PUSH_NEEDS_PULL_MESSAGE)
+    }
+    // A push refused for lack of write access has the other one-click
+    // recovery — fork the repository and push to the fork (git/fork.ts).
+    // Only promise the button when a signed-in GitHub account serves this
+    // remote's host; everyone else keeps a plain permission error. The host
+    // comes from toWebRepository so ssh remotes are covered too.
+    if (
+      err instanceof GitExecError &&
+      isPushPermissionDenied(`${err.result.stderr}\n${err.result.stdout}`)
+    ) {
+      const web = toWebRepository(remoteUrl)
+      if (web !== null && (await githubAccountCoversHost(web.host))) {
+        throw new Error(PUSH_NEEDS_FORK_MESSAGE)
+      }
+      throw new Error(
+        'Push rejected — you do not have write access to this repository.'
+      )
     }
     throw err
   }
@@ -300,29 +321,32 @@ export function suggestedCloneDirectory(url: string): string {
   return basename(last) || 'repository'
 }
 
+/**
+ * Clone `url` into a folder the app lays out — `<parentDir>/<folderName>` — and
+ * report the destination. Taking parent and name separately (the same shape
+ * createLocalRepository uses) keeps the path joining and the not-empty guard in
+ * one place: `git clone` builds the repository *inside* its destination
+ * argument, and the child process needs a working directory that already
+ * exists — so the destination is validated here and the clone runs from the
+ * parent, which git creates the folder in. That also means a failed clone
+ * tidies itself up: `git clone` removes a destination it made itself, so the
+ * next attempt is not blocked by a folder the last one introduced.
+ */
 export async function cloneRepository(
   url: string,
-  destinationPath: string
+  parentDir: string,
+  folderName: string
 ): Promise<string> {
   if (url.trim().length === 0) {
     throw new Error('Enter a repository URL to clone.')
   }
-  if (!existsSync(destinationPath)) {
-    throw new Error(`Destination does not exist: ${destinationPath}`)
-  }
-  const existing = readdirSync(destinationPath)
-  if (existing.length > 0) {
-    throw new Error(
-      `Destination folder is not empty: ${destinationPath}\nPick an empty folder to clone into.`
-    )
-  }
-
-  const r = await execGitWithTokenRetry(
-    ['clone', '--progress', '--end-of-options', url.trim(), destinationPath],
-    { cwd: destinationPath, timeoutMs: 15 * 60_000 },
+  const { destination } = await prepareRepositoryFolder(parentDir, folderName)
+  await execGitWithTokenRetry(
+    ['clone', '--progress', '--end-of-options', url.trim(), destination],
+    { cwd: parentDir, timeoutMs: 15 * 60_000 },
     url.trim()
   )
-  return (r.stderr + r.stdout).trim()
+  return destination
 }
 
 /** Validates that a directory is a usable git repository. */

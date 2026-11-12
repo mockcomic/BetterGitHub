@@ -6,6 +6,7 @@ import type {
   AccountInfo,
   CreateRepoRequest,
   ExternalApp,
+  ForkPreflight,
   GeneratedCommitMessage,
   GitHubTarget,
   IgnoreRequest,
@@ -45,6 +46,7 @@ import {
   cherryPickCommit,
   commitPaths,
   revertCommit,
+  uncommitCommit,
   undoLastCommit
 } from './git/commit'
 import {
@@ -92,6 +94,12 @@ import {
 } from './git/sync'
 import { createLocalRepository } from './git/init'
 import {
+  precheckFork,
+  pullRequestUrlFor,
+  pushCurrentBranchToFork,
+  retargetToFork
+} from './git/fork'
+import {
   addRepository,
   getAiConfig,
   getPublicSettings,
@@ -110,6 +118,7 @@ import { parentKey, pathKey } from './repo-scan-plan'
 import {
   accountAvatar,
   accountGitCredential,
+  accountRepoHost,
   addAccount,
   getAccount,
   getAccountToken,
@@ -398,6 +407,8 @@ const handlers: Handlers = {
               ahead: status.ahead,
               behind: status.behind,
               hasUpstream: status.upstream !== undefined,
+              upstream: status.upstream,
+              upstreamGone: status.upstreamGone === true,
               lastCommitAt: log[0]?.date ?? null,
               unreadable: false
             }
@@ -517,7 +528,7 @@ const handlers: Handlers = {
     return checkForUpdates(true)
   },
   async downloadUpdate() {
-    downloadApprovedUpdate()
+    await downloadApprovedUpdate()
   },
   async quitAndInstallUpdate() {
     quitAndInstallUpdate()
@@ -645,6 +656,59 @@ const handlers: Handlers = {
     const credential = await accountGitCredential(account)
     await publishToRemote(repoPath, created.cloneUrl, credential)
     return created
+  },
+  async forkPreflight(repoPath: string): Promise<ForkPreflight> {
+    const parent = await precheckFork(repoPath)
+    const accounts = (await listAccounts()).filter(
+      a => a.provider === 'github' && accountRepoHost(a) === parent.web.host
+    )
+    if (accounts.length === 0) {
+      throw new Error(
+        `No signed-in GitHub account serves ${parent.web.host} — sign in first, then fork.`
+      )
+    }
+    return {
+      parentFullName: parent.fullName,
+      parentWebUrl: parent.web.webUrl,
+      accounts
+    }
+  },
+  async forkRepository(
+    repoPath: string,
+    accountId: string
+  ): Promise<RemoteRepository> {
+    const account = await requireAccount(accountId)
+    const parent = await precheckFork(repoPath)
+    if (
+      account.provider === 'github' &&
+      accountRepoHost(account) !== parent.web.host
+    ) {
+      throw new Error(
+        `${account.login} is a ${accountRepoHost(account)} account — ` +
+          `this repository's origin is on ${parent.web.host}.`
+      )
+    }
+    const client = account.provider === 'github' ? githubClient : gitlabClient
+    // The provider call (and its one 401-refresh retry) is what gates the
+    // local rewire below — no fork, no remote changes.
+    const fork = await withAccountToken(account, token =>
+      client.forkRepo(
+        account.apiBase,
+        account,
+        token,
+        account.authKind,
+        parent.fullName
+      )
+    )
+    await retargetToFork(repoPath, fork)
+    // Same push discipline as publish (git/fork.ts): token pinned first,
+    // helper/retry fallback second, remotes kept on any failure.
+    const credential = await accountGitCredential(account)
+    await pushCurrentBranchToFork(repoPath, fork.cloneUrl, credential)
+    return fork
+  },
+  async createPullRequest(repoPath: string): Promise<void> {
+    await openUrl(await pullRequestUrlFor(repoPath))
   },
   async createLocalRepository(parentDir: string, name: string, addReadme: boolean) {
     return createLocalRepository(parentDir, name, addReadme)
@@ -789,6 +853,9 @@ const handlers: Handlers = {
   async undoLastCommit(repoPath: string, expectedSha: string) {
     await undoLastCommit(repoPath, expectedSha)
   },
+  async uncommitCommit(repoPath: string, sha: string) {
+    await uncommitCommit(repoPath, sha)
+  },
   async revertCommit(repoPath: string, sha: string) {
     await revertCommit(repoPath, sha)
   },
@@ -875,11 +942,9 @@ const handlers: Handlers = {
   async setConfigInfo(repoPath: string, name: string, email: string) {
     await setConfigInfo(repoPath, name, email)
   },
-  async cloneRepository(url: string, destinationPath: string) {
-    const output = await cloneRepository(url, destinationPath)
-    const path = destinationPath
-    await addRepository(path)
-    return output.length > 0 ? output : `Cloned ${url} into ${path}`
+  async cloneRepository(url: string, parentDir: string, folderName: string) {
+    const destination = await cloneRepository(url, parentDir, folderName)
+    return addRepository(destination)
   },
   async viewOnGitHub(repoPath: string, target: GitHubTarget) {
     const repo = await resolveWebRepo(repoPath)

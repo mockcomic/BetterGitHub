@@ -13,6 +13,8 @@ import {
 import { ConfettiBurst, useCelebration } from './Celebration'
 import { useJustArmed } from '../motion'
 import { showStagedBadges } from '../progressive'
+import { DivergenceChips, UpstreamGoneChip } from './BranchBadges'
+import { commits, divergenceSentence } from '../divergence'
 
 function matches(path: string, filter: string): boolean {
   const needle = filter.trim().toLowerCase()
@@ -447,10 +449,10 @@ export function HistoryQueue(): JSX.Element {
                   label: 'Create branch from commit…',
                   onSelect: () => store.createBranchFromSelectedCommit()
                 },
-                ...(state.commits[0]?.sha === c.sha && !c.isMerge
+                ...(!c.isMerge
                   ? [
                       {
-                        label: 'Uncommit latest commit…',
+                        label: 'Uncommit commit…',
                         onSelect: () => store.uncommitSelectedCommit()
                       }
                     ]
@@ -778,12 +780,16 @@ export function CommitTray(): JSX.Element {
   const total = state.status?.files.length ?? 0
   const ahead = state.status?.ahead ?? 0
   const behind = state.status?.behind ?? 0
-  const hasUpstream = state.status?.upstream !== undefined
+  const gone = state.status?.upstreamGone === true
+  // An upstream deleted on the remote still has a name, but nothing to pull
+  // from and nothing to compare against: the tray treats it as unpublished
+  // work, exactly as the strip's verb does (see progressive.syncVerb).
+  const hasUpstream = state.status?.upstream !== undefined && !gone
   // The same conversion as the strip's Sync button: a diverged branch — or a
   // push that just bounced off a moved-ahead remote — turns the tray's Push
   // into the compound Pull & Push verb, whose click pulls first and pushes
   // automatically (see store.pullThenPush and progressive.syncVerb).
-  const diverged = state.pushNeedsPull || (behind > 0 && ahead > 0)
+  const diverged = !gone && (state.pushNeedsPull || (behind > 0 && ahead > 0))
   const checked = draft?.checked ?? new Set<string>()
   // Staged files are the commit baseline; ticking only adds to it.
   const staged = new Set(
@@ -806,6 +812,7 @@ export function CommitTray(): JSX.Element {
   )
   const commitArmed = useJustArmed(commitEnabled)
   const pushArmed = useJustArmed(pushEnabled)
+  const push = pushStory(state)
 
   return (
     <>
@@ -913,14 +920,16 @@ export function CommitTray(): JSX.Element {
         {/* The tray's Push joins the desk when it can act — it appears at the
             moment a commit lands ahead of the remote (or a branch is ready to
             publish), instead of sitting permanently dead next to Commit. When
-            the branch has diverged it converts to Pull & Push in place. */}
+            the branch has diverged it converts to Pull & Push in place, and it
+            wears the same divergence chips the strip's verb does. */}
         {pushEnabled && (
           <button
             className={`btn push${pushArmed ? ' arming' : ''}${diverged ? ' sync-verb' : ''}`}
+            aria-label={push.aria}
             onClick={() =>
               diverged ? void store.pullThenPush() : void store.doSync('push')
             }
-            title={pushTitle(state)}
+            title={push.title}
           >
             {diverged && state.busy === 'pull' ? (
               <>
@@ -930,29 +939,13 @@ export function CommitTray(): JSX.Element {
               <>
                 <span className="spinner" /> Pushing…
               </>
-            ) : diverged ? (
-              <>
-                ⇅ Pull &amp; Push
-                {behind > 0 && (
-                  <span className="count-pop" key={`tray-pull-count-${behind}`}>
-                    {' '}↓{behind}
-                  </span>
-                )}
-                {ahead > 0 && (
-                  <span className="count-pop" key={`tray-push-count-${ahead}`}>
-                    {' '}↑{ahead}
-                  </span>
-                )}
-              </>
             ) : (
               <>
-                ↑ Push
-                {ahead > 0 ? (
-                  <span className="count-pop" key={`tray-push-count-${ahead}`}>
-                    {' '}{ahead}
-                  </span>
+                {push.label}
+                {gone ? (
+                  <UpstreamGoneChip upstream={state.status?.upstream ?? ''} />
                 ) : (
-                  ''
+                  <DivergenceChips ahead={ahead} behind={behind} />
                 )}
               </>
             )}
@@ -963,19 +956,54 @@ export function CommitTray(): JSX.Element {
   )
 }
 
-function pushTitle(state: AppState): string {
-  if (state.status === null) return 'Loading repository status…'
+/**
+ * What the tray's outgoing verb says, in one place, so its label, its tooltip
+ * and its accessible name can never disagree — and so the tray's story stays
+ * word-for-word the strip's story (see Header's SyncButton and
+ * progressive.syncVerb, which this defers to).
+ */
+function pushStory(state: AppState): {
+  label: string
+  title: string
+  aria: string
+} {
+  if (state.status === null)
+    return { label: 'Push', title: 'Loading repository status…', aria: 'Push' }
   const ahead = state.status.ahead ?? 0
   const behind = state.status.behind ?? 0
-  if (state.pushNeedsPull || (behind > 0 && ahead > 0)) {
-    return 'The branches have diverged — Pull lands the remote\u2019s commits first, then your Push follows automatically'
-  }
-  if (state.status.upstream === undefined) {
-    return 'No upstream branch yet — Push publishes this branch and sets upstream on origin'
-  }
+  const upstream = state.status.upstream ?? 'origin'
+  const branch = state.status.branch
+  if (state.status.upstreamGone === true)
+    return {
+      label: 'Publish',
+      title: `The remote branch this one tracked is gone — Pushing publishes ${branch} again and re-sets its upstream`,
+      aria: `Publish ${branch} again — the upstream ${upstream} was deleted on the remote`
+    }
+  if (state.pushNeedsPull || (behind > 0 && ahead > 0))
+    return {
+      label: 'Pull & Push',
+      title:
+        'The branches have diverged — Pull lands the remote\u2019s commits first, then your Push follows automatically',
+      aria: `Pull & Push — ${divergenceSentence(ahead, behind)} against ${upstream}`
+    }
+  if (state.status.upstream === undefined)
+    return {
+      label: 'Publish',
+      title:
+        'No upstream branch yet — Push publishes this branch and sets upstream on origin',
+      aria: `Publish ${branch} — it is not on the remote yet`
+    }
   return ahead > 0
-    ? `Push ${ahead} commit${ahead === 1 ? '' : 's'} to ${state.status.upstream}`
-    : `Nothing to push — ${state.status.branch} is up to date with ${state.status.upstream}`
+    ? {
+        label: 'Push',
+        title: `Push ${commits(ahead)} to ${upstream}`,
+        aria: `Push — ${commits(ahead)} to ${upstream}`
+      }
+    : {
+        label: 'Push',
+        title: `Nothing to push — ${branch} is up to date with ${upstream}`,
+        aria: `Push — ${branch} is up to date with ${upstream}`
+      }
 }
 
 // ----------------------------------------------------------------- shared

@@ -1,5 +1,5 @@
 /**
- * Compiled defaults for browser sign-in.
+ * Compiled defaults for the code/browser sign-ins.
  *
  * - GitHub (**device-code flow** — the only browser sign-in GitHub offers):
  *   press **Sign in with GitHub**, Aspen shows a one-time code, you paste it at
@@ -50,11 +50,11 @@ export const DEFAULT_GITHUB_CLIENT_ID = '178c6fc778ccc68e1d6a'
 export const DEFAULT_GITLAB_CLIENT_ID = ''
 
 /**
- * Fixed loopback port for the browser sign-in redirect. It serves the
- * **GitLab** authorization-code flow only (GitHub's device flow needs no
- * port), and it must match the redirect URI registered on the application, so
- * it is not ephemeral; a busy port makes the GitLab web flow fail with an
- * actionable message.
+ * Fixed loopback port for the GitLab browser sign-in redirect. GitHub's
+ * device flow needs no port at all, so the callback server serves only
+ * GitLab's authorization-code flow (dispatch on the `state` parameter), and
+ * it must match the redirect URI registered on the application; a busy port
+ * makes the GitLab web flow fail with an actionable message.
  */
 export const OAUTH_REDIRECT_PORT = 8765
 export const OAUTH_REDIRECT_URI = `http://127.0.0.1:${OAUTH_REDIRECT_PORT}/callback`

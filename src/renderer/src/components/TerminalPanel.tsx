@@ -413,6 +413,15 @@ function TerminalView({
         if (e.type !== 'keydown' || (!e.ctrlKey && !e.metaKey)) return true
         const key = e.key.toLowerCase()
         if (key === 'v') {
+          // Suppress the browser's own paste too. xterm attaches a `paste`
+          // listener to its hidden textarea and to the terminal element
+          // (@xterm/xterm src/browser/Terminal.ts:342-344), so an unprevented
+          // Ctrl+V lets Chromium paste into the textarea AND this read-back
+          // paste run — the text reached the PTY twice (verified against a
+          // real keydown in Electron 44 + xterm 5.5: one keydown produced two
+          // identical onData writes). Pasting from here only keeps the one
+          // spelling working on every platform.
+          e.preventDefault()
           void navigator.clipboard?.readText().then(text => terminal.paste(text))
           return false
         }

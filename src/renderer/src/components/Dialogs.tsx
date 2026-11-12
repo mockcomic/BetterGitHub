@@ -7,15 +7,32 @@ import type { AccountInfo, ProviderOwner, RemoteRepoSort } from '../../../shared
 import type { ThemeId } from '../../../shared/themes'
 import { isThemeId, THEME_ENTRIES } from '../../../shared/themes'
 import { Dialog, Field, InfoTip } from './Dialog'
-import { BranchDivergence, divergenceTitleSuffix } from './BranchBadges'
+import { BranchDivergence } from './BranchBadges'
+import { branchAriaLabel, divergenceTitleSuffix } from '../divergence'
 import { AccountList, EMPTY_PANE, RemoteRepoPane, SignInPanel, type RepoPaneState } from './AccountsUi'
 
 import { DONATE_URL } from '../../../shared/links'
 import { RELEASES_URL, type UpdateState } from '../../../shared/updates'
+import {
+  AUTO_FETCH_CHOICES,
+  DEFAULT_AUTO_FETCH_MINUTES,
+  isAutoFetchMinutes
+} from '../../../shared/auto-fetch'
+import type { AutoFetchMinutes } from '../../../shared/auto-fetch'
 
 const autoEntries = THEME_ENTRIES.filter(e => e.group === 'auto')
 const lightEntries = THEME_ENTRIES.filter(e => e.group === 'light')
 const darkEntries = THEME_ENTRIES.filter(e => e.group === 'dark')
+
+/** How each offered fetch cadence is named in Preferences ▸ Behavior. */
+const AUTO_FETCH_LABELS: Record<AutoFetchMinutes, string> = {
+  0: 'Off — fetch only when I press Fetch',
+  1: 'Every minute',
+  5: 'Every 5 minutes',
+  15: 'Every 15 minutes',
+  30: 'Every 30 minutes',
+  60: 'Every hour'
+}
 
 /** The preferences rail, in panel order. General leads: it is where the
  *  app-level switches live, and the conventional first item of a settings
@@ -54,6 +71,8 @@ export function SettingsDialog(): JSX.Element | null {
   const [gitlabClientId, setGitLabClientId] = useState('')
   const [confirmOverride, setConfirmOverride] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoFetchMinutes, setAutoFetchMinutes] =
+    useState<AutoFetchMinutes>(DEFAULT_AUTO_FETCH_MINUTES)
   const [hintsEnabled, setHintsEnabled] = useState(true)
   const [autoUpdateChecks, setAutoUpdateChecks] = useState(true)
   const [theme, setTheme] = useState<ThemeId>('system')
@@ -72,6 +91,7 @@ export function SettingsDialog(): JSX.Element | null {
       setCustomInstructions(settings.ai.customInstructions)
       setConfirmOverride(settings.confirmOverrideWithGeneratedMessage)
       setAutoRefresh(settings.autoRefresh)
+      setAutoFetchMinutes(settings.autoFetchMinutes)
       setHintsEnabled(settings.hintsEnabled)
       setAutoUpdateChecks(settings.autoUpdateChecks)
       setTheme(settings.theme)
@@ -167,6 +187,7 @@ export function SettingsDialog(): JSX.Element | null {
                   },
                   confirmOverrideWithGeneratedMessage: confirmOverride,
                   autoRefresh,
+                  autoFetchMinutes,
                   hintsEnabled,
                   autoUpdateChecks,
                   theme,
@@ -229,7 +250,7 @@ export function SettingsDialog(): JSX.Element | null {
             onChange={e => setAutoUpdateChecks(e.target.checked)}
           />
           <span>Check GitHub releases for updates at startup</span>
-          <InfoTip text={'Aspen asks the public releases page of this app’s GitHub repository whether a newer version exists. Nothing identifies you, and nothing downloads or installs itself.'} />
+          <InfoTip text={'Aspen asks the public releases page of this app\u2019s GitHub repository whether a newer version exists. Nothing identifies you, and nothing downloads or installs itself.'} />
         </label>
         <p className="field-hint">
           Switches the automatic pass only, in installed builds, and takes
@@ -247,8 +268,8 @@ export function SettingsDialog(): JSX.Element | null {
         </label>
         <Field
           label="Watch folder for repositories"
-          hint="Its direct subfolders that are git repositories keep the list in step — new ones appear, folders that leave the disk are dropped. Applies when you press Save; Rescan stays in the repository manager."
-          tip={'Leave empty to keep the list exactly as you built it.\nOne level deep: the folder’s own subfolders, each recognised by its .git — a worktree or submodule folder counts, nested projects deeper down do not.'}
+          hint="Its direct subfolders that are git repositories keep the list in step \u2014 new ones appear, folders that leave the disk are dropped. Applies when you press Save; Rescan stays in the repository manager."
+          tip={'Leave empty to keep the list exactly as you built it.\nOne level deep: the folder\u2019s own subfolders, each recognised by its .git \u2014 a worktree or submodule folder counts, nested projects deeper down do not.'}
         >
           <div className="row">
             <input
@@ -267,7 +288,7 @@ export function SettingsDialog(): JSX.Element | null {
                 if (dir !== null) setScanFolder(dir)
               }}
             >
-              Choose…
+              Choose\u2026
             </button>
             {scanFolder.length > 0 && (
               <button
@@ -287,31 +308,31 @@ export function SettingsDialog(): JSX.Element | null {
       <section className="settings-section">
         <h3>AI agent</h3>
         <p className="field-hint">
-          Optional — this is what powers ✨ Generate in the commit tray and
-          ✨ AI on conflicted files. The rest of Aspen works without any of
+          Optional \u2014 this is what powers \u2728 Generate in the commit tray and
+          \u2728 AI on conflicted files. The rest of Aspen works without any of
           it.
         </p>
         {state.settingsAiNote && (
           <div className="workflow-banner settings-note">
             <strong>The AI agent needs an endpoint first.</strong>
             <span>
-              Point Base URL at any OpenAI-compatible server — OpenAI,
-              OpenRouter, or a local Ollama or LM Studio — add an API key if
+              Point Base URL at any OpenAI-compatible server \u2014 OpenAI,
+              OpenRouter, or a local Ollama or LM Studio \u2014 add an API key if
               your server asks for one, then press Test connection.
             </span>
           </div>
         )}
         <Field
           label="Base URL"
-          hint="Any OpenAI-compatible server: https://api.openai.com/v1, https://openrouter.ai/api/v1, http://localhost:11434/v1 …"
-          tip={'✨ Generate sends your staged diff and draft message to this one host — no other git content leaves the machine because of the AI.\nLocal servers (Ollama, LM Studio) answer the same shape and need no key.'}
+          hint="Any OpenAI-compatible server: https://api.openai.com/v1, https://openrouter.ai/api/v1, http://localhost:11434/v1 \u2026"
+          tip={'\u2728 Generate sends your staged diff and draft message to this one host \u2014 no other git content leaves the machine because of the AI.\nLocal servers (Ollama, LM Studio) answer the same shape and need no key.'}
         >
           <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} />
         </Field>
         <Field
           label="Model"
           hint="e.g. gpt-4o-mini, claude-3-5-haiku, llama3.1, qwen2.5-coder"
-          tip={'Any model id your endpoint serves. Small, fast chat models write good commit messages — a 7–14B coder model locally beats a huge one over the wire.'}
+          tip={'Any model id your endpoint serves. Small, fast chat models write good commit messages \u2014 a 7\u201314B coder model locally beats a huge one over the wire.'}
         >
           <input value={model} onChange={e => setModel(e.target.value)} />
         </Field>
@@ -326,7 +347,7 @@ export function SettingsDialog(): JSX.Element | null {
         >
           <input
             type="password"
-            placeholder={settings.ai.hasApiKey ? '••••••••••••••' : 'sk-…'}
+            placeholder={settings.ai.hasApiKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : 'sk-\u2026'}
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
           />
@@ -334,7 +355,7 @@ export function SettingsDialog(): JSX.Element | null {
         <Field
           label="Custom commit message rules (optional)"
           hint="Fixed rules added to the AI's instructions for this app, e.g. conventional commits, issue trailer format."
-          tip={'Plain text appended to the agent’s fixed system prompt for every generation in this app. Example: “summary ≤ 50 chars, body wrapped at 72, add Closes #NNN trailers”.'}
+          tip={'Plain text appended to the agent\u2019s fixed system prompt for every generation in this app. Example: \u201csummary \u2264 50 chars, body wrapped at 72, add Closes #NNN trailers\u201d.'}
         >
           <textarea
             rows={3}
@@ -357,15 +378,15 @@ export function SettingsDialog(): JSX.Element | null {
                   ...(apiKey.length > 0 ? { apiKey } : {})
                 })
                 .then(r => {
-                  setTestResult(`${r.ok ? '✓ ' : '✗ '}${r.message}`)
+                  setTestResult(`${r.ok ? '\u2713 ' : '\u2717 '}${r.message}`)
                 })
                 .finally(() => setTesting(false))
             }}
           >
-            {testing ? 'Testing…' : 'Test connection'}
+            {testing ? 'Testing\u2026' : 'Test connection'}
           </button>
           {testResult !== null && (
-            <span className={testResult.startsWith('✓') ? 'ok' : 'bad'}>
+            <span className={testResult.startsWith('\u2713') ? 'ok' : 'bad'}>
               {testResult}
             </span>
           )}
@@ -385,25 +406,25 @@ export function SettingsDialog(): JSX.Element | null {
         >
           <summary>
             Browser sign-in apps
-            <InfoTip text={'Both buttons are always clickable. With an id here GitHub shows its one-time code straight away and GitLab goes to your browser for authorization; without one the button first asks for the id, in place. Aspen ships no shared id, so your sign-ins never ride on someone else’s rate limits — and the token sign-in above needs none of this.'} />
+            <InfoTip text={'Both sign-in buttons are always clickable. With an id here GitHub goes straight to the one-time code and GitLab straight to your browser for authorization; without one the button first asks for the id, in place. Aspen ships no shared id, so your sign-ins never ride on someone else\u2019s rate limits \u2014 and the token sign-in above needs none of this.'} />
           </summary>
           <p className="field-hint">
             The browser buttons sign you in through an OAuth application you register
-            once and paste here (or bake into providers/config.ts and rebuild) — the
+            once and paste here (or bake into providers/config.ts and rebuild) \u2014 the
             sign-in panel walks you through the same registration when a box is empty.
             Aspen ships no shared id so your sign-ins never ride on someone else's
             rate limits.
           </p>
           <Field
             label="GitHub OAuth App client id"
-            hint="Already filled in: Aspen ships GitHub’s own device-flow app id, so the button shows a code on a fresh install. Paste your own app’s id to have GitHub name it instead (tick “Enable Device Flow”; any callback URL); required on GitHub Enterprise. Clear the box to go back to the built-in id."
-            tip={'A device-code sign-in needs an OAuth App with “Enable Device Flow” ticked.\nOut of the box Aspen uses the public id GitHub’s own CLI embeds, so the approval page says “GitHub CLI” and the token is listed under that app.\nTo change that: Settings → Developer settings → OAuth Apps → New OAuth App. Homepage URL and callback URL: anything.\nTick “Enable Device Flow”, then paste the Client ID here — Aspen never needs the secret.\nOn GitHub Enterprise the built-in id names no app, so registering one there is required.'}
+            hint="Already filled in: Aspen ships GitHub\u2019s own device-flow app id, so the button shows a code on a fresh install. Paste your own app\u2019s id to have GitHub name it instead (tick \u201cEnable Device Flow\u201d; any callback URL); required on GitHub Enterprise. Clear the box to go back to the built-in id."
+            tip={'A device-code sign-in needs an OAuth App with \u201cEnable Device Flow\u201d ticked.\nOut of the box Aspen uses the public id GitHub\u2019s own CLI embeds, so the approval page says \u201cGitHub CLI\u201d and the token is listed under that app.\nTo change that: Settings \u2192 Developer settings \u2192 OAuth Apps \u2192 New OAuth App. Homepage URL and callback URL: anything.\nTick \u201cEnable Device Flow\u201d, then paste the Client ID here \u2014 Aspen never needs the secret.\nOn GitHub Enterprise the built-in id names no app, so registering one there is required.'}
           >
             <input
               placeholder={
                 settings.accounts.hasGitHubClientId
-                  ? '•••••••• configured — paste a new id to replace'
-                  : 'Iv23li…'
+                  ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 configured \u2014 paste a new id to replace'
+                  : 'Iv23li\u2026'
               }
               value={githubClientId}
               onChange={e => setGitHubClientId(e.target.value)}
@@ -411,14 +432,14 @@ export function SettingsDialog(): JSX.Element | null {
           </Field>
           <Field
             label="GitLab application id"
-            hint="gitlab.com Profile → Applications → confidential OFF, redirect URI exactly http://127.0.0.1:8765/callback, scope api."
-            tip={'GitLab → Preferences → Applications.\nConfidential: OFF — Aspen is a public PKCE client.\nRedirect URI: exactly http://127.0.0.1:8765/callback; tick the api scope.\nPaste the numeric Application ID.'}
+            hint="gitlab.com Profile \u2192 Applications \u2192 confidential OFF, redirect URI exactly http://127.0.0.1:8765/callback, scope api."
+            tip={'GitLab \u2192 Preferences \u2192 Applications.\nConfidential: OFF \u2014 Aspen is a public PKCE client.\nRedirect URI: exactly http://127.0.0.1:8765/callback; tick the api scope.\nPaste the numeric Application ID.'}
           >
             <input
               placeholder={
                 settings.accounts.hasGitLabClientId
-                  ? '•••••••• configured — paste a new id to replace'
-                  : 'app id…'
+                  ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 configured \u2014 paste a new id to replace'
+                  : 'app id\u2026'
               }
               value={gitlabClientId}
               onChange={e => setGitLabClientId(e.target.value)}
@@ -438,7 +459,7 @@ export function SettingsDialog(): JSX.Element | null {
             onChange={e => setConfirmOverride(e.target.checked)}
           />
           <span>Confirm before replacing a typed commit message with a generated one</span>
-          <InfoTip text={'When off, ✨ Generate replaces a message you have typed without asking. When on, a typed summary or description makes Aspen confirm first.'} />
+          <InfoTip text={'When off, \u2728 Generate replaces a message you have typed without asking. When on, a typed summary or description makes Aspen confirm first.'} />
         </label>
         <label className="check-row">
           <input
@@ -447,8 +468,27 @@ export function SettingsDialog(): JSX.Element | null {
             onChange={e => setAutoRefresh(e.target.checked)}
           />
           <span>Refresh the changes list automatically when files change on disk</span>
-          <InfoTip text={'When off, the changes list refreshes after git actions and when you press Refresh — handy if watching a very large working tree feels heavy.'} />
+          <InfoTip text={'When off, the changes list refreshes after git actions and when you press Refresh \u2014 handy if watching a very large working tree feels heavy.'} />
         </label>
+        <Field
+          label="Check the remote for new commits"
+          hint={'Also once each time you switch repository, so the counts on arrival are today\'s. Nothing downloads into your working tree \u2014 Pull still does that.'}
+          tip={'An automatic fetch updates the remote-tracking refs the \u2193 chip, the route readout and the Pull verb read \u2014 it never merges, rebases or touches your files. It stays silent: no spinner, no toast, and a failed one (offline, an expired token) simply tries again on the next tick. The Fetch button in the bar always works, whatever is set here, and says out loud what a background fetch swallowed.'}
+        >
+          <select
+            value={String(autoFetchMinutes)}
+            onChange={e => {
+              const next = Number(e.target.value)
+              if (isAutoFetchMinutes(next)) setAutoFetchMinutes(next)
+            }}
+          >
+            {AUTO_FETCH_CHOICES.map(minutes => (
+              <option key={minutes} value={String(minutes)}>
+                {AUTO_FETCH_LABELS[minutes]}
+              </option>
+            ))}
+          </select>
+        </Field>
       </section>
       )}
 
@@ -458,7 +498,7 @@ export function SettingsDialog(): JSX.Element | null {
         <Field
           label="Theme"
           hint="Applies the moment you press Save; Cancel leaves the current theme alone."
-          tip={'System follows the OS light/dark setting.\nCommunity palettes re-ink every colour role at once — they change how the app looks, never how it behaves.'}
+          tip={'System follows the OS light/dark setting.\nCommunity palettes re-ink every colour role at once \u2014 they change how the app looks, never how it behaves.'}
         >
           <select
             value={theme}
@@ -531,7 +571,15 @@ export function CloneDialog(): JSX.Element | null {
       setPanes({})
       return
     }
-    // The tab list must reflect accounts added since the app booted — and
+    // The destination defaults to the folder used last, then the watch
+    // folder \u2014 the same rule the Create dialog runs, so the Clone verb is
+    // live the moment a URL lands in the box instead of waiting on a picker.
+    setBaseDir(
+      window.localStorage.getItem('aspen.lastCloneDir') ??
+        state.settings?.scanFolder ??
+        ''
+    )
+    // The tab list must reflect accounts added since the app booted \u2014 and
     // sign-ins completed from inside this very dialog.
     void store.refreshAccounts()
   }, [state.showClone, store])
@@ -557,8 +605,6 @@ export function CloneDialog(): JSX.Element | null {
     if (activeAccount === null && (tab === 'signin' || accounts.length === 0)) return
     if (activeAccount === null) setTab(accounts[0]?.id ?? 'signin')
   }, [state.showClone, tab, activeAccount, accounts])
-
-  if (!state.showClone) return null
 
   const pane = activeAccount === null ? null : panes[activeAccount.id] ?? null
 
@@ -613,8 +659,15 @@ export function CloneDialog(): JSX.Element | null {
     }
   }
 
-  // First view of an account tab fetches its first page automatically.
+  // First view of an account tab fetches its first page automatically. Every
+  // hook of this component sits above the closed-render `return null` below:
+  // a hook beneath it changes the hook count between the closed and open
+  // render, React then throws "Rendered more hooks than during the previous
+  // render", and \u2014 with no error boundary \u2014 the whole window goes blank the
+  // moment Clone is clicked. That is what used to make the Clone verb look
+  // dead from every one of its entry points.
   useEffect(() => {
+    if (!state.showClone) return
     if (activeAccount !== null && panes[activeAccount.id] === undefined) {
       void loadPane(activeAccount, '', DEFAULT_SORT, false)
     }
@@ -648,6 +701,9 @@ export function CloneDialog(): JSX.Element | null {
     void loadPane(account, search, value, false)
   }
 
+  // All hooks have run: only now is it safe to skip the closed render.
+  if (!state.showClone) return null
+
   const derivedName = folderTouched ? folderName : suggested
 
   return (
@@ -664,9 +720,19 @@ export function CloneDialog(): JSX.Element | null {
           <button
             className="btn primary"
             disabled={
+              state.busy !== null ||
               url.trim().length === 0 ||
               baseDir.length === 0 ||
               derivedName.trim().length === 0
+            }
+            title={
+              url.trim().length === 0
+                ? 'Paste a URL or pick one from an account tab first'
+                : baseDir.length === 0
+                  ? 'Choose the folder to clone into first'
+                  : state.busy !== null
+                    ? 'Wait for the current operation to finish'
+                    : `Clone into ${baseDir}`
             }
             onClick={() =>
               void store.clone(url, baseDir, derivedName.trim())
@@ -695,7 +761,7 @@ export function CloneDialog(): JSX.Element | null {
             onClick={() => setTab(a.id)}
             title={`Repositories for ${a.login}`}
           >
-            {a.provider === 'github' ? 'GitHub' : 'GitLab'} · {a.login}
+            {a.provider === 'github' ? 'GitHub' : 'GitLab'} \u00b7 {a.login}
           </button>
         ))}
         {accounts.length === 0 && (
@@ -713,7 +779,7 @@ export function CloneDialog(): JSX.Element | null {
       {tab === 'url' && (
         <Field
           label="Repository URL"
-          hint="https://github.com/owner/repo.git or git@github.com:owner/repo.git — authentication uses your git credential helper, falling back to your signed-in account's token."
+          hint="https://github.com/owner/repo.git or git@github.com:owner/repo.git \u2014 authentication uses your git credential helper, falling back to your signed-in account's token."
         >
           <input
             autoFocus
@@ -749,7 +815,7 @@ export function CloneDialog(): JSX.Element | null {
           }
           onPick={repo => {
             // Choosing a row fills the URL through the same suggestion
-            // pipeline as typing one — the footer Clone then works unchanged.
+            // pipeline as typing one \u2014 the footer Clone then works unchanged.
             setUrl(repo.cloneUrl)
             setFolderTouched(false)
           }}
@@ -770,11 +836,18 @@ export function CloneDialog(): JSX.Element | null {
           }}
         />
       </Field>
-      <Field label="Local path">
+      <Field
+        label="Local path"
+        hint={
+          baseDir.length === 0
+            ? 'Pick the folder that will hold it \u2014 a folder named after the repository is created inside, so Clone unlocks once a URL and a destination are set.'
+            : 'The repository folder is created inside this one.'
+        }
+      >
         <div className="row">
           <input
             readOnly
-            placeholder="Choose a folder…"
+            placeholder="Choose a folder\u2026"
             value={baseDir}
             onClick={async () => {
               const dir = await call('selectDirectory')
@@ -788,17 +861,75 @@ export function CloneDialog(): JSX.Element | null {
               if (dir !== null) setBaseDir(dir)
             }}
           >
-            Choose…
+            Choose\u2026
           </button>
         </div>
       </Field>
-      {state.busy === 'clone' && <p className="busy-line">Cloning…</p>}
+      {state.busy === 'clone' && <p className="busy-line">Cloning\u2026</p>}
     </Dialog>
   )
 }
 
 /**
- * Create / Publish — one dialog, two modes, mirroring how the Clone dialog
+ * Fork \u2014 the recovery behind a permission-rejected push and the Repository
+ * menu's own verb. Main's preflight already proved the flow can run here
+ * (a parseable origin, a free-or-matching `upstream` name, a checked-out
+ * branch, at least one GitHub account on the host), so this dialog is just
+ * the last question: *into which account?* One click forks the repository,
+ * rewires origin \u2192 fork / parent \u2192 upstream, and pushes the current branch
+ * (src/main/git/fork.ts).
+ */
+export function ForkDialog(): JSX.Element | null {
+  const state = useStoreState()
+  const store = useStore()
+  if (!state.showFork || state.forkPreflight === null) return null
+  const pre = state.forkPreflight
+  const busy = state.busy === 'fork'
+
+  return (
+    <Dialog
+      title="Fork this repository"
+      width={520}
+      maxWidth={520}
+      onClose={() => store.closeForkDialog()}
+      footer={
+        <button className="btn" onClick={() => store.closeForkDialog()}>
+          Cancel
+        </button>
+      }
+    >
+      <p className="confirm-message">
+        You cannot push to <strong>{pre.parentFullName}</strong> \u2014 forking it
+        gives you a copy you own. Aspen will point <code>origin</code> at your
+        fork, keep the parent as the <code>upstream</code> remote, and push
+        your current branch. Afterwards, Pull &amp; Push work against your
+        fork; <em>Create Pull Request</em> opens the parent&apos;s new-PR form
+        with your branch pre-filled.
+      </p>
+      <div className="dialog-branch-list">
+        {pre.accounts.map(a => (
+          <button
+            key={a.id}
+            className="popover-item"
+            disabled={busy}
+            title={`Fork ${pre.parentFullName} into ${a.login} and push there`}
+            onClick={() => void store.createFork(a.id)}
+          >
+            <span className="branch-line">
+              <span className="branch-name">
+                Fork into GitHub \u00b7 {a.login}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {busy && <p className="busy-line">Forking, rewiring remotes, pushing\u2026</p>}
+    </Dialog>
+  )
+}
+
+/**
+ * Create / Publish \u2014 one dialog, two modes, mirroring how the Clone dialog
  * already grows a tab per signed-in account. 'new' builds a repository on
  * disk and can take it online in the same breath; 'publish' does the online
  * half for the selected repository that has no origin. The account tabs are
@@ -830,7 +961,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
   const ownerList = activeAccount === null ? null : owners[activeAccount.id] ?? null
 
   // Fresh fields on every open. The destination defaults to the folder used
-  // last, then the watch folder — a newcomer who set one never picks again.
+  // last, then the watch folder \u2014 a newcomer who set one never picks again.
   useEffect(() => {
     if (mode === null) return
     setName(publishing ? state.selectedRepo?.name ?? '' : '')
@@ -894,7 +1025,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
     try {
       window.localStorage.setItem('aspen.lastNewRepoDir', baseDir)
     } catch {
-      /* private-mode localStorage — the default just stays the scan folder */
+      /* private-mode localStorage \u2014 the default just stays the scan folder */
     }
   }
 
@@ -948,8 +1079,8 @@ export function NewRepositoryDialog(): JSX.Element | null {
           >
             {busy
               ? publishing
-                ? 'Publishing…'
-                : 'Creating…'
+                ? 'Publishing\u2026'
+                : 'Creating\u2026'
               : publishing
                 ? 'Publish repository'
                 : 'Create and Publish'}
@@ -975,7 +1106,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
             onClick={() => setTab(a.id)}
             title={`Publish as ${a.login}`}
           >
-            {a.provider === 'github' ? 'GitHub' : 'GitLab'} · {a.login}
+            {a.provider === 'github' ? 'GitHub' : 'GitLab'} \u00b7 {a.login}
           </button>
         ))}
         {accounts.length === 0 && (
@@ -997,7 +1128,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
       {activeAccount !== null && (
         <Field
           label="Owner"
-          hint="Where the repository lives — your account, or an organization/group you can create in."
+          hint="Where the repository lives \u2014 your account, or an organization/group you can create in."
         >
           <div className="row">
             <select
@@ -1006,7 +1137,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
               disabled={ownerList === null}
             >
               {ownerList === null ? (
-                <option value="">Loading owners…</option>
+                <option value="">Loading owners\u2026</option>
               ) : (
                 ownerList.map(o => (
                   <option key={o.name} value={o.name}>
@@ -1021,7 +1152,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
               onClick={() => loadOwners(activeAccount)}
               title="Reload the owners this token can publish into"
             >
-              ↻
+              \u21bb
             </button>
           </div>
         </Field>
@@ -1029,7 +1160,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
 
       <Field
         label="Name"
-        hint="Letters, numbers, dots, dashes and underscores — this becomes the repository and folder name."
+        hint="Letters, numbers, dots, dashes and underscores \u2014 this becomes the repository and folder name."
       >
         <input
           autoFocus
@@ -1051,7 +1182,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
           checked={isPrivate}
           onChange={e => setIsPrivate(e.target.checked)}
         />
-        <span>Private repository — visible only to you and people you invite</span>
+        <span>Private repository \u2014 visible only to you and people you invite</span>
       </label>
       {!publishing && (
         <>
@@ -1067,7 +1198,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
             <div className="row">
               <input
                 readOnly
-                placeholder="Choose a folder…"
+                placeholder="Choose a folder\u2026"
                 value={baseDir}
                 onClick={async () => {
                   const dir = await call('selectDirectory')
@@ -1081,7 +1212,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
                   if (dir !== null) setBaseDir(dir)
                 }}
               >
-                Choose…
+                Choose\u2026
               </button>
             </div>
           </Field>
@@ -1092,7 +1223,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
         <p className="field-hint">
           {publishing
             ? 'Sign in above to publish this repository.'
-            : 'Sign in above to publish right away — or create it locally and publish later.'}
+            : 'Sign in above to publish right away \u2014 or create it locally and publish later.'}
         </p>
       )}
     </Dialog>
@@ -1102,7 +1233,7 @@ export function NewRepositoryDialog(): JSX.Element | null {
 /**
  * Creates a branch from a chosen base: any local branch, a remote-tracking
  * branch (which gets local tracking, like a checkout from the branch list),
- * or — when opened from History — the selected commit. The base defaults to
+ * or \u2014 when opened from History \u2014 the selected commit. The base defaults to
  * the checked-out branch / selected commit but is freely switchable.
  */
 export function NewBranchDialog(): JSX.Element | null {
@@ -1234,7 +1365,7 @@ export function NewBranchDialog(): JSX.Element | null {
 /**
  * Picks a branch to merge into the checked-out one. The dialog itself is
  * the confirmation (unlike the branch popover's row shortcuts, which route
- * through store.requestMergeBranch); opening it from Repository ▸ Merge… or
+ * through store.requestMergeBranch); opening it from Repository \u25b8 Merge\u2026 or
  * the branch dropdown's footer item.
  */
 export function MergeBranchDialog(): JSX.Element | null {
@@ -1318,11 +1449,12 @@ export function MergeBranchDialog(): JSX.Element | null {
           <button
             key={`merge-local-${b.name}`}
             className={`popover-item${isSelected(b.name) ? ' active' : ''}`}
+            aria-label={branchAriaLabel(b)}
             title={`Merge "${b.name}" into "${current}"${divergenceTitleSuffix(b)}`}
             onClick={() => setSelected({ name: b.name })}
           >
             <span className="branch-line">
-              {b.name}
+              <span className="branch-name">{b.name}</span>
               <BranchDivergence branch={b} current={current} />
             </span>
           </button>
@@ -1337,13 +1469,14 @@ export function MergeBranchDialog(): JSX.Element | null {
                 className={`popover-item${
                   isSelected(b.name, b.remote) ? ' active' : ''
                 }`}
+                aria-label={branchAriaLabel(b)}
                 title={`Merge the remote-tracking branch ${b.remote}/${b.name} into "${current}"${divergenceTitleSuffix(b)}`}
                 onClick={() =>
                   setSelected({ name: b.name, remote: b.remote })
                 }
               >
                 <span className="branch-line">
-                  {b.name}
+                  <span className="branch-name">{b.name}</span>
                   <BranchDivergence branch={b} current={current} />
                 </span>
                 <small className="popover-path">
@@ -1356,7 +1489,7 @@ export function MergeBranchDialog(): JSX.Element | null {
       </div>
       <span className="field-hint">
         The chosen branch is merged into{' '}
-        <strong>{current}</strong> — fast-forward when possible, a merge
+        <strong>{current}</strong> \u2014 fast-forward when possible, a merge
         commit otherwise.
       </span>
     </Dialog>
@@ -1413,8 +1546,8 @@ export function RenameBranchDialog(): JSX.Element | null {
 }
 
 /**
- * "Stash your changes": park every working change — untracked included —
- * under an optional message. ✨ describes all dirty paths with the same
+ * "Stash your changes": park every working change \u2014 untracked included \u2014
+ * under an optional message. \u2728 describes all dirty paths with the same
  * agent (and cancel channel) as the commit box; leaving the fields empty
  * stashes under git's plain "Aspen on <branch>" label.
  */
@@ -1480,7 +1613,7 @@ export function StashDialog(): JSX.Element | null {
       </Field>
       <Field
         label="Description"
-        tip="Stored as the stash commit's message body — visible in the stash detail pane and in git log."
+        tip="Stored as the stash commit's message body \u2014 visible in the stash detail pane and in git log."
       >
         <textarea
           rows={3}
@@ -1512,7 +1645,7 @@ export function StashDialog(): JSX.Element | null {
             }
             title="Describe all working changes with the AI agent"
           >
-            ✨ Describe
+            \u2728 Describe
           </button>
         )}
       </div>
@@ -1529,15 +1662,18 @@ function updateSummary(update: UpdateState | null, currentVersion: string | null
   }
   switch (update.phase) {
     case 'checking':
-      return 'Checking GitHub releases…'
+      return 'Checking GitHub releases\u2026'
     case 'available':
+      if (update.authenticated === false) {
+        return `Aspen ${update.version ?? 'x'} is available but not signed \u2014 install it from the releases page.`
+      }
       return update.canInstall
-        ? `Aspen ${update.version ?? 'x'} is available — choose an action below.`
-        : `Aspen ${update.version ?? 'x'} is available — this build updates from the releases page.`
+        ? `Aspen ${update.version ?? 'x'} is available \u2014 choose an action below.`
+        : `Aspen ${update.version ?? 'x'} is available \u2014 this build updates from the releases page.`
     case 'downloading':
-      return `Downloading Aspen ${update.version ?? 'x'} — ${update.percent ?? 0}%.`
+      return `Downloading Aspen ${update.version ?? 'x'} \u2014 ${update.percent ?? 0}%.`
     case 'ready':
-      return `Aspen ${update.version ?? 'x'} is ready — restart to install it.`
+      return `Aspen ${update.version ?? 'x'} is ready \u2014 restart to install it.`
     case 'up-to-date':
       return `Aspen ${currentVersion ?? ''} is the newest release.`
     case 'error':
@@ -1547,7 +1683,7 @@ function updateSummary(update: UpdateState | null, currentVersion: string | null
 
 /** Where the update flow stands and what you can do about it, as one unit:
  *  the honest status sentence, a live download bar, and the verb that fits
- *  the current phase. Shared by Preferences ▸ General and the About card, so
+ *  the current phase. Shared by Preferences \u25b8 General and the About card, so
  *  the two can never offer different update buttons. */
 function UpdateRow({
   currentVersion
@@ -1584,7 +1720,7 @@ function UpdateRow({
           >
             Restart to update
           </button>
-        ) : update?.phase === 'available' && update.canInstall ? (
+        ) : update?.phase === 'available' && update.canInstall && update.authenticated === true ? (
           <button
             className="btn primary"
             onClick={() => void store.downloadAvailableUpdate()}
@@ -1622,7 +1758,7 @@ export function AboutDialog(): JSX.Element | null {
   const store = useStore()
   const [appVersion, setAppVersion] = useState<string | null>(null)
 
-  // The packaged version, asked from main once per dialog open — the About
+  // The packaged version, asked from main once per dialog open \u2014 the About
   // card must report what is actually running, not what package.json said
   // at the last release cut.
   useEffect(() => {
@@ -1654,11 +1790,11 @@ export function AboutDialog(): JSX.Element | null {
       }
     >
       <p className="confirm-message">
-        <strong>Aspen Git</strong> — a visual desktop client for Git, with an
+        <strong>Aspen Git</strong> \u2014 a visual desktop client for Git, with an
         AI commit-message and merge agent.
       </p>
       <p className="confirm-message">
-        Version {appVersion ?? '…'} · git operations run through your system{' '}
+        Version {appVersion ?? '\u2026'} \u00b7 git operations run through your system{' '}
         <code>git</code>; AI requests go to the OpenAI-compatible endpoint
         configured in Preferences.
       </p>
@@ -1681,7 +1817,7 @@ export function AboutDialog(): JSX.Element | null {
             <code>Ctrl+Shift+F</code> / <code>P</code> / <code>U</code> fetch / pull / push
           </li>
           <li>
-            <code>Ctrl+Shift+G</code> view on GitHub · <code>Ctrl+R</code> refresh
+            <code>Ctrl+Shift+G</code> view on GitHub \u00b7 <code>Ctrl+R</code> refresh
           </li>
           <li>
             <code>Ctrl+,</code> preferences
@@ -1704,7 +1840,7 @@ export function AboutDialog(): JSX.Element | null {
             className="btn primary"
             onClick={() => void call('openExternal', DONATE_URL)}
           >
-            ♥ Donate via PayPal
+            \u2665 Donate via PayPal
           </button>
           <small className="muted">paypal.com/paypalme/kurtishight</small>
         </div>
@@ -1785,7 +1921,7 @@ export function AiMergeDialog(): JSX.Element | null {
 
   return (
     <Dialog
-      title="✨ AI merge agent"
+      title="\u2728 AI merge agent"
       width={540}
       onClose={() => store.closeAiMerge()}
       footer={
@@ -1815,7 +1951,7 @@ export function AiMergeDialog(): JSX.Element | null {
         {questions === null && merge.busy && (
           <span className="merge-thinking">
             {' '}
-            <span className="spinner" /> thinking…
+            <span className="spinner" /> thinking\u2026
           </span>
         )}
       </p>
@@ -1860,7 +1996,7 @@ export function AiMergeDialog(): JSX.Element | null {
           ))}
           {merge.busy && (
             <p className="merge-thinking">
-              <span className="spinner" /> thinking…
+              <span className="spinner" /> thinking\u2026
             </p>
           )}
         </div>

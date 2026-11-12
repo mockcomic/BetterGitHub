@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { execGit } from '../src/main/git/exec'
 import { getStatus } from '../src/main/git/status'
 import { getLog } from '../src/main/git/log'
+import { cloneRepository } from '../src/main/git/sync'
 import {
   checkoutBranch,
   createBranch,
@@ -18,6 +19,7 @@ import {
   cherryPickCommit,
   commitPaths,
   revertCommit,
+  uncommitCommit,
   undoLastCommit
 } from '../src/main/git/commit'
 import {
@@ -248,6 +250,163 @@ describe('git integration', () => {
     // The refusal must leave the merge untouched at the tip.
     expect(await git(['rev-parse', 'HEAD'])).toBe(tip?.sha)
     await git(['branch', '-D', 'undo-merge'])
+  })
+
+  describe('uncommitCommit', () => {
+    /** A branch with `a`, `b`, `c` commits on top of main, returning the SHAs. */
+    async function seedBranch(name: string): Promise<[string, string, string]> {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await git(['checkout', '-q', '-b', name])
+      write(`${name}-a.txt`, 'a\n')
+      const a = await commitAll(`uc ${name} first`)
+      write(`${name}-b.txt`, 'b\n')
+      const b = await commitAll(`uc ${name} second`)
+      write(`${name}-c.txt`, 'c\n')
+      const c = await commitAll(`uc ${name} third`)
+      return [a, b, c]
+    }
+
+    async function cleanUpBranches(...names: string[]): Promise<void> {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await git(['branch', '-D', ...names])
+    }
+
+    it('drops an older commit, replays descendants and restages its changes', async () => {
+      const [a, b, c] = await seedBranch('uc-mid')
+      await uncommitCommit(repo, b)
+
+      const log = await getLog(repo, { maxCount: 20 })
+      const summaries = log.map(entry => entry.summary)
+      expect(summaries[0]).toBe('uc uc-mid third')
+      expect(summaries).not.toContain('uc uc-mid second')
+      expect(summaries).toContain('uc uc-mid first')
+      // The descendant was rewritten, so its SHA changed while the untouched
+      // ancestor stayed exactly where it was.
+      const head = await git(['rev-parse', 'HEAD'])
+      expect(head).not.toBe(c)
+      expect(summaries.indexOf('uc uc-mid first')).toBe(1)
+      expect(
+        (await git(['rev-list', '--parents', '-n', '1', head])).split(/\s+/)[1]
+      ).toBe(a)
+
+      // The dropped commit's changes are staged for the commit box again…
+      const status = await getStatus(repo)
+      const restaged = status.files.find(f => f.path === 'uc-mid-b.txt')
+      expect(restaged?.staged).toBe(true)
+      expect(readFileSync(join(repo, 'uc-mid-b.txt'), 'utf8')).toBe('b\n')
+      // …and nothing else reads as dirty.
+      expect(status.files.map(f => f.path)).toEqual(['uc-mid-b.txt'])
+
+      await cleanUpBranches('uc-mid')
+      expect(existsSync(join(repo, 'uc-mid-b.txt'))).toBe(false)
+    })
+
+    it('treats a selected tip like the guarded soft reset, even with a dirty tree', async () => {
+      const [, b, c] = await seedBranch('uc-tip')
+      // Extra uncommitted work — the soft-reset path must not touch it.
+      write('uc-tip-dirty.txt', 'dirty\n')
+
+      await uncommitCommit(repo, c)
+      expect(await git(['rev-parse', 'HEAD'])).toBe(b)
+      const status = await getStatus(repo)
+      expect(status.files.find(f => f.path === 'uc-tip-c.txt')?.staged).toBe(true)
+      expect(status.files.find(f => f.path === 'uc-tip-dirty.txt')).toBeDefined()
+
+      await cleanUpBranches('uc-tip')
+    })
+
+    it('refuses merges, roots, unknown commits and commits from other branches', async () => {
+      const [, b] = await seedBranch('uc-refuse')
+      await git(['checkout', '-q', 'main'])
+      // Make the merge a real merge: main must have diverged.
+      write('uc-refuse-feature.txt', 'feature\n')
+      await commitAll('uc refuse feature')
+      await mergeBranch(repo, 'uc-refuse')
+      const [tip] = await getLog(repo, { maxCount: 1 })
+      expect(tip?.isMerge).toBe(true)
+
+      // A merge commit tip is refused by the delegated guarded undo, and its
+      // root parent cannot be uncommitted either.
+      await expect(uncommitCommit(repo, tip?.sha ?? '')).rejects.toThrow(
+        /This is a merge commit/
+      )
+      const root = (await git(['rev-list', '--max-parents=0', 'HEAD'])).split(/\s+/)[0]
+      await expect(uncommitCommit(repo, root)).rejects.toThrow(
+        /first commit in the repository/
+      )
+      await expect(
+        uncommitCommit(repo, 'ffffffffffffffffffffffffffffffffffffffff')
+      ).rejects.toThrow(/no longer exists in this repository/)
+
+      // A commit that exists but is not in the checked-out branch's history —
+      // true again once the merge above is reset away.
+      await git(['reset', '--quiet', '--hard', 'HEAD^'])
+      await expect(uncommitCommit(repo, b)).rejects.toThrow(
+        /not in the current branch/
+      )
+
+      await cleanUpBranches('uc-refuse')
+    })
+
+    it('refuses an older commit while the tree is dirty', async () => {
+      const [, b] = await seedBranch('uc-dirty')
+      const head = await git(['rev-parse', 'HEAD'])
+      write('uc-dirty-work.txt', 'uncommitted\n')
+      await expect(uncommitCommit(repo, b)).rejects.toThrow(
+        /Commit or stash your local changes before uncommitting/
+      )
+      expect(await git(['rev-parse', 'HEAD'])).toBe(head)
+      await cleanUpBranches('uc-dirty')
+    })
+
+    it('refuses when a later merge would be flattened', async () => {
+      const [, b, c] = await seedBranch('uc-flat')
+      await git(['checkout', '-q', 'main'])
+      write('uc-flat-feature.txt', 'feature\n')
+      await commitAll('uc flat feature')
+      await git(['checkout', '-q', 'uc-flat'])
+      await mergeBranch(repo, 'main')
+
+      await expect(uncommitCommit(repo, b)).rejects.toThrow(
+        /later merge commit is built on this one/
+      )
+      // Untouched: still the merge on top of the original third commit.
+      expect((await getLog(repo, { maxCount: 1 }))[0]?.isMerge).toBe(true)
+      expect(
+        (await getLog(repo, { maxCount: 5 })).map(entry => entry.summary)
+      ).toContain('uc uc-flat second')
+      expect(c).toHaveLength(40)
+      await cleanUpBranches('uc-flat')
+    })
+
+    it('rolls back untouched when a later commit conflicts with the removal', async () => {
+      await git(['checkout', '-q', 'main'])
+      await resetClean()
+      await git(['checkout', '-q', '-b', 'uc-conf'])
+      write('shared.txt', 'base\n')
+      await commitAll('uc conf base')
+      write('shared.txt', 'first\n')
+      const dropped = await commitAll('uc conf middle')
+      write('shared.txt', 'second\n')
+      const head = await commitAll('uc conf top')
+
+      await expect(uncommitCommit(repo, dropped)).rejects.toThrow(
+        /conflict with removing this commit, so it was left in history/
+      )
+      expect(await git(['rev-parse', 'HEAD'])).toBe(head)
+      const status = await getStatus(repo)
+      expect(status.files).toHaveLength(0)
+      expect(status.inProgress).toEqual({
+        merge: false,
+        rebase: false,
+        cherryPick: false,
+        revert: false
+      })
+      expect(readFileSync(join(repo, 'shared.txt'), 'utf8')).toBe('second\n')
+      await cleanUpBranches('uc-conf')
+    })
   })
 
   it('reverts a commit and refuses merge commits', async () => {
@@ -557,6 +716,42 @@ describe('git integration', () => {
     await git(['update-ref', '-d', 'refs/remotes/origin/ahead-one'])
   })
 
+  it('names a deleted upstream instead of reporting the branch in sync', async () => {
+    await git(['checkout', '-q', '-b', 'stranded'])
+    await commitAll('work on a branch that will be stranded')
+    await git(['push', '-q', '--set-upstream', 'origin', 'stranded'])
+
+    // Tracked, in sync, and the ref is genuinely there: the probe answers no.
+    const tracked = await getStatus(repo)
+    expect(tracked.upstream).toBe('origin/stranded')
+    expect(tracked.ahead).toBe(0)
+    expect(tracked.behind).toBe(0)
+    expect(tracked.upstreamGone).toBe(false)
+
+    // Someone else deletes the branch and the remote-tracking ref goes with it
+    // (a `fetch --prune`). git still reports +0 -0, which alone would read as
+    // a branch at peace.
+    await git(['update-ref', '-d', 'refs/remotes/origin/stranded'])
+    const gone = await getStatus(repo)
+    expect(gone.upstream).toBe('origin/stranded')
+    expect(gone.ahead).toBe(0)
+    expect(gone.behind).toBe(0)
+    expect(gone.upstreamGone).toBe(true)
+
+    // The branch list says the same thing, from `%(upstream:track)`.
+    const listed = await getBranches(repo)
+    expect(listed.local.find(b => b.name === 'stranded')?.upstreamGone).toBe(true)
+
+    // Re-establish the ref: an in-sync branch is not a gone one again.
+    await git(['push', '-q', '--set-upstream', 'origin', 'stranded'])
+    expect((await getStatus(repo)).upstreamGone).toBe(false)
+
+    await git(['checkout', '-q', 'main'])
+    await git(['push', '-q', 'origin', '--delete', 'stranded'])
+    await git(['branch', '-D', 'stranded'])
+    await git(['update-ref', '-d', 'refs/remotes/origin/stranded'])
+  })
+
   it('guards branch deletion and supports rename', async () => {
     await expect(deleteBranch(repo, 'main', false)).rejects.toThrow(/Switch to another branch/)
 
@@ -841,3 +1036,134 @@ describe('git integration', () => {
   })
 
 })
+
+/**
+ * The clone verb, end to end against real git. The regression these guard is
+ * the destination itself: the dialog sends a parent folder plus a name, and the
+ * folder usually does not exist yet — so main validates the parent and the name
+ * and lets `git clone` lay the folder down, running the child from the parent
+ * (which does exist). A clone that only works into a hand-made empty folder is a
+ * Clone button that does not work, and a clone that mkdirs the destination
+ * itself fails wherever the app process may not write there (EPERM).
+ */
+describe('cloneRepository', () => {
+  const tempDirs: string[] = []
+
+  function temp(prefix: string): string {
+    const dir = mkdtempSync(join(tmpdir(), prefix))
+    tempDirs.push(dir)
+    return dir
+  }
+
+  /** A one-commit source to clone from, made fresh so each case stands alone. */
+  async function seedSource(): Promise<string> {
+    const source = temp('aspen-clone-src-')
+    await execGit(['init', '--initial-branch=main', '--quiet', source], {
+      cwd: source
+    })
+    await execGit(['config', 'user.name', 'Test Author'], { cwd: source })
+    await execGit(['config', 'user.email', 'test@example.com'], { cwd: source })
+    writeFileSync(join(source, 'README.md'), '# seeded\n', 'utf8')
+    await execGit(['add', '-A'], { cwd: source })
+    await execGit(['commit', '--quiet', '-m', 'seed commit'], { cwd: source })
+    return source
+  }
+
+  let source = ''
+  beforeEach(async () => {
+    source = await seedSource()
+  })
+
+  afterAll(() => {
+    for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('creates the destination folder and clones into it', async () => {
+    const base = temp('aspen-clone-parent-')
+    const destination = await cloneRepository(source, base, 'fresh-repo')
+
+    expect(destination).toBe(join(base, 'fresh-repo'))
+    expect(existsSync(join(destination, '.git'))).toBe(true)
+    expect(readFileSync(join(destination, 'README.md'), 'utf8')).toContain('seeded')
+    const log = await getLog(destination)
+    expect(log.some(c => c.summary === 'seed commit')).toBe(true)
+    expect(log).toHaveLength(1)
+  })
+
+  it('clones into a destination that already exists but is empty', async () => {
+    const base = temp('aspen-clone-parent-')
+    mkdirSync(join(base, 'picked'))
+    const destination = await cloneRepository(source, base, 'picked')
+    expect(destination).toBe(join(base, 'picked'))
+    expect(existsSync(join(destination, '.git'))).toBe(true)
+  })
+
+  it('refuses a destination that already holds work and leaves it alone', async () => {
+    const base = temp('aspen-clone-parent-')
+    mkdirSync(join(base, 'busy'))
+    writeFileSync(join(base, 'busy', 'keepme.txt'), 'mine\n', 'utf8')
+    await expect(cloneRepository(source, base, 'busy')).rejects.toThrow(
+      /already exists and is not empty/
+    )
+    expect(readFileSync(join(base, 'busy', 'keepme.txt'), 'utf8')).toBe('mine\n')
+    expect(existsSync(join(base, 'busy', '.git'))).toBe(false)
+  })
+
+  it('refuses a parent folder that is not there', async () => {
+    const missing = join(temp('aspen-clone-parent-'), 'nope')
+    await expect(cloneRepository(source, missing, 'repo')).rejects.toThrow(
+      /Parent folder does not exist/
+    )
+  })
+
+  it('refuses a name that cannot be a folder', async () => {
+    const base = temp('aspen-clone-parent-')
+    await expect(cloneRepository(source, base, 'group/repo')).rejects.toThrow(
+      /cannot be a folder here/
+    )
+    await expect(cloneRepository(source, base, '   ')).rejects.toThrow(
+      /Enter a repository name\./
+    )
+  })
+
+  it('checks the URL before it touches the disk', async () => {
+    const base = temp('aspen-clone-parent-')
+    await expect(cloneRepository('   ', base, 'fresh-repo')).rejects.toThrow(
+      /Enter a repository URL to clone\./
+    )
+    expect(existsSync(join(base, 'fresh-repo'))).toBe(false)
+  })
+
+  it('leaves no folder behind when the clone fails, so a retry fits', async () => {
+    const base = temp('aspen-clone-parent-')
+    await expect(
+      cloneRepository(join(base, 'no-such-source.git'), base, 'repo')
+    ).rejects.toThrow(/clone --progress .* failed \(exit 128\)/)
+    // git created the destination, so git removes it again — the retry must not
+    // be blocked by a folder the failed attempt introduced.
+    expect(existsSync(join(base, 'repo'))).toBe(false)
+    await cloneRepository(source, base, 'repo')
+    expect(existsSync(join(base, 'repo', '.git'))).toBe(true)
+  })
+
+  it('keeps a destination the user had already made when the clone fails', async () => {
+    const base = temp('aspen-clone-parent-')
+    mkdirSync(join(base, 'mine'))
+    await expect(
+      cloneRepository(join(base, 'no-such-source.git'), base, 'mine')
+    ).rejects.toThrow(/clone --progress .* failed \(exit 128\)/)
+    expect(existsSync(join(base, 'mine'))).toBe(true)
+  })
+
+  it('never creates the destination in-process — git does', async () => {
+    // The app must not need permission to mkdir the user's folders: Electron
+    // has been observed failing that with EPERM inside ~/Documents while
+    // `git clone` into the same parent worked. Both verbs therefore hand the
+    // missing folder to git, which creates it as its own first act.
+    const base = temp('aspen-init-parent-')
+    const target = join(base, 'init-makes-me')
+    await execGit(['init', '--quiet', target], { cwd: base })
+    expect(existsSync(join(target, '.git'))).toBe(true)
+  })
+})
+

@@ -64,4 +64,18 @@ export interface ProviderClient {
     authKind: AccountAuthKind,
     request: CreateRepoRequest
   ): Promise<RemoteRepository>
+  /**
+   * Fork `<parentFullName>` into the account's own namespace and return the
+   * fork once the provider has finished making it — a push may follow
+   * immediately. GitHub creates forks asynchronously (202 + polling); the
+   * call resolves only when the fork's API record is readable. Providers
+   * without an in-app fork story throw one clear, actionable message.
+   */
+  forkRepo(
+    apiBase: string,
+    account: Pick<AccountInfo, 'id' | 'login'>,
+    token: string,
+    authKind: AccountAuthKind,
+    parentFullName: string
+  ): Promise<RemoteRepository>
 }

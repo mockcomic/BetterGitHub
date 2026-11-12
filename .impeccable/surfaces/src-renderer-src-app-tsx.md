@@ -17,7 +17,7 @@ OWN-WORLD: Primer, played straight. Light: white canvas, `#f6f8fa` chrome (strip
 
 STORY: Unchanged — where you are (strip + active tab), what changed (queue), exactly what ships (tray scope line `N of M · +A −D`), then Commit or Generate. The git facts, not the chrome, carry the color.
 
-FIRST VIEWPORT: Unchanged composition, GitHub Desktop materials: full-width strip (repository ▾, branch ▾, mono `branch ⇄ origin · ↑n ↓m`, centered filter with its `Ctrl K` chip, refresh/Fetch/Pull/Push/GitHub), the desk switch as a segmented control row beneath it, then queue (340px) | diff with its sticky path header | 300px commit tray whose full-width blue verb is the loudest control on the desk, and the `#f6f8fa` status bar.
+FIRST VIEWPORT: Unchanged composition, GitHub Desktop materials: full-width strip (repository ▾, branch ▾, mono `branch ⇄ origin`, centered filter with its `Ctrl K` chip, refresh/the Sync split verb with its divergence chips/`GitHub`), the desk switch as a segmented control row beneath it, then queue (340px) | diff with its sticky path header | 300px commit tray whose full-width blue verb is the loudest control on the desk, and the `#f6f8fa` status bar.
 
 FORM: The category standard, played straight — the canon path, taken by the user's own words ("more like GitHub Desktop"); the craft bar is GitHub Desktop itself, with GitHub.com's Primer as its system source. No concept roll ran: a user-pinned direction beats the roll.
 
@@ -36,7 +36,7 @@ Should the AI verb stay filled purple, or drop to a purple-bordered default butt
 
 The strip and desk keep their composition; what changes is *when* complexity appears:
 
-- **Strip:** Fetch / ↓ Pull / ↑ Push collapse into one context-aware **Sync split button** (behind → Pull, ahead/no-upstream → Push, else Fetch origin) whose caret menu always lists all three with their accelerators; `GitHub`, `Open in ▾` and `Add remote…` fold into a `⋯` overflow popover (the remote form expands inline). The push arm-ring moves with the Push verb. The "no upstream" mono hint retires — the route readout's tooltip says it whole.
+- **Strip:** Fetch / ↓ Pull / ↑ Push collapse into one context-aware **Sync split button** (behind → Pull, ahead/no-upstream → Push, gone upstream → Push, else Fetch origin) whose caret menu always lists all three with their accelerators; `GitHub`, `Open in ▾` and `Add remote…` fold into a `⋯` overflow popover (the remote form expands inline). The push arm-ring moves with the Push verb. The verb's label names the action alone; the counts wear the shared divergence chips (↓ amber, ↑ green, `deleted` for a gone upstream) and the route readout states only the route — `branch ⇄ not published` is now a thing the readout says out loud instead of falling silent.
 - **Desk switch:** Review and History are permanent; Conflicts appears when anything waits (or an operation is mid-flight) and Stash when a stash exists; the desk falls back to Review when the tab under it retires.
 - **Queue:** staged/unstaged badges render only once the staging area holds something (`progressive.ts`); a one-time three-step coach banner (workflow-banner hunk wash) rides above the list until the first commit, dismissible, gated by Preferences ▸ "Show tips for getting started" (`hintsEnabled`, main-process setting).
 - **Tray:** the Push verb renders when it can act; a muted hint line appears under the scope line while a pre-first-commit user has nothing checked. ✨ Generate on an unconfigured agent opens Preferences with a pointer note instead of firing a doomed request.

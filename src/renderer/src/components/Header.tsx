@@ -4,7 +4,12 @@ import { useStore, useStoreState } from '../store'
 import type { DeskView } from '../store'
 import type { ExternalApp, ManagedRepository } from '../../../shared/models'
 import { ConfettiBurst, useCelebration } from './Celebration'
-import { BranchDivergence } from './BranchBadges'
+import {
+  BranchDivergence,
+  DivergenceChips,
+  UpstreamGoneChip
+} from './BranchBadges'
+import { branchAriaLabel, commits, divergenceSentence } from '../divergence'
 import { useJustArmed } from '../motion'
 import { syncVerb } from '../progressive'
 import type { SyncVerb } from '../progressive'
@@ -20,8 +25,9 @@ const FILTER_LABELS: Record<DeskView, string> = {
 
 /**
  * The command strip: repository and branch pickers, the route readout
- * (branch ⇄ origin with ahead/behind), the context filter, and sync
- * controls — everything the desk does is reachable from this row.
+ * (branch ⇄ origin), the context filter, and sync controls — everything the
+ * desk does is reachable from this row, with the repository-list verbs
+ * (Clone, Add, Manage) in the overflow sub-menu.
  */
 export function Header(): JSX.Element {
   const state = useStoreState()
@@ -134,6 +140,14 @@ export function Header(): JSX.Element {
  * raw verbs by name, with their accelerators. The context-aware label is
  * GitHub Desktop's own pattern; the caret keeps every verb a first-class
  * click, so nothing is hidden, only prioritised.
+ *
+ * The label is the verb alone. The counts ride beside it as divergence chips
+ * (↓ before ↑, `behind` in the Pull face's amber, `ahead` in the Push face's
+ * green) — the desk's one way to write these numbers — and `aria-label` spells
+ * the state in words so the chips need not be read aloud as arrows. A branch
+ * whose upstream was deleted on the remote wears the `deleted` chip instead of
+ * counts: git's `+0 -0` against a missing ref is not a branch in sync, and
+ * Push is the only way back.
  */
 function SyncButton(): JSX.Element {
   const state = useStoreState()
@@ -143,7 +157,16 @@ function SyncButton(): JSX.Element {
   const { status } = state
   const ahead = status?.ahead ?? 0
   const behind = status?.behind ?? 0
-  const hasUpstream = status?.upstream !== undefined
+  const gone = status?.upstreamGone === true
+  /**
+   * A branch whose upstream was deleted on the remote still names one, but it
+   * can be pulled from nothing and compared against nothing: for the desk's
+   * purposes its work is unpushed. That is why the flag counts as "no
+   * upstream" here — otherwise the verb correctly reads Push while the
+   * enabled test, seeing an upstream, greys it out.
+   */
+  const hasUpstream = status?.upstream !== undefined && !gone
+  const upstreamName = status?.upstream ?? 'origin'
   const busy = state.busy
   const { nonce: celebrateNonce, celebrating } = useCelebration('push')
   // The Push story still arms with a ring the moment git makes it true — a
@@ -190,18 +213,47 @@ function SyncButton(): JSX.Element {
     else void store.doSync(op)
   }
 
+  // The label names the verb and nothing else: the direction and the counts
+  // belong to the chips, and the button's own face is already amber (incoming)
+  // or green (outgoing). `↓ Pull ↓2` said the same thing three times.
+  const label =
+    verb === 'sync'
+      ? 'Pull & Push'
+      : verb === 'pull'
+        ? 'Pull'
+        : verb === 'push'
+          ? ahead > 0 && !gone
+            ? 'Push'
+            : 'Publish'
+          : 'Fetch origin'
+  // The accessible name spells the whole state in words, which is what lets
+  // the chips stay aria-hidden rather than being read as "down two up three".
+  const spoken =
+    verb === 'sync'
+      ? `Pull & Push — ${divergenceSentence(ahead, behind)} against ${upstreamName}`
+      : verb === 'pull'
+        ? `Pull — ${commits(behind)} waiting on ${upstreamName}`
+        : verb === 'push'
+          ? gone
+            ? `Publish ${status?.branch ?? 'this branch'} again — the upstream ${upstreamName} was deleted on the remote`
+            : ahead > 0
+              ? `Push — ${commits(ahead)} to ${upstreamName}`
+              : `Publish — ${status?.branch ?? 'this branch'} is not on the remote yet`
+            : 'Fetch origin — check the remote for new work'
   const title =
     verb === 'sync'
       ? needsPull
         ? 'The remote branch has commits you do not have — Pull lands first, then your Push follows automatically (the ▾ menu also has them on their own)'
-        : `The remote has ${behind} new commit${behind === 1 ? '' : 's'} and you have ${ahead} to send — Pull lands first, then your Push follows automatically (the ▾ menu also has them on their own)`
+        : `The remote has ${commits(behind)} new and you have ${ahead} to send — Pull lands first, then your Push follows automatically (the ▾ menu also has them on their own)`
       : verb === 'pull'
-        ? `The remote has ${behind} new commit${behind === 1 ? '' : 's'} — Pull brings them in (the ▾ menu also has Fetch and Push)`
+        ? `The remote has ${commits(behind)} new — Pull brings them in (the ▾ menu also has Fetch and Push)`
         : verb === 'push'
-          ? ahead > 0
-            ? `Push ${ahead} commit${ahead === 1 ? '' : 's'} to ${status?.upstream ?? 'origin'}`
-            : 'Publish this branch — the first push sets upstream on origin'
-          : 'Check the remote for new work. Nothing on your machine changes.'
+          ? gone
+            ? `The remote branch this one tracked is gone — Pushing publishes ${status?.branch ?? 'the branch'} again and re-sets its upstream`
+            : ahead > 0
+              ? `Push ${commits(ahead)} to ${upstreamName}`
+              : 'Publish this branch — the first push sets upstream on origin'
+            : 'Check the remote for new work. Nothing on your machine changes.'
 
   const item = (op: SyncVerb, label: string, accel: string, enabled: boolean): JSX.Element => (
     <button
@@ -220,45 +272,17 @@ function SyncButton(): JSX.Element {
       <div className="sync-split">
         <button
           className={`btn sync${verbClass}${celebrating ? ' celebrating' : ''}${armed}`}
+          aria-label={spoken}
           disabled={busy !== null}
           onClick={() => run(verb)}
           title={title}
         >
           {busy === verb || syncing ? <span className="spinner" /> : null}
-          {verb === 'sync' ? (
-            <>
-              ⇅ Pull &amp; Push
-              {behind > 0 && (
-                <span className="count-pop" key={`sync-behind-${behind}`}>
-                  {' '}↓{behind}
-                </span>
-              )}
-              {ahead > 0 && (
-                <span className="count-pop" key={`sync-ahead-${ahead}`}>
-                  {' '}↑{ahead}
-                </span>
-              )}
-            </>
-          ) : verb === 'pull' ? (
-            <>
-              ↓ Pull
-              {behind > 0 && (
-                <span className="count-pop" key={`sync-behind-${behind}`}>
-                  {' '}{behind}
-                </span>
-              )}
-            </>
-          ) : verb === 'push' ? (
-            <>
-              ↑ Push
-              {ahead > 0 && (
-                <span className="count-pop" key={`sync-ahead-${ahead}`}>
-                  {' '}{ahead}
-                </span>
-              )}
-            </>
+          {label}
+          {gone ? (
+            <UpstreamGoneChip upstream={status?.upstream ?? ''} />
           ) : (
-            <>Fetch origin</>
+            <DivergenceChips ahead={ahead} behind={behind} />
           )}
           {celebrating && <ConfettiBurst nonce={celebrateNonce} />}
         </button>
@@ -371,7 +395,7 @@ function OverflowButton(): JSX.Element {
         disabled={state.busy !== null}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="More — GitHub page, publish, open in…"
+        title="More — GitHub page, publish, clone, open in…"
         onClick={() => setOpen(o => !o)}
       >
         ⋯
@@ -441,6 +465,20 @@ function OverflowButton(): JSX.Element {
               </>
             )
           ) : null}
+          <div className="popover-sep" />
+          {/* Not a strip button: cloning is the repository list's verb, so it
+              lives in a sub-menu next the other ways in, and a click always
+              lands on the dialog instead of on a greyed control. */}
+          <button
+            className="popover-item"
+            title="Clone another repository from a URL or from your account"
+            onClick={() => {
+              closeAll()
+              store.setCloneOpen(true)
+            }}
+          >
+            Clone repository…
+          </button>
           <button
             className="popover-item"
             title="Dock or close the integrated terminal in this repository"
@@ -477,42 +515,42 @@ function OverflowButton(): JSX.Element {
 }
 
 /**
- * The route this checkout travels — branch ⇄ origin, one arrow-count per
- * direction, always in mono. It reports git truth only; when there is
- * nothing to say (0/0, upstream set) it stays quiet.
+ * The route this checkout travels — branch ⇄ remote, in the mono voice that
+ * quotes the repository. It states the *route* and nothing else: the counts
+ * belong to the verb beside them, which is the control they describe, and
+ * saying them twice forty pixels apart in two formats and opposite orders only
+ * gave the desk two things to read for one fact. What the readout keeps is the
+ * pair of states the verb cannot speak — a branch not on the remote yet, and
+ * an upstream deleted underneath it.
  */
 function RouteReadout(): JSX.Element | null {
   const state = useStoreState()
   const status = state.status
-  if (status === null) return null
-  const upstream = status.upstream?.split('/').filter(p => p.length > 0)[0] ?? null
-  const ahead = status.ahead
-  const behind = status.behind
-  if (upstream === null && ahead === 0 && behind === 0) return null
-  const title =
-    status.upstream !== undefined
-      ? `Push and pull route: ${status.branch} ⇄ ${status.upstream}`
-      : `This branch isn't on the remote yet — the first push publishes it`
+  // A detached HEAD has no route to state, and an unpublished branch's
+  // counts are zeroes against nothing — the Publish verb owns that story.
+  if (status === null || status.detached) return null
+  const upstreamRef = status.upstream
+  if (upstreamRef === undefined) {
+    const title = `This branch isn't on the remote yet — Push publishes it and sets its upstream`
+    return (
+      <span className="route-readout" title={title} aria-label={title}>
+        <span className="route-branch">{status.branch}</span>
+        <span className="route-arrow">⇄</span>
+        <span>not published</span>
+      </span>
+    )
+  }
+  const remote = upstreamRef.split('/').filter(p => p.length > 0)[0] ?? upstreamRef
+  const gone = status.upstreamGone === true
+  const title = gone
+    ? `Push and pull route: ${status.branch} ⇄ ${upstreamRef} — that upstream branch was deleted on the remote, so pushing republishes it`
+    : `Push and pull route: ${status.branch} ⇄ ${upstreamRef}`
   return (
     <span className="route-readout" title={title} aria-label={title}>
-      {status.branch} <span className="route-arrow">⇄</span>{' '}
-      {upstream ?? 'no remote'}
-      {ahead > 0 && (
-        <>
-          {' · ↑'}
-          <span className="count-pop" key={`route-ahead-${ahead}`}>
-            {ahead}
-          </span>
-        </>
-      )}
-      {behind > 0 && (
-        <>
-          {' · ↓'}
-          <span className="count-pop" key={`route-behind-${behind}`}>
-            {behind}
-          </span>
-        </>
-      )}
+      <span className="route-branch">{status.branch}</span>
+      <span className="route-arrow">⇄</span>
+      <span className="route-remote">{remote}</span>
+      {gone && <UpstreamGoneChip upstream={upstreamRef} />}
     </span>
   )
 }
@@ -880,14 +918,17 @@ function BranchButton({
             <div key={`local-${b.name}`} className="popover-item-row">
               <button
                 className={`popover-item${b.current ? ' active' : ''}`}
+                aria-label={branchAriaLabel(b)}
                 onClick={() => {
                   onClose()
                   if (!b.current) void store.checkoutBranch(b.name)
                 }}
               >
                 <span className="branch-line">
-                  {b.current ? '✓ ' : ''}
-                  {b.name}
+                  <span className="branch-name">
+                    {b.current ? '✓ ' : ''}
+                    {b.name}
+                  </span>
                   <BranchDivergence branch={b} current={branch} />
                 </span>
               </button>
@@ -935,6 +976,7 @@ function BranchButton({
                 <div key={`remote-${b.remote}-${b.name}`} className="popover-item-row">
                   <button
                     className="popover-item"
+                    aria-label={branchAriaLabel(b)}
                     title={`Create a local branch tracking ${b.remote}/${b.name}`}
                     onClick={() => {
                       onClose()
@@ -942,7 +984,7 @@ function BranchButton({
                     }}
                   >
                     <span className="branch-line">
-                      {b.name}
+                      <span className="branch-name">{b.name}</span>
                       <BranchDivergence branch={b} current={branch} />
                     </span>
                     <small className="popover-path">

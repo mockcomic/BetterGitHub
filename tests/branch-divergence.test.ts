@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isUpstreamGone,
   parseDivergence,
   parseUpstreamTrack
 } from '../src/main/git/branches'
+import {
+  branchAriaLabel,
+  divergenceSentence,
+  divergenceTitleSuffix
+} from '../src/renderer/src/divergence'
+import type { BranchInfo } from '../src/shared/models'
 
 /**
- * Pure parser coverage for the branch-list divergence data: the two-number
- * `rev-list --left-right --count` output and git's `%(upstream:track)`
- * bracket format. The integration suite covers the end-to-end wiring.
+ * Pure coverage for the branch-list divergence data: the two-number
+ * `rev-list --left-right --count` output, git's `%(upstream:track)` bracket
+ * format, and the words the divergence chips are built from. The integration
+ * suite covers the end-to-end wiring.
  */
 
 describe('parseDivergence', () => {
@@ -54,3 +62,73 @@ describe('parseUpstreamTrack', () => {
     expect(parseUpstreamTrack('[]')).toBeNull()
   })
 })
+
+describe('isUpstreamGone', () => {
+  it('recognises the deleted-upstream bracket parseUpstreamTrack reports nothing for', () => {
+    expect(isUpstreamGone('[gone]')).toBe(true)
+    expect(isUpstreamGone(' [gone] ')).toBe(true)
+    expect(isUpstreamGone('')).toBe(false)
+    expect(isUpstreamGone('[ahead 2]')).toBe(false)
+    expect(isUpstreamGone('[gone ahead 2]')).toBe(false)
+  })
+})
+
+describe('divergenceSentence', () => {
+  it('states incoming work before outgoing work', () => {
+    expect(divergenceSentence(3, 2)).toBe('2 commits behind · 3 ahead')
+    expect(divergenceSentence(0, 2)).toBe('2 commits behind')
+    expect(divergenceSentence(3, 0)).toBe('3 commits ahead')
+    expect(divergenceSentence(1, 1)).toBe('1 commit behind · 1 ahead')
+  })
+
+  it('says the plain thing when there is nothing to report', () => {
+    expect(divergenceSentence(0, 0)).toBe('in sync')
+  })
+})
+
+describe('divergenceTitleSuffix', () => {
+  it('stays out of the tooltip when the row has no numbers to show', () => {
+    expect(divergenceTitleSuffix({ name: 'x', head: 'a', current: false })).toBe('')
+    expect(
+      divergenceTitleSuffix(
+        branch({ ahead: 0, behind: 0, upstream: 'origin/x' })
+      )
+    ).toBe('')
+  })
+
+  it('carries the same sentence the chips spell in glyphs', () => {
+    expect(divergenceTitleSuffix(branch({ ahead: 4, behind: 1 }))).toBe(
+      ' — 1 commit behind · 4 ahead'
+    )
+  })
+})
+
+describe('branchAriaLabel', () => {
+  it('names the remote for a remote-tracking branch', () => {
+    expect(
+      branchAriaLabel(branch({ name: 'main', remote: 'origin' }))
+    ).toBe('origin/main')
+  })
+
+  it('says the divergence, the checked-out state and a deleted upstream in words', () => {
+    // The chips are aria-hidden, so this string is their only announcement.
+    expect(
+      branchAriaLabel(
+        branch({
+          name: 'trunk',
+          current: true,
+          ahead: 2,
+          behind: 5,
+          upstream: 'origin/trunk',
+          upstreamGone: true
+        })
+      )
+    ).toBe(
+      'trunk — current branch — 5 commits behind · 2 ahead — upstream origin/trunk deleted on the remote'
+    )
+  })
+})
+
+function branch(patch: Partial<BranchInfo> = {}): BranchInfo {
+  return { name: 'feature', head: 'deadbeef', current: false, ...patch }
+}

@@ -77,3 +77,37 @@ export function compareUrl(
 ): string {
   return `${repo.webUrl}/compare/${encodeRef(base)}...${encodeRef(head)}`
 }
+
+/**
+ * The head half of a pull request: a branch of this repository, or a branch
+ * of a fork — GitHub's cross-repository ref syntax `user:repo:branch`, which
+ * is how the fork workflow targets the parent repository's compare page.
+ */
+export interface PullRequestHead {
+  readonly branch: string
+  /** Set only for a fork head; both parts are required together. */
+  readonly forkOwner?: string
+  readonly forkName?: string
+}
+
+/**
+ * The URL that opens GitHub's new-pull-request form: `…/compare/base...head`
+ * with `?expand=1` so the description box is already open. For a fork head
+ * the ref carries `forkOwner:forkName:branch` and the repository part is the
+ * parent's — GitHub resolves the cross-repository diff from it. Colons stay
+ * literal (they are legal in the path segment; GitHub's router wants them
+ * plain) while slashes in the branch remain path-like, exactly as refs
+ * already do in `compareUrl`.
+ */
+export function pullRequestUrl(
+  baseRepo: WebRepository,
+  baseBranch: string,
+  head: PullRequestHead
+): string {
+  const headRef =
+    head.forkOwner !== undefined && head.forkName !== undefined
+      ? `${head.forkOwner}:${head.forkName}:${head.branch}`
+      : head.branch
+  const encoded = encodeRef(headRef).replace(/%3A/g, ':')
+  return `${baseRepo.webUrl}/compare/${encodeRef(baseBranch)}...${encoded}?expand=1`
+}

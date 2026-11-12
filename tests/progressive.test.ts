@@ -58,6 +58,7 @@ function settings(
     accounts: { hasGitHubClientId: false, hasGitLabClientId: false },
     confirmOverrideWithGeneratedMessage: true,
     autoRefresh: true,
+    autoFetchMinutes: 5,
     scanFolder: '',
     theme: 'system',
     hintsEnabled: true,
@@ -98,6 +99,18 @@ describe('syncVerb', () => {
 
   it('settles on fetch when everything is in sync', () => {
     expect(syncVerb(status())).toBe('fetch')
+  })
+
+  it('pushes a branch whose upstream was deleted on the remote', () => {
+    // git's own counts read 0/0 against a missing ref, which would otherwise
+    // land in the in-sync branch above and silently strand the work.
+    expect(syncVerb(status({ upstreamGone: true }))).toBe('push')
+    // Push is the only recovery, so even the rejected-push flag cannot turn it
+    // into the compound verb — there is nothing to pull from.
+    expect(syncVerb(status({ upstreamGone: true }), true)).toBe('push')
+    expect(
+      syncVerb(status({ upstreamGone: true, behind: 2, ahead: 1 }))
+    ).toBe('push')
   })
 })
 
