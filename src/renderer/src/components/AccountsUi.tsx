@@ -270,8 +270,9 @@ export function SignInPanel({
           {notice !== null && <p className="signin-notice">{notice}</p>}
         </>
       ) : (
-        <BrowserSignInProgress
-          onCopy={async (text: string): Promise<void> => {
+        <>
+          <BrowserSignInProgress
+            onCopy={async (text: string): Promise<void> => {
             await call('writeClipboard', text)
             setNotice('Code copied.')
           }}
@@ -282,6 +283,11 @@ export function SignInPanel({
             setSetupFor('github')
           }}
         />
+          {/* The Copy button's promise lives in `notice` — invisible unless
+              the progress branch renders it too: a mistyped one-time code
+              wastes the whole flow, so confirm the copy. */}
+          {notice !== null && <p className="signin-notice">{notice}</p>}
+        </>
       )}
 
       {challenge === null && (

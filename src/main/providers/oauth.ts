@@ -89,6 +89,18 @@ function closeEntry(entry: PendingSignIn): void {
   pruneCallbackServer()
 }
 
+/**
+ * Enforce the one-live-challenge-per-provider invariant at the INSERT site,
+ * not just at the top of beginSignIn: the replace pass there runs before
+ * begin's awaits, so two overlapping begins (double-click, or setup-save
+ * racing a still-in-flight begin) both see an empty map and both insert.
+ */
+function closeProviderPending(provider: AccountProvider): void {
+  for (const entry of [...pending.values()]) {
+    if (entry.provider === provider) closeEntry(entry)
+  }
+}
+
 function webChallengesLive(): boolean {
   for (const entry of pending.values()) {
     if (entry.state !== undefined) return true
@@ -99,6 +111,10 @@ function webChallengesLive(): boolean {
 /** Once no web challenge can still receive a redirect, release the port. */
 function pruneCallbackServer(): void {
   if (callbackServer !== null && !webChallengesLive() && callbackStarting === null) {
+    // Drop lingering keep-alive connections too: a browser holding the old
+    // redirect's connection open makes the immediate re-listen of a
+    // replacement sign-in fail with EADDRINUSE on close-then-rebind.
+    callbackServer.closeAllConnections?.()
     callbackServer.close()
     callbackServer = null
   }
@@ -221,6 +237,7 @@ async function beginGitHubDevice(
     intervalMs: intervalSec * 1000,
     nextPollAt: Date.now() + intervalSec * 1000
   }
+  closeProviderPending('github')
   pending.set(entry.requestId, entry)
   return {
     kind: 'github-device',
@@ -250,6 +267,7 @@ async function beginGitLabBrowser(
     verifier,
     state
   }
+  closeProviderPending('gitlab')
   await ensureCallbackServer()
   pending.set(entry.requestId, entry)
   byState.set(state, entry)
@@ -272,9 +290,8 @@ export async function beginSignIn(
 ): Promise<SignInChallenge> {
   sweepExpired()
   // One live challenge per provider: a second begin replaces the first.
-  for (const entry of [...pending.values()]) {
-    if (entry.provider === provider) closeEntry(entry)
-  }
+  // (Also re-checked at each begin's insert — see closeProviderPending.)
+  closeProviderPending(provider)
   const config = await getAccountsConfig()
   const clientId = provider === 'github' ? config.githubClientId : config.gitlabClientId
   if (clientId.length === 0) {
@@ -319,14 +336,23 @@ async function pollGitHubDevice(entry: PendingSignIn): Promise<SignInStatus> {
   if (entry.deviceCode === undefined) {
     return { status: 'failed', message: 'This sign-in is no longer pending \u2014 start it again.' }
   }
-  const res = await formPost(
-    `${githubSiteRoot(entry.apiBase)}/login/oauth/access_token`,
-    {
-      client_id: entry.clientId,
-      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-      device_code: entry.deviceCode
-    }
-  )
+  let res: Awaited<ReturnType<typeof formPost>>
+  try {
+    res = await formPost(
+      `${githubSiteRoot(entry.apiBase)}/login/oauth/access_token`,
+      {
+        client_id: entry.clientId,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        device_code: entry.deviceCode
+      }
+    )
+  } catch {
+    // A network hiccup mid-wait must not abort a sign-in whose device code
+    // is still valid: report pending, back off one interval, and let the
+    // expiry deadline (checked by the caller) be the only thing that ends it.
+    entry.nextPollAt = Date.now() + entry.intervalMs
+    return { status: 'pending' }
+  }
   const error = str(res.json.error)
   if (error !== null) {
     switch (error) {
@@ -373,7 +399,7 @@ async function finishGitHub(
   expiresAt: number | null = null
 ): Promise<SignInStatus> {
   const identity = await githubClient.validate(entry.apiBase, token, 'oauth')
-  const credential: AccountCredential = { token, refreshToken, expiresAt }
+  const credential: AccountCredential = { token, refreshToken, expiresAt, clientId: entry.clientId }
   const account = await addAccount({
     provider: 'github',
     apiBase: entry.apiBase,
@@ -415,7 +441,8 @@ async function pollGitLab(entry: PendingSignIn): Promise<SignInStatus> {
   const credential: AccountCredential = {
     token,
     refreshToken: str(res.json.refresh_token),
-    expiresAt: Date.now() + expiresIn * 1000
+    expiresAt: Date.now() + expiresIn * 1000,
+    clientId: entry.clientId
   }
   const identity = await gitlabClient.validate(entry.apiBase, token, 'oauth')
   const account = await addAccount({
