@@ -37,6 +37,7 @@ import { RepoManagerDialog } from './components/RepoManagerDialog'
 import { EmptyState } from './components/EmptyState'
 import { useStore, useStoreState } from './store'
 import type { AppState, DeskView } from './store'
+import { commits } from './divergence'
 
 interface DeskTab {
   readonly id: DeskView
@@ -375,6 +376,12 @@ function SegmentedSwitch(): JSX.Element {
   const files = state.status?.files.length ?? 0
   const stashes = state.stashes.length
   const scripts = state.packageScripts?.scripts.length ?? 0
+  // The History tab wears the queue behind Push. Only a branch with a live
+  // upstream has a count to wear: unpublished work has no ahead number for git
+  // to stand behind, and the strip's route readout already says `not
+  // published` for that. A detached HEAD has no route at all.
+  const outgoing =
+    state.status?.upstream === undefined ? 0 : (state.status?.ahead ?? 0)
 
   const measure = (): void => {
     const nav = tabsRef.current
@@ -390,7 +397,7 @@ function SegmentedSwitch(): JSX.Element {
   // or disappears, since that changes the label's width.
   useLayoutEffect(() => {
     measure()
-  }, [state.view, files, conflicts, stashes, scripts])
+  }, [state.view, files, conflicts, stashes, scripts, outgoing])
 
   useEffect(() => {
     const nav = tabsRef.current
@@ -439,13 +446,15 @@ function SegmentedSwitch(): JSX.Element {
         const count =
           tab.id === 'review'
             ? files
-            : tab.id === 'conflicts'
-              ? conflicts
-              : tab.id === 'stash'
-                ? stashes
-                : tab.id === 'scripts'
-                  ? scripts
-                  : 0
+            : tab.id === 'history'
+              ? outgoing
+              : tab.id === 'conflicts'
+                ? conflicts
+                : tab.id === 'stash'
+                  ? stashes
+                  : tab.id === 'scripts'
+                    ? scripts
+                    : 0
         return (
           <button
             key={tab.id}
@@ -462,7 +471,9 @@ function SegmentedSwitch(): JSX.Element {
               tab.id === 'review'
                 ? 'Review and commit your changes'
                 : tab.id === 'history'
-                  ? 'Browse the commit history'
+                  ? outgoing > 0
+                    ? `Browse the commit history — ${commits(outgoing)} to push; press Unpushed to list them`
+                    : 'Browse the commit history'
                   : tab.id === 'conflicts'
                     ? conflicts > 0
                       ? `${conflicts} file${conflicts === 1 ? '' : 's'} waiting to be resolved`

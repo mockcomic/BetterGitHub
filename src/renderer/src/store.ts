@@ -18,6 +18,7 @@ import type {
   GitHubTarget,
   GitignoreResult,
   IgnoreRequest,
+  LogQuery,
   ManagedRepository,
   MergeAnswer,
   MergeExchange,
@@ -187,6 +188,14 @@ export interface LastCommitState {
   readonly summary: string
   readonly description: string
   readonly paths: ReadonlyArray<string>
+  /**
+   * True by construction: a commit Aspen has not had the chance to push yet is
+   * not on the remote, and amending one that was there leaves the remote
+   * holding a different commit — which is why the undo of an amend may need a
+   * force-push too. A post-commit hook that pushes is the one case that makes
+   * this stale, and only until the next history load.
+   */
+  readonly unpushed: boolean
 }
 
 export interface AppState {
@@ -203,6 +212,11 @@ export interface AppState {
   readonly logError: string | null
   readonly logSearch: string
   readonly logAuthor: string
+  /**
+   * The History desk's Unpushed pill: the log is walked over the outgoing
+   * range only. Independent of the strip's filter, which narrows *within* it.
+   */
+  readonly logUnpushed: boolean
   readonly logExhausted: boolean
   readonly view: DeskView
   /** Text in the command strip's filter; scopes the current view. */
@@ -355,6 +369,7 @@ const initialState: AppState = {
   logError: null,
   logSearch: '',
   logAuthor: '',
+  logUnpushed: false,
   logExhausted: false,
   view: 'review',
   deskFilter: '',
@@ -812,6 +827,9 @@ export class AppStore {
       case 'undo-commit':
         this.undoCommit()
         break
+      case 'show-unpushed-commits':
+        this.showUnpushedCommits()
+        break
       case 'copy-sha':
         this.copySelectedCommitSha()
         break
@@ -884,6 +902,7 @@ export class AppStore {
   scopeLoading: false,
       logSearch: '',
       logAuthor: '',
+      logUnpushed: false,
       commits: []
     })
     void call('startWatching', repo.path).catch(() => undefined)
@@ -1726,12 +1745,17 @@ export class AppStore {
     const skip = append ? this.state.commits.length : 0
     this.update({ commitsLoading: true, logError: null })
     try {
-      const page = await call('getLog', repo.path, {
+      const query: LogQuery = {
         maxCount: PAGE_SIZE,
         skip,
         search: this.state.logSearch,
-        author: this.state.logAuthor
-      })
+        author: this.state.logAuthor,
+        // The pill restricts the walk; off it, the rows still need their
+        // outgoing marks, so the history list says the same thing the pill
+        // would. The hub's one-row log asks for neither.
+        unpushed: this.state.logUnpushed ? 'only' : 'mark'
+      }
+      const page = await call('getLog', repo.path, query)
       if (this.state.selectedRepo?.path !== repo.path) return
       this.update({
         commits: append ? [...this.state.commits, ...page] : page,
@@ -1755,6 +1779,27 @@ export class AppStore {
   setLogAuthor(value: string): void {
     this.update({ logAuthor: value })
     this.scheduleLogReload()
+  }
+
+  /** The History desk's Unpushed pill. */
+  setLogUnpushed(value: boolean): void {
+    if (value === this.state.logUnpushed) return
+    this.update({ logUnpushed: value })
+    this.scheduleLogReload()
+  }
+
+  toggleLogUnpushed(): void {
+    this.setLogUnpushed(!this.state.logUnpushed)
+  }
+
+  /**
+   * Name the outgoing list directly — the Repository menu's route. Both steps
+   * debounce through the same handle, so switching desks and turning the pill
+   * on costs exactly one reload.
+   */
+  showUnpushedCommits(): void {
+    this.setView('history')
+    this.setLogUnpushed(true)
   }
 
   private scheduleLogReload(): void {
@@ -2453,7 +2498,8 @@ export class AppStore {
           // Undo re-checks the whole shipped scope: after the soft reset
           // those paths are all staged again, so the ticks just mirror the
           // baseline they will commit on the next press.
-          paths: wasAmend ? selected : [...new Set([...staged, ...selected])]
+          paths: wasAmend ? selected : [...new Set([...staged, ...selected])],
+          unpushed: true
         }
       })
       this.toast(
@@ -2519,7 +2565,13 @@ export class AppStore {
   undoCommit(): void {
     const last = this.state.lastCommit
     if (last !== null) {
-      this.confirmUncommit(last.sha, last.summary, last.description, last.paths)
+      this.confirmUncommit(
+        last.sha,
+        last.summary,
+        last.description,
+        last.paths,
+        last.unpushed
+      )
       return
     }
     // No just-created Aspen commit: Undo still works as a generic
@@ -2538,7 +2590,7 @@ export class AppStore {
       )
       return
     }
-    this.confirmUncommit(tip.sha, tip.summary, tip.body, null)
+    this.confirmUncommit(tip.sha, tip.summary, tip.body, null, tip.unpushed)
   }
 
   /**
@@ -2554,6 +2606,19 @@ export class AppStore {
       this.toast('error', 'Select a commit first.')
       return
     }
+    this.uncommit(commit)
+  }
+
+  /**
+   * The same uncommit, asked of a commit named by its row rather than by the
+   * selection — what the list's hover verb needs, so a click on row five acts
+   * on row five whatever is open in the detail pane.
+   */
+  uncommit(commit: CommitInfo): void {
+    if (this.state.selectedRepo === null) {
+      this.toast('error', 'Open a repository first.')
+      return
+    }
     if (commit.isMerge) {
       this.toast(
         'error',
@@ -2561,49 +2626,48 @@ export class AppStore {
       )
       return
     }
-    this.confirmUncommit(commit.sha, commit.summary, commit.body, null)
+    this.confirmUncommit(
+      commit.sha,
+      commit.summary,
+      commit.body,
+      null,
+      commit.unpushed
+    )
   }
 
   /**
    * Shared confirm → guarded uncommit → refill-the-commit-box flow behind
    * Undo and Uncommit. `paths` rides along when Aspen just produced the
    * commit (the toast's Undo); otherwise the scope is read from the commit
-   * itself when the dialog is confirmed.
+   * itself when the dialog is confirmed. `unpushed` is the commit's own
+   * answer, which is what decides the force-push warning.
    */
   private confirmUncommit(
     sha: string,
     summary: string,
     description: string,
-    paths: ReadonlyArray<string> | null
+    paths: ReadonlyArray<string> | null,
+    unpushed: boolean
   ): void {
     const repo = this.state.selectedRepo
     if (repo === null) {
       this.toast('error', 'Open a repository first.')
       return
     }
-    const status = this.state.status
     const isTip = this.state.commits[0]?.sha === sha
-    // A commit that is already in the upstream needs a force-push to leave
-    // history. The tip is pushed whenever the branch is not ahead; an older
-    // commit is pushed unless it sits inside the unpushed window at the tip.
-    // That position is only meaningful on an unfiltered list, so a filtered
-    // view (or a commit missing from it) warns whenever an upstream exists.
-    const index = this.state.commits.findIndex(c => c.sha === sha)
-    const filtered =
-      this.state.logSearch.trim().length > 0 ||
-      this.state.logAuthor.trim().length > 0
-    const ahead = status?.ahead ?? 0
-    const pushed =
-      status?.upstream !== undefined &&
-      (isTip ? ahead === 0 : filtered || index === -1 ? true : index >= ahead)
+    // Whether this costs a force-push is git's fact about the commit, not
+    // something to reconstruct from a row's position: the flag arrives with
+    // every log entry, so it stays right on a filtered list, on the Unpushed
+    // list, and for a commit that is not on this page at all.
+    const pushed = !unpushed
     this.update({
       confirm: {
         title: 'Uncommit this commit?',
         message:
           `"${summary.slice(0, 70)}" will be removed from history. ` +
           (isTip
-            ? 'Its changes stay staged and its message goes back to the commit box'
-            : 'Later commits will be rewritten onto its parent, and its changes and message go back to the commit box') +
+            ? 'Its changes come back to Review as staged files and its message goes back to the commit box'
+            : 'Later commits will be rewritten onto its parent, and its changes come back to Review as staged files with its message in the commit box') +
           (pushed
             ? ' — it was already pushed, so your next push will need a force-push.'
             : '.'),

@@ -1,4 +1,4 @@
-import type { BranchInfo } from '../../shared/models'
+import type { BranchInfo, RepositoryStatus } from '../../shared/models'
 
 /**
  * The words half of the divergence story, kept out of the components the way
@@ -54,4 +54,17 @@ export function branchAriaLabel(branch: BranchInfo): string {
   if (branch.upstreamGone === true && branch.upstream !== undefined)
     parts.push(`upstream ${branch.upstream} deleted on the remote`)
   return parts.join(' — ')
+}
+
+/**
+ * The tooltip for a commit's ↑ mark — the outgoing fact the divergence chips
+ * count, pinned to one commit instead of a branch. Shared so the history list
+ * and the commit detail cannot say it two different ways, and worded so a
+ * branch with nothing to name (`origin/main` absent) points at the verb that
+ * changes that rather than naming a ref that is not there.
+ */
+export function unpushedMarkTitle(status: RepositoryStatus | null): string {
+  return status?.upstream === undefined
+    ? 'Not on the remote yet — Publish sends it'
+    : `Not pushed to ${status.upstream}`
 }

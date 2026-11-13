@@ -148,6 +148,8 @@ const MENUS: ReadonlyArray<TopMenu> = [
         accelerator: 'CmdOrCtrl+Shift+U',
         action: 'push'
       },
+      // Beside the verb whose queue it lists: this is what Push would send.
+      { label: 'View unpushed commits', action: 'show-unpushed-commits' },
       { separator: true },
       {
         label: 'View on GitHub',

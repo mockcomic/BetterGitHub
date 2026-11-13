@@ -103,7 +103,14 @@ parsing → cancellable request).
   rest of the app uses; closing the panel ends the shell.
 - **History** — searchable commit log (message + author filters) with paging,
   per-commit changed files and diffs, and commit actions: copy SHA, create
-  branch from commit, cherry-pick, revert, open on GitHub.
+  branch from commit, cherry-pick, revert, open on GitHub. An **Unpushed** chip
+  in its filter bar lists exactly the commits Push would send — git answers the
+  question (`@{upstream}..HEAD`, or the commits no fetched remote carries for a
+  branch not on it yet), so the list and the ↑ count on the verb cannot
+  disagree — and every outgoing commit wears an `↑` mark and offers
+  **Uncommit** on its own row: the commit leaves history, its changes come back
+  to Review as staged files and its message goes back to the commit box. The
+  History tab wears the outgoing count while anything waits on Push.
 - **Sync** — fetch / pull / push with ahead-behind badges and in-button
   spinners; first push sets upstream on `origin`. A push rejected because the
   remote moved ahead answers with a **Pull first / Pull and push again** toast
@@ -119,13 +126,16 @@ parsing → cancellable request).
 - **Menus & shortcuts** — Ctrl+Enter commit, Ctrl+Shift+X/Z stage/unstage all,
   Ctrl+Shift+S stash, Ctrl+Shift+M edit latest commit, Ctrl+Shift+F/P/U
   fetch/pull/push, Ctrl+Shift+G view on GitHub, Ctrl+R refresh,
-  Ctrl+, preferences, plus a History menu for commit operations and an About
-  dialog.
+  Ctrl+, preferences, plus a History menu for commit operations, a
+  Repository ▸ *View unpushed commits* route beside the push verbs, and an
+  About dialog.
 - **Newcomer-friendly defaults** — progressive disclosure instead of a mode
   switch: one context-aware **Sync** verb whose caret always lists Fetch, Pull
   and Push; Conflicts and Stash tabs appear when there are conflicts or
-  stashes; staged badges appear once anything is staged; a one-time three-step
-  coaching banner retires itself at your first commit (Preferences ▸ General
+  stashes; staged badges appear once anything is staged; the History desk's
+  **Unpushed** chip carries a number only while the branch owes the remote
+  one; a one-time three-step coaching banner retires itself at your first
+  commit (Preferences ▸ General
   ▸ *Show tips for getting started*); and copy that says "not on the remote
   yet" instead of "no upstream". Every shortcut, menu and tooltip power users
   rely on is unchanged.

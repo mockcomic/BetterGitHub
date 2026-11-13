@@ -12,9 +12,9 @@ import {
 } from './ContextMenu'
 import { ConfettiBurst, useCelebration } from './Celebration'
 import { useJustArmed } from '../motion'
-import { showStagedBadges } from '../progressive'
+import { showStagedBadges, unpushedStory } from '../progressive'
 import { DivergenceChips, UpstreamGoneChip } from './BranchBadges'
-import { commits, divergenceSentence } from '../divergence'
+import { commits, divergenceSentence, unpushedMarkTitle } from '../divergence'
 
 function matches(path: string, filter: string): boolean {
   const needle = filter.trim().toLowerCase()
@@ -387,6 +387,13 @@ export function HistoryQueue(): JSX.Element {
   const state = useStoreState()
   const store = useStore()
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
+  // The marks came from git in the same reply that drew these rows, so an
+  // unpublished branch still gets an honest number where there is no `ahead`
+  // count to quote. See progressive.unpushedStory.
+  const story = unpushedStory(
+    state.status,
+    state.commits.filter(c => c.unpushed).length
+  )
 
   return (
     <div className="changes-list">
@@ -398,6 +405,18 @@ export function HistoryQueue(): JSX.Element {
           value={state.logAuthor}
           onChange={e => store.setLogAuthor(e.target.value)}
         />
+        <div className="history-toggles">
+          <button
+            className="toggle-chip"
+            type="button"
+            aria-pressed={state.logUnpushed}
+            title={story.title}
+            onClick={() => store.toggleLogUnpushed()}
+          >
+            Unpushed
+            {story.count > 0 && <span className="count">{story.count}</span>}
+          </button>
+        </div>
       </div>
 
       {state.commitsLoading && state.commits.length === 0 && (
@@ -418,18 +437,41 @@ export function HistoryQueue(): JSX.Element {
         state.logError === null &&
         state.commits.length === 0 && (
           <div className="sidebar-message">
-            <strong>
-              {state.logSearch.length > 0 || state.logAuthor.length > 0
-                ? 'No commits match'
-                : 'No commits yet'}
-            </strong>
-            <p>
-              {state.logSearch.length > 0 || state.logAuthor.length > 0
-                ? 'Try a different search or author.'
-                : 'Your history will show up here.'}
-            </p>
+            {state.logUnpushed ? (
+              <>
+                <strong>{story.emptyTitle}</strong>
+                <p>{story.emptyHint}</p>
+                <p>
+                  <button
+                    className="mini"
+                    onClick={() => store.setLogUnpushed(false)}
+                  >
+                    Show all commits
+                  </button>
+                </p>
+              </>
+            ) : (
+              <>
+                <strong>
+                  {state.logSearch.length > 0 || state.logAuthor.length > 0
+                    ? 'No commits match'
+                    : 'No commits yet'}
+                </strong>
+                <p>
+                  {state.logSearch.length > 0 || state.logAuthor.length > 0
+                    ? 'Try a different search or author.'
+                    : 'Your history will show up here.'}
+                </p>
+              </>
+            )}
           </div>
         )}
+
+      {state.logUnpushed && state.commits.length > 0 && (
+        <div className="queue-label" title={story.title}>
+          Unpushed <b>{state.commits.length}</b>
+        </div>
+      )}
 
       {state.commits.map(c => (
         <div
@@ -481,7 +523,32 @@ export function HistoryQueue(): JSX.Element {
           <span className="commit-summary">
             {c.summary}
             {c.isMerge && <span className="badge">merge</span>}
+            {c.unpushed && (
+              <span
+                className="badge div mark"
+                role="img"
+                aria-label={unpushedMarkTitle(state.status)}
+                title={unpushedMarkTitle(state.status)}
+              >
+                ↑
+              </span>
+            )}
           </span>
+          {!c.isMerge && c.unpushed && (
+            <span
+              className="conflict-actions commit-row-actions"
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                className="mini"
+                title="Undo this commit and bring its changes back to Review"
+                disabled={state.busy !== null}
+                onClick={() => store.uncommit(c)}
+              >
+                Uncommit
+              </button>
+            </span>
+          )}
           <span className="commit-meta">
             {relativeTime(c.date)}
             <br />

@@ -47,4 +47,29 @@ describe('buildLogArgs', () => {
     expect(format).toContain(`%H${FIELD}%P`)
     expect(format?.endsWith(RECORD)).toBe(true)
   })
+
+  it('appends an outgoing range last, behind the search filters', () => {
+    const args = buildLogArgs({ search: 'fix', author: 'kim' }, [
+      '@{upstream}..HEAD'
+    ])
+    expect(args.at(-1)).toBe('@{upstream}..HEAD')
+    expect(args.indexOf('@{upstream}..HEAD')).toBeGreaterThan(
+      args.indexOf('--author=kim')
+    )
+    expect(args.indexOf('--author=kim')).toBeGreaterThan(args.indexOf('--grep=fix'))
+  })
+
+  it('carries the no-upstream form raw, so --not is still an option', () => {
+    // `--end-of-options` would break this form: git insists `--not` comes
+    // before any non-option argument, and the range's own revs are positional.
+    const args = buildLogArgs({}, ['HEAD', '--not', '--remotes'])
+    expect(args.slice(-3)).toEqual(['HEAD', '--not', '--remotes'])
+    expect(args).not.toContain('--end-of-options')
+  })
+
+  it('leaves the argv untouched when nothing was asked about outgoing work', () => {
+    expect(buildLogArgs()).toEqual(buildLogArgs({}, []))
+    // No filters, no range: the format argument is still the last one.
+    expect(buildLogArgs().at(-1)?.startsWith('--format=')).toBe(true)
+  })
 })

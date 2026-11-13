@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   aiLooksUnconfigured,
   showStagedBadges,
-  syncVerb
+  syncVerb,
+  unpushedStory
 } from '../src/renderer/src/progressive'
 import type {
   FileStatus,
@@ -145,5 +146,64 @@ describe('aiLooksUnconfigured', () => {
 
   it('is not opinionated before settings have loaded', () => {
     expect(aiLooksUnconfigured(null)).toBe(false)
+  })
+})
+
+describe('unpushedStory', () => {
+  it('quotes git’s ahead count when a live upstream can be counted against', () => {
+    const story = unpushedStory(status({ ahead: 3 }), 0)
+    expect(story.count).toBe(3)
+    // The same number the ↑ chip wears, and the ref it will land on.
+    expect(story.title).toContain('3 commits')
+    expect(story.title).toContain('origin/main')
+  })
+
+  it('says so when the branch is up to date, in the list too', () => {
+    const story = unpushedStory(status(), 5)
+    expect(story.count).toBe(0)
+    expect(story.title).toContain('up to date with origin/main')
+    // Row marks are irrelevant here: ahead 0 is git's word on the matter.
+    expect(story.emptyHint).toContain('main is up to date with origin/main')
+  })
+
+  it('does not claim a sync when the remote holds work to pull', () => {
+    // The state the probe caught: ahead 0 beside behind 6. Quoting only the
+    // ahead count would read as an all-clear on a branch that is behind.
+    const story = unpushedStory(status({ ahead: 0, behind: 6 }), 0)
+    expect(story.count).toBe(0)
+    expect(story.title).toContain('6 commits to pull first')
+    expect(story.title).not.toContain('up to date')
+    expect(story.emptyHint).toContain('6 commits behind origin/main')
+  })
+
+  it('counts marked rows for a branch with no upstream, and names Publish', () => {
+    const story = unpushedStory(status({ upstream: undefined }), 2)
+    expect(story.count).toBe(2)
+    expect(story.title).toContain('not on the remote yet')
+    expect(story.title).toContain('Publish')
+    // The empty case is a real state: a fresh branch cut from origin/main has
+    // nothing the remote has not already seen.
+    expect(unpushedStory(status({ upstream: undefined }), 0).emptyHint).toContain(
+      'Publish only creates main'
+    )
+  })
+
+  it('never reads as nothing-to-push on a deleted upstream', () => {
+    // Porcelain reports +0 -0 against a ref that is not there, so the ahead
+    // count is not a fact worth quoting in this state.
+    const story = unpushedStory(status({ upstreamGone: true, ahead: 0 }), 4)
+    expect(story.count).toBe(4)
+    expect(story.title).toContain('deleted')
+    expect(story.title).not.toContain('up to date')
+  })
+
+  it('has no route to name on a detached HEAD', () => {
+    const story = unpushedStory(status({ detached: true, upstream: undefined }), 1)
+    expect(story.count).toBe(1)
+    expect(story.title).toContain('detached HEAD')
+  })
+
+  it('admits it is still loading', () => {
+    expect(unpushedStory(null, 0).title).toContain('Loading')
   })
 })

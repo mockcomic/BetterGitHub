@@ -453,6 +453,7 @@ export type MenuAction =
   | 'stash-all'
   | 'edit-last-commit'
   | 'undo-commit'
+  | 'show-unpushed-commits'
   | 'copy-sha'
   | 'revert-commit'
   | 'cherry-pick-commit'

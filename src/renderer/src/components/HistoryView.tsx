@@ -7,6 +7,7 @@ import {
   type ContextMenuState
 } from './ContextMenu'
 import { useStore, useStoreState } from '../store'
+import { unpushedMarkTitle } from '../divergence'
 
 /**
  * Main pane for the History tab: selected commit details + its changed
@@ -55,7 +56,11 @@ export function HistoryView(): JSX.Element {
             {!commit.isMerge && (
               <button
                 className="mini"
-                title="Drop this commit and move its changes back to the commit box"
+                title={
+                  commit.unpushed
+                    ? 'Undo this commit and bring its changes back to Review'
+                    : 'Undo this commit and bring its changes back to Review — it is already pushed, so the next push needs a force-push'
+                }
                 disabled={state.busy !== null}
                 onClick={() => store.uncommitSelectedCommit()}
               >
@@ -100,6 +105,16 @@ export function HistoryView(): JSX.Element {
           {commit.authorName} &lt;{commit.authorEmail}&gt; ·{' '}
           {new Date(commit.date).toLocaleString()} · {commit.sha.slice(0, 10)}
           {commit.parents.length > 1 && ` · ${commit.parents.length} parents`}
+          {commit.unpushed && (
+            <span
+              className="badge div mark"
+              role="img"
+              aria-label={unpushedMarkTitle(state.status)}
+              title={unpushedMarkTitle(state.status)}
+            >
+              ↑
+            </span>
+          )}
         </div>
         {commit.body.length > 0 && (
           <pre className="commit-detail-body">{commit.body}</pre>

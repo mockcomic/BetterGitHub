@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { execGit } from '../src/main/git/exec'
 import { getStatus } from '../src/main/git/status'
 import { getLog } from '../src/main/git/log'
-import { cloneRepository } from '../src/main/git/sync'
+import { cloneRepository, push } from '../src/main/git/sync'
 import {
   checkoutBranch,
   createBranch,
@@ -792,6 +792,144 @@ describe('git integration', () => {
     const mergeCommit = all.find(c => c.isMerge)
     expect(mergeCommit).toBeDefined()
     expect(mergeCommit?.parents).toHaveLength(2)
+  })
+
+  describe('unpushed log', () => {
+    /**
+     * Branch `branch` with one commit the remote has, then `count` commits it
+     * does not. Returns the outgoing SHAs oldest first, so a newest-first log
+     * answer is that list reversed.
+     */
+    async function seedOutgoing(
+      branch: string,
+      count: number
+    ): Promise<string[]> {
+      await resetClean()
+      await git(['checkout', '-q', 'main'])
+      await git(['checkout', '-q', '-b', branch])
+      write(`${branch}-base.txt`, 'base\n')
+      await commitAll(`out ${branch} pushed`)
+      await git(['push', '-q', '--set-upstream', 'origin', branch])
+      const shas: string[] = []
+      for (let i = 0; i < count; i++) {
+        write(`${branch}-out-${i}.txt`, `${i}\n`)
+        shas.push(await commitAll(`out ${branch} waiting ${i}`))
+      }
+      return shas
+    }
+
+    async function cleanUpOutgoing(branch: string): Promise<void> {
+      // Clear the worktree first: `checkout main` refuses to carry staged
+      // changes over, and a case may leave exactly that behind.
+      await resetClean()
+      await git(['checkout', '-q', 'main'])
+      // All three deletes tolerate "already gone": this runs as a sweep before
+      // every case too, so a failed assertion cannot strand a branch, its
+      // remote ref, or the HEAD of the tests that follow.
+      await execGit(['push', '-q', 'origin', '--delete', branch], {
+        cwd: repo,
+        successExitCodes: new Set([0, 1])
+      })
+      await execGit(['update-ref', '-d', `refs/remotes/origin/${branch}`], {
+        cwd: repo,
+        successExitCodes: new Set([0, 1])
+      })
+      await execGit(['branch', '-D', branch], {
+        cwd: repo,
+        successExitCodes: new Set([0, 1])
+      })
+    }
+
+    beforeEach(async () => {
+      for (const branch of ['unp-range', 'unp-pushed', 'unp-gone']) {
+        await cleanUpOutgoing(branch)
+      }
+    })
+
+    it('lists exactly the commits the ahead count claims', async () => {
+      const shas = await seedOutgoing('unp-range', 2)
+      const status = await getStatus(repo)
+      expect(status.upstream).toBe('origin/unp-range')
+      expect(status.ahead).toBe(2)
+
+      const only = await getLog(repo, { maxCount: 50, unpushed: 'only' })
+      expect(only.map(c => c.sha)).toEqual([...shas].reverse())
+      // Restricting by the range is git's own answer, so its rows are outgoing
+      // by construction — no second walk needed to say so.
+      expect(only.every(c => c.unpushed)).toBe(true)
+
+      // An unfiltered walk marks the same set, so a row's badge cannot disagree
+      // with the pill that counts it.
+      const marked = await getLog(repo, { maxCount: 50, unpushed: 'mark' })
+      expect(marked.filter(c => c.unpushed).map(c => c.sha)).toEqual(
+        [...shas].reverse()
+      )
+      expect(
+        marked.find(c => c.summary === 'out unp-range pushed')?.unpushed
+      ).toBe(false)
+      expect(marked.find(c => c.summary === 'initial commit')?.unpushed).toBe(
+        false
+      )
+
+      // A plain query pays nothing for the question it did not ask.
+      const plain = await getLog(repo, { maxCount: 50 })
+      expect(plain.length).toBeGreaterThanOrEqual(marked.length)
+      expect(plain.every(c => c.unpushed === false)).toBe(true)
+
+      await cleanUpOutgoing('unp-range')
+    })
+
+    it('empties the list once the work is pushed', async () => {
+      await seedOutgoing('unp-pushed', 1)
+      await push(repo)
+      expect((await getStatus(repo)).ahead).toBe(0)
+      expect(await getLog(repo, { maxCount: 50, unpushed: 'only' })).toHaveLength(
+        0
+      )
+      const marked = await getLog(repo, { maxCount: 50, unpushed: 'mark' })
+      expect(marked.some(c => c.unpushed)).toBe(false)
+      await cleanUpOutgoing('unp-pushed')
+    })
+
+    it('keeps the list honest when the tracked ref is gone', async () => {
+      await seedOutgoing('unp-gone', 1)
+      // The remote branch is deleted and the last-fetched value with it: git
+      // now reports +0 -0 against nothing, which would read as an empty list
+      // on a desk whose only verb is Publish.
+      await git(['push', '-q', 'origin', '--delete', 'unp-gone'])
+      await git(['update-ref', '-d', 'refs/remotes/origin/unp-gone'])
+      expect((await getStatus(repo)).ahead).toBe(0)
+
+      const only = await getLog(repo, { maxCount: 50, unpushed: 'only' })
+      // The fallback range has nothing left to subtract for this branch, so
+      // both of its commits are listed — the one the remote did receive
+      // included — along with any ancestor of the branch the remote never saw.
+      // That is the honest reading of a state with no count: the desk's only
+      // verb is Publish, and Publish sends all of it.
+      const summaries = only.map(c => c.summary)
+      expect(summaries).toContain('out unp-gone waiting 0')
+      expect(summaries).toContain('out unp-gone pushed')
+      await cleanUpOutgoing('unp-gone')
+    })
+
+    it('calls every commit outgoing where no remote carries any', async () => {
+      // A repository with a lone commit and no remote at all: the fallback
+      // range has nothing to subtract, and "all of it" is the truth.
+      const lone = mkdtempSync(join(tmpdir(), 'aspen-lone-'))
+      const inLone = (args: ReadonlyArray<string>) =>
+        execGit(args, { cwd: lone, timeoutMs: 30_000 })
+      await inLone(['init', '--initial-branch=main', '--quiet', '.'])
+      await inLone(['config', 'user.name', 'Test Author'])
+      await inLone(['config', 'user.email', 'test@example.com'])
+      writeFileSync(join(lone, 'only.txt'), 'only\n')
+      await inLone(['add', '-A'])
+      await inLone(['commit', '--quiet', '-m', 'lone commit'])
+
+      const only = await getLog(lone, { maxCount: 10, unpushed: 'only' })
+      expect(only.map(c => c.summary)).toEqual(['lone commit'])
+      expect(only[0]?.unpushed).toBe(true)
+      rmSync(lone, { recursive: true, force: true })
+    })
   })
 
   it('stages paths and honours .gitignore rules', async () => {

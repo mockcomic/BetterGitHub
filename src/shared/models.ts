@@ -165,6 +165,17 @@ export interface LogQuery {
   readonly search?: string
   /** Case-insensitive substring match on author name or email. */
   readonly author?: string
+  /**
+   * How the outgoing set participates in this call. `'only'` restricts the
+   * walk to commits the remote does not have (git decides, so the list can
+   * never disagree with the ahead count the Push verb wears); `'mark'` walks
+   * everything but still answers {@link CommitInfo.unpushed} per row, which is
+   * what the badge on an ordinary history list needs; the default `'off'` asks
+   * nothing extra, so the repository hub's one-row log stays a single
+   * subprocess. See `unpushedRange` in src/main/git/log.ts for the three branch
+   * states and the range each one gets.
+   */
+  readonly unpushed?: 'off' | 'only' | 'mark'
 }
 
 export interface CommitInfo {
@@ -177,6 +188,15 @@ export interface CommitInfo {
   readonly summary: string
   readonly body: string
   readonly isMerge: boolean
+  /**
+   * The remote does not have this commit yet — the same measurement as
+   * {@link RepositoryStatus.ahead}, computed per log call rather than inferred
+   * from a row's position in a possibly filtered list. Answered when the query
+   * asked for it (`unpushed: 'only' | 'mark'`); a plain query does not pay the
+   * walk and reports false, so a false is only ever "not waiting on you",
+   * never a claim about what the hosting site shows right now.
+   */
+  readonly unpushed: boolean
 }
 
 export interface Repository {

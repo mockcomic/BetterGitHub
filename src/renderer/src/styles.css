@@ -2874,6 +2874,30 @@ select {
   border-color: var(--on-accent-chip-border);
 }
 
+/* The outgoing mark: the divergence chips' ↑ glyph with the number taken out,
+   pinned to the one commit that number describes. It keeps the Push hue for
+   the same reason the chip does — hue names the verb this work is waiting on —
+   and takes `.gone`'s `min-width: 0`, because a lone glyph claims no digit box.
+   */
+.badge.div.mark {
+  min-width: 0;
+  letter-spacing: 0.02em;
+}
+
+/* A commit row's own verbs arrive the way the discard × does: the ground change
+   is the hover answer, so an appearing control is found, never seen to move.
+   Keyboard focus reveals them too — a control invisible until focused is a
+   control nobody finds. */
+.commit-row .commit-row-actions {
+  opacity: 0;
+  transition: opacity var(--motion-instant) ease-out;
+}
+
+.commit-row:hover .commit-row-actions,
+.commit-row-actions:focus-within {
+  opacity: 1;
+}
+
 /* Avatars are GitHub's neutral discs: the initials stand in for a fetched
    photo, and nothing about them competes with the commit subject. */
 .avatar {
@@ -4631,6 +4655,78 @@ img.account-avatar {
 .filter-input {
   width: 100%;
   font-size: 12px;
+}
+
+/* The History desk's filter verbs. A filter you press is a control, so it takes
+   the control radius and the button face; the pill silhouette stays reserved
+   for counters, which report state and cannot be pressed. */
+.history-toggles {
+  display: flex;
+  gap: 4px;
+}
+
+.toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-header);
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04);
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background var(--motion-instant) ease-out,
+    color var(--motion-instant) ease-out,
+    border-color var(--motion-instant) ease-out;
+}
+
+.toggle-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.toggle-chip:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* On, it borrows the chip recipe the staged badge already uses — a 12% wash
+   under a 45% ring — in the interaction hue rather than the success one,
+   because this is a filter the user set, not a state git reported. One blue
+   still does all interaction, so a re-inked theme re-lights this with its own
+   accent alongside the tabs and links. */
+.toggle-chip[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* The count is a counter, so it keeps the divergence chips' shape and mono
+   voice — tabular digits at the same two-digit floor — and gives up the hue the
+   way a `.quiet` pair does: the chip itself is the thing under the cursor. */
+.toggle-chip .count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  min-width: 2.9ch;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-header);
+  padding: 0 4px;
+}
+
+.toggle-chip[aria-pressed='true'] .count {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 
 .load-more {
